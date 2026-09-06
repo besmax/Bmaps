@@ -31,3 +31,13 @@ dependencyResolutionManagement {
 
 include(":androidApp")
 include(":shared")
+
+include(
+    ":core:network",
+    ":core:database",
+    ":core:mbtiles",
+    ":core:datastore",
+    ":core:storage",
+    ":core:map-engine",
+    ":core:di",
+)
