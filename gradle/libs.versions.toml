@@ -1,8 +1,8 @@
 [versions]
-agp = "9.0.1"
-android-compileSdk = "36"
+agp = "9.1.0"
+android-compileSdk = "37"
 android-minSdk = "30"
-android-targetSdk = "36"
+android-targetSdk = "37"
 androidx-activity = "1.13.0"
 androidx-appcompat = "1.8.0"
 androidx-core = "1.19.0"
@@ -16,6 +16,7 @@ kotlinxIoCore = "0.9.1"
 ktor = "3.5.2"
 mapcomposeMp = "1.1.3"
 material3 = "1.11.0-alpha07"
+metro = "1.4.2"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -41,7 +42,11 @@ ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "kto
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 mapcompose-mp = { module = "ovh.plrapps:mapcompose-mp", version.ref = "mapcomposeMp" }
 
+[bundles]
+compose-core = ["compose-runtime", "compose-foundation", "compose-material3", "compose-ui", "compose-components-resources", "compose-uiToolingPreview", "androidx-lifecycle-viewmodelCompose", "androidx-lifecycle-runtimeCompose"]
+
 [plugins]
+metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
 androidApplication = { id = "com.android.application", version.ref = "agp" }
 androidMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }

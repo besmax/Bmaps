@@ -1,6 +1,8 @@
 rootProject.name = "Bmaps"
 
 pluginManagement {
+    includeBuild("build-logic")
+
     repositories {
         google {
             mavenContent {
