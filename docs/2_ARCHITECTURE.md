@@ -28,9 +28,10 @@ The `:shared` module is not a standard library module. It is the **Umbrella Modu
 * **Responsibilities:** Encapsulate pure business logic (e.g., calculating required tile matrices for a bounding box).
 * **Constraints:** Structural business use cases must maintain single responsibility. Do not pollute use cases with input validation logic; assume data passed from the presentation layer is already validated.
 
-## 5. Data & Persistence Layer
+## 5. Data & Pers## 5. Data & Persistence Layer
 * **Custom Pagination:** Do not use standardized pagination libraries (e.g., Paging 3). Pagination and historical list filtering must be implemented organically from the data layer upwards. This guarantees architectural flexibility when complex, multi-parameter queries are required for saved map projects.
 * **Data Sources:** `core:database` acts as the single source of truth for app metadata. `core:mbtiles` acts as a dynamic source for map rendering.
+* **Spatial Data & Annotations:** User-generated map data (markers, routes, polygons) is intentionally excluded from the central `core:database`. Instead, it is persisted in a localized `annotations.db` SQLite file inside the specific map's folder. This database acts as the spatial source of truth, enabling performant viewport querying while maintaining a schema that seamlessly serializes to/from the GeoJSON standard for cross-platform sharing.
 
 ## 6. Hardware & Transport Abstractions
 Given the offline-first nature and the need for peer-to-peer export/import of heavy map packages:

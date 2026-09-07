@@ -21,10 +21,11 @@ Bmaps is an offline-first, privacy-focused map constructor and viewer. It allows
 Maps are stored entirely locally to maintain offline capabilities. Each downloaded map is packaged into an isolated folder within the device's internal storage.
 **Folder Structure Standard:**
 * `/{map_package_name}/`
-    * `map_data.mbtiles`: The core SQLite database containing the raster tiles.
-    * `config.json`: Master configuration file defining map boundaries, zoom levels, layers, and metadata.
-    * `elevation.geotiff` (or `.tiff`): The DEM matrix for altitude parsing.
-    * `*.*`: Any additional required auxiliary files.
+  * `map_data.mbtiles`: The core SQLite database containing the raster tiles.
+  * `annotations.db`: A localized SQLite database storing user markers, routes, and polygons. The schema is specifically designed to map directly to GeoJSON geometries and properties. This ensures high-performance spatial queries (viewport bounding box filtering) while allowing frictionless serialization to standard `.geojson` files during package export.
+  * `config.json`: Master configuration file defining map boundaries, zoom levels, layers, and metadata.
+  * `elevation.geotiff` (or `.tiff`): The DEM matrix for altitude parsing.
+  * `*.*`: Any additional required auxiliary files.
 
 ## 4. Architectural Future-Proofing
 The architecture must remain highly modular to accommodate the following future expansions without requiring fundamental rewrites:

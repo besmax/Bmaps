@@ -4,6 +4,13 @@ project: "Bmaps"
 purpose: "Strict architectural and coding rules for AI agents and human developers."
 ---
 
+# Project Documentation
+Before proposing any architectural changes, creating new modules, or refactoring the application, you MUST read and analyze the detailed context files located in the `docs/` directory:
+- `docs/1_VISION_AND_PRODUCT.md`
+- `docs/2_ARCHITECTURE.md`
+- `docs/3_MODULES.md`
+- `docs/4_STATE_AND_UI.md`
+
 # Bmaps: AI Agent Core Conventions
 
 ## 1. Commenting and Documentation
