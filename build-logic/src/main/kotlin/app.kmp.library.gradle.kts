@@ -7,12 +7,8 @@ plugins {
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 kotlin {
-    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
-        target.binaries.framework {
-            baseName = "Shared"
-            isStatic = true
-        }
-    }
+    iosArm64()
+    iosSimulatorArm64()
     sourceSets.commonTest.dependencies {
         implementation(libs.findLibrary("kotlin-test").get())
     }

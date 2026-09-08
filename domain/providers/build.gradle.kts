@@ -1,12 +1,10 @@
 plugins {
     id("app.android.library")
-    id("app.compose.multiplatform")
     id("app.serialization")
 }
 
 kotlin {
     sourceSets.commonMain.dependencies {
-        implementation(libs.mapcompose.mp)
-        api(libs.kotlinx.io.bytestring)
+        api(project(":core:map-engine"))
     }
 }

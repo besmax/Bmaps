@@ -25,9 +25,12 @@ Modules containing Compose Multiplatform screens, ViewModels, and presentation-l
 ## 3. Domain Layer (Business Logic & Contracts)
 Modules containing pure use cases, models, and interface contracts.
 * **`domain:providers`**
-    * **Responsibility:** Defines models and repositories for available raster tile providers (e.g., OSM, Satellite, topographic).
+    * **Responsibility:** Provider/style identities, extensible provider definitions, endpoint and credential-reference contracts, configuration, attribution, and online/offline capabilities. Includes the initial provider catalog; does not execute HTTP requests.
+    * **Dependencies:** `core:map-engine` for renderer-independent geometry and tile contracts.
 * **`domain:map-builder`**
-    * **Responsibility:** Orchestrates the complex process of compiling an offline map. Calculates required tile matrices (X, Y, Z) from bounding boxes and manages the download queue orchestration.
+    * **Responsibility:** Offline build planning and execution contracts, versioned package manifests, size policy, lifecycle, library/open/delete contracts, and failures/progress. Owns package-related annotation, elevation, and transfer business contracts as those phases are implemented.
+    * **Dependencies:** `domain:providers` for source identities/configuration and `core:map-engine` for geometry/tile contracts. The domain-to-domain dependency is one-way; providers do not depend on map-builder.
+    * **Implementation ownership:** Domain adapters implement domain repositories using lower-level core APIs; core modules never import domain contracts. Metro bindings are assembled in `:shared`. No persistence or download implementation exists in Phase 1.
 
 ## 4. Core Layer (Infrastructure & Data)
 Isolated infrastructure modules. Cross-dependencies within this layer must be minimized.
@@ -44,6 +47,7 @@ Isolated infrastructure modules. Cross-dependencies within this layer must be mi
     * **Responsibility:** Cross-platform file system management (`kotlinx-io-core`). Handles directory creation, `.mbtiles` packaging, DEM matrix file parsing, and I/O for sharing/importing, also there are classes for working with annotations.db and classes for import/export our map objects (markers, routes, etc.) to/from GEOJson located .
 * **`core:map-engine`**
     * **Responsibility:** Wrappers for `MapComposeMP`. Encapsulates geospatial mathematics, bounding box calculations, and coordinate system transformations (WGS-84, SK-91).
+    * **Contract ownership:** Renderer-independent coordinates, CRS identifiers, bounds, tile keys, content descriptors, and tile-source/transform interfaces. Public contracts do not expose MapComposeMP types. Tile matrix enumeration belongs to `domain:map-builder`; reusable coordinate mathematics belongs here.
 * **`core:di`**
     * **Responsibility:** Global abstractions and scopes for Metro DI.
 

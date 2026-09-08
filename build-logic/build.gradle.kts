@@ -17,4 +17,5 @@ dependencies {
     implementation(plugin(libs.plugins.composeMultiplatform))
     implementation(plugin(libs.plugins.composeCompiler))
     implementation(plugin(libs.plugins.metro))
+    implementation(plugin(libs.plugins.kotlinSerialization))
 }

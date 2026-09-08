@@ -1,8 +1,8 @@
 # Bmaps Implementation Plan
 
-Planning baseline: 2026-09-08. Status: proposed implementation sequence; application implementation has not started.
+Planning baseline: 2026-09-08. Status: Phase 1 contracts implemented and verified. Phase 0's framework ownership prerequisite is complete; its remaining work is still pending.
 
-This plan follows `AGENTS.md` and documents 1–4. Checkboxes represent deliverables, not completed work. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats.
+This plan follows `AGENTS.md` and documents 1–4. Checked boxes represent completed deliverables. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats. The table below preserves the original source-inspection baseline; current Phase 1 decisions are recorded in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 
 ## 1. Verified starting point
 
@@ -61,7 +61,7 @@ Presentation owns user-input validation, invoked separately before structural us
 
 Dependencies: none.
 
-- [ ] Remove framework creation from `app.kmp.library`; retain platform targets there and configure framework generation exclusively for `:shared` through umbrella-specific build configuration.
+- [x] Remove framework creation from `app.kmp.library`; retain platform targets there and configure framework generation exclusively for `:shared` through umbrella-specific build configuration.
 - [ ] Add an Android application convention and move reusable Android application settings into build logic.
 - [ ] Add catalog entries and convention support for the code-generation, serialization, coroutines, and test dependencies actually required by subsequent phases. Verify compatibility before selecting additions.
 - [ ] Configure Room generation and schema export through a persistence convention when introducing the first database; do not apply Room tooling to unrelated modules.
@@ -73,19 +73,21 @@ Acceptance: Android debug assembly and iOS simulator framework linking pass; bot
 
 ### Phase 1 — Define package and application contracts
 
-Dependencies: Phase 0.
+Dependencies: Phase 0. Executed with the required framework-convention correction; remaining Phase 0 work is not marked complete. Details and format decisions: `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 
-- [ ] Register and scaffold `domain:providers` and `domain:map-builder` using convention plugins.
-- [ ] Update document 3 with the decided ownership of package lifecycle and other domain responsibilities before implementation.
-- [ ] Define provider identity, supported zoom range, tile addressing, content format, attribution, and capability models.
-- [ ] Define package ID, bounds, zoom range, layer descriptors, manifest version, asset references, timestamps, and package lifecycle states.
-- [ ] Define renderer-independent coordinates, bounds, tile keys, coordinate-system identifiers, and transformation contracts in the documented core owner.
-- [ ] Define contracts for provider lookup, download planning/execution, package observation/open/delete, and tile reading.
-- [ ] Define failure categories with explicit cancellation behavior and immutable progress snapshots.
-- [ ] Specify package compatibility rules, incomplete-package visibility, and reconciliation between local files and central metadata.
-- [ ] Reserve a tile-content discriminator for future vector support; implement raster only.
+- [x] Register and scaffold `domain:providers` and `domain:map-builder` using convention plugins.
+- [x] Update document 3 with the decided ownership of package lifecycle and other domain responsibilities before implementation.
+- [x] Define provider identity, supported zoom range, tile addressing, content format, attribution, and capability models.
+- [x] Define package ID, bounds, zoom range, layer descriptors, manifest version, asset references, timestamps, and package lifecycle states.
+- [x] Define renderer-independent coordinates, bounds, tile keys, coordinate-system identifiers, and transformation contracts in the documented core owner.
+- [x] Define contracts for provider lookup, download planning/execution, package observation/open/delete, and tile reading.
+- [x] Define failure categories with explicit cancellation behavior and immutable progress snapshots.
+- [x] Specify package compatibility rules, incomplete-package visibility, and reconciliation between local files and central metadata.
+- [x] Reserve a tile-content discriminator for future vector support; implement raster only.
 
 Acceptance: module dependencies obey the hierarchy; the versioned manifest has representative fixtures; contracts can support a fake online source and a fake local source without exposing renderer types. No speculative generic framework is introduced.
+
+Verification: 10 Android host tests passed; domain contracts compiled for iOS device and simulator; Android debug assembly and shared iOS simulator framework linking passed. Initial 300,000,000-byte total-package policy, PNG/JPEG support, and extensible provider/style configuration are defined. Actual size enforcement, HTTP, and rendering remain in their implementation phases. Native apps were not launched during Phase 1.
 
 ### Phase 2 — Build the feature shell and DI composition
 
@@ -252,4 +254,4 @@ Apply these constraints to every work item:
 
 Split each phase into reviewable changes around coherent behavior. Each implementation change records its affected modules, user-visible outcome, verification performed, and remaining limitations. Do not add tests that merely mirror boilerplate or reversible documentation edits.
 
-A phase is complete only when its deliverables and acceptance criteria pass and the documentation reflects the result. Track deviations with rationale rather than silently narrowing the MVP. Prioritize Phase 0 as the first implementation change, followed by the contract/package-format decisions in Phase 1.
+A phase is complete only when its deliverables and acceptance criteria pass and the documentation reflects the result. Track deviations with rationale rather than silently narrowing the MVP. Following Phase 1, finish the remaining Phase 0 foundation work before feature-shell and renderer integration.

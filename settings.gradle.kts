@@ -31,6 +31,7 @@ dependencyResolutionManagement {
 
 include(":androidApp")
 include(":shared")
+include(":domain:providers", ":domain:map-builder")
 
 include(
     ":core:network",

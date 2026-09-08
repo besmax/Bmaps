@@ -1,8 +1,5 @@
 plugins {
-    id("app.kmp.library")
-    id("app.android.library")
-    id("app.compose.multiplatform")
-    id("app.di")
+    id("app.shared")
 }
 
 kotlin {
