@@ -1,49 +1,61 @@
 package bes.max.bmaps
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import org.jetbrains.compose.resources.painterResource
-
-import bmaps.shared.generated.resources.Res
-import bmaps.shared.generated.resources.compose_multiplatform
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.dialog
+import androidx.navigation.compose.rememberNavController
+import bes.max.bmaps.feature.constructor.ConstructorScreen
+import bes.max.bmaps.feature.library.LibraryScreen
+import bes.max.bmaps.feature.shell.AppShell
+import bes.max.bmaps.feature.shell.PreferencesContent
+import bes.max.bmaps.feature.shell.ShellDestination
+import bes.max.bmaps.feature.viewer.ViewerScreen
+import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 
 @Composable
-@Preview
-fun App() {
-    MaterialTheme {
-        var showContent by remember { mutableStateOf(false) }
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .safeContentPadding()
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
-            }
-            AnimatedVisibility(showContent) {
-                val greeting = remember { Greeting().greet() }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Image(painterResource(Res.drawable.compose_multiplatform), null)
-                    Text("Compose: $greeting")
+internal fun App(graph: AppGraph) {
+    CompositionLocalProvider(LocalMetroViewModelFactory provides graph.metroViewModelFactory) {
+        val navigation = rememberNavController()
+        val entry by navigation.currentBackStackEntryAsState()
+        val route = if (entry?.destination?.route == PreferencesRoute) {
+            navigation.previousBackStackEntry?.destination?.route
+        } else {
+            entry?.destination?.route
+        }
+        AppShell(
+            destination = ShellDestination.entries.firstOrNull { it.route == route } ?: ShellDestination.LIBRARY,
+            onNavigate = navigation::openDestination,
+            onPreferences = { navigation.navigate(PreferencesRoute) { launchSingleTop = true } },
+        ) { navigate ->
+            NavHost(navController = navigation, startDestination = ShellDestination.LIBRARY.route) {
+                composable(ShellDestination.LIBRARY.route) {
+                    LibraryScreen(onBuildMap = { navigate(ShellDestination.CONSTRUCTOR) })
+                }
+                composable(ShellDestination.CONSTRUCTOR.route) {
+                    ConstructorScreen(onOpenLibrary = { navigate(ShellDestination.LIBRARY) })
+                }
+                composable(ShellDestination.VIEWER.route) {
+                    ViewerScreen(onOpenLibrary = { navigate(ShellDestination.LIBRARY) })
+                }
+                dialog(PreferencesRoute) {
+                    PreferencesContent(onDismiss = { navigation.popBackStack() })
                 }
             }
         }
     }
 }
+
+private fun NavHostController.openDestination(destination: ShellDestination) {
+    navigate(destination.route) {
+        popUpTo(ShellDestination.LIBRARY.route) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
+
+private const val PreferencesRoute = "preferences"

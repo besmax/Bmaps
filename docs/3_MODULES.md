@@ -15,6 +15,8 @@ This document serves as the single source of truth for the project's module topo
 
 ## 2. Feature Layer (Presentation & UI)
 Modules containing Compose Multiplatform screens, ViewModels, and presentation-layer validation logic.
+* **`feature:shell`**
+    * **Responsibility:** Application chrome, theme presentation, and preferences dialog with its own ViewModel. Accepts content/navigation callbacks from `:shared`; never imports other features. Theme preferences use `core:datastore` and ViewModel injection uses `core:di`.
 * **`feature:constructor`**
     * **Responsibility:** UI for the map builder. Handles user interaction for bounding box selection, zoom level toggling, layer opacity control, and initiating the download process.
 * **`feature:library`**
@@ -43,6 +45,7 @@ Isolated infrastructure modules. Cross-dependencies within this layer must be mi
     * **Responsibility:** Specialized SQLite driver logic to dynamically read/write tile blobs to `.mbtiles` files on the device filesystem.
 * **`core:datastore`**
     * **Responsibility:** KMP DataStore implementation for persisting user preferences and system flags (e.g., default coordinate system, theme).
+    * **Dependencies:** `core:di` for application scope and Metro contributions. Platform DataStore construction remains here; platform entry points supply Android application context through the umbrella graph.
 * **`core:storage`**
     * **Responsibility:** Cross-platform file system management (`kotlinx-io-core`). Handles directory creation, `.mbtiles` packaging, DEM matrix file parsing, and I/O for sharing/importing, also there are classes for working with annotations.db and classes for import/export our map objects (markers, routes, etc.) to/from GEOJson located .
 * **`core:map-engine`**
@@ -50,6 +53,7 @@ Isolated infrastructure modules. Cross-dependencies within this layer must be mi
     * **Contract ownership:** Renderer-independent coordinates, CRS identifiers, bounds, tile keys, content descriptors, and tile-source/transform interfaces. Public contracts do not expose MapComposeMP types. Tile matrix enumeration belongs to `domain:map-builder`; reusable coordinate mathematics belongs here.
 * **`core:di`**
     * **Responsibility:** Global abstractions and scopes for Metro DI.
+    * **ViewModel integration:** Owns the Metro ViewModel factory binding. This factory creates unscoped ViewModels; navigation entries and native root owners control their lifetime, independently of application-scoped services.
 
 ## 5. Adding a New Module
 When a new module is required:

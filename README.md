@@ -1,24 +1,39 @@
-This is a Kotlin Multiplatform project targeting Android, iOS.
+# Bmaps
 
-* [/iosApp](./iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+An offline-first map constructor and viewer for Android and iOS, built with Kotlin and Compose Multiplatform.
 
-* [/shared](./shared/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./shared/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./shared/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./shared/src/jvmMain/kotlin)
-    folder is the appropriate location.
+The current implementation includes provider/package contracts, feature navigation, Metro dependency injection, and persisted appearance preferences. Map rendering, downloads, and package management are planned in subsequent phases.
 
-### Running the apps
+## Project structure
 
-Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
+- `androidApp` and `iosApp`: native application hosts.
+- `shared`: Metro graph assembly, feature navigation composition, and platform entry points. Only this module generates the static iOS framework.
+- `feature`: shell, constructor, library, and viewer presentation. Features do not depend on other features.
+- `domain`: provider and package/build contracts.
+- `core`: infrastructure and renderer-independent contracts.
+- `build-logic`: Gradle convention plugins, with dependencies managed by `gradle/libs.versions.toml`.
 
-- Android app: `./gradlew :androidApp:assembleDebug`
-- iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there.
+Read [AGENTS.md](AGENTS.md) and the [documentation](docs/5_IMPLEMENTATION_PLAN.md) before extending the architecture. See [feature shell details](docs/7_FEATURE_SHELL.md) for graph lifetimes and preferences behavior.
 
----
+## Build and run
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
+Use Android Studio with the configured JDK/Android SDK to run `androidApp`, or build its APK:
+
+```sh
+./gradlew :androidApp:assembleDebug
+```
+
+On macOS, open `iosApp/iosApp.xcodeproj` in Xcode, choose a simulator or provisioned device, and run the `iosApp` scheme. Its build phase compiles and embeds the shared framework. To verify framework linking directly:
+
+```sh
+./gradlew :shared:linkDebugFrameworkIosSimulatorArm64
+```
+
+## Verify the shell
+
+```sh
+./gradlew :core:datastore:testAndroidHostTest :feature:shell:testAndroidHostTest :androidApp:testDebugUnitTest
+./gradlew :androidApp:connectedDebugAndroidTest
+```
+
+The first command runs persistence, ViewModel, and Robolectric UI checks without an emulator. The second runs the shared navigation/recreation scenario on a connected Android device or emulator.

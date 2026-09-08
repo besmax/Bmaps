@@ -22,8 +22,18 @@ sqlite = "2.6.2"
 datastore = "1.2.1"
 kotlinxCoroutines = "1.11.0"
 kotlinxSerialization = "1.11.0"
+navigation = "2.9.2"
+okio = "3.17.0"
+androidx-compose-test = "1.11.2"
+robolectric = "4.16.1"
 
 [libraries]
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+androidx-compose-ui-test = { module = "androidx.compose.ui:ui-test-junit4", version.ref = "androidx-compose-test" }
+navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation" }
+metro-viewmodel = { module = "dev.zacsweers.metro:metrox-viewmodel", version.ref = "metro" }
+metro-viewmodel-compose = { module = "dev.zacsweers.metro:metrox-viewmodel-compose", version.ref = "metro" }
+okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerialization" }

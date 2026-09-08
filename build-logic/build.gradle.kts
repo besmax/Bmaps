@@ -12,6 +12,7 @@ fun DependencyHandler.plugin(alias: Provider<PluginDependency>) = alias.map {
 }
 
 dependencies {
+    implementation(plugin(libs.plugins.androidApplication))
     implementation(plugin(libs.plugins.kotlinMultiplatform))
     implementation(plugin(libs.plugins.androidMultiplatformLibrary))
     implementation(plugin(libs.plugins.composeMultiplatform))

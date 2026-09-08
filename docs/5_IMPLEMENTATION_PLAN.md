@@ -1,6 +1,6 @@
 # Bmaps Implementation Plan
 
-Planning baseline: 2026-09-08. Status: Phase 1 contracts implemented and verified. Phase 0's framework ownership prerequisite is complete; its remaining work is still pending.
+Planning baseline: 2026-09-08. Status: Phases 1 and 2 implemented. Phase 2 platform verification is recorded below. Phase 0's remaining build/CI work is still pending.
 
 This plan follows `AGENTS.md` and documents 1–4. Checked boxes represent completed deliverables. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats. The table below preserves the original source-inspection baseline; current Phase 1 decisions are recorded in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 
@@ -65,9 +65,9 @@ Dependencies: none.
 - [ ] Add an Android application convention and move reusable Android application settings into build logic.
 - [ ] Add catalog entries and convention support for the code-generation, serialization, coroutines, and test dependencies actually required by subsequent phases. Verify compatibility before selecting additions.
 - [ ] Configure Room generation and schema export through a persistence convention when introducing the first database; do not apply Room tooling to unrelated modules.
-- [ ] Verify Metro compilation for Android and iOS with a minimal binding and graph.
+- [x] Verify Metro compilation for Android and iOS with a minimal binding and graph.
 - [ ] Discover and document actual Gradle tasks for common/host tests, Android assembly, and iOS framework linking. Establish CI with an appropriate macOS job for iOS.
-- [ ] Correct the duplicated persistence heading in document 2, resolve its broad MVI wording in favor of document 4's MVVM+ rule, and update the template README to describe the umbrella architecture.
+- [x] Correct the duplicated persistence heading in document 2, resolve its broad MVI wording in favor of document 4's MVVM+ rule, and update the template README to describe the umbrella architecture.
 
 Acceptance: Android debug assembly and iOS simulator framework linking pass; both native apps launch; only `:shared` produces the application framework. Record commands and environment prerequisites. Do not upgrade the stack merely because newer versions exist.
 
@@ -93,15 +93,19 @@ Verification: 10 Android host tests passed; domain contracts compiled for iOS de
 
 Dependencies: Phase 1.
 
-- [ ] Scaffold `feature:constructor`, `feature:library`, and `feature:viewer` and register them in settings.
-- [ ] Replace template content with root navigation composed in `:shared`; keep screen behavior inside features.
-- [ ] Define global Metro scopes in `core:di`, assemble the graph in `:shared`, and bind platform services through platform entry points.
-- [ ] Provide lifecycle-aware ViewModel creation, including dialog-scoped ViewModels for heavy dialogs; avoid manual service passing.
-- [ ] Establish one immutable `StateFlow` state per ViewModel and a `Channel` exposed as `Flow` for one-off events. No reducers, stores, or middleware.
-- [ ] Implement preference persistence in `core:datastore` for theme and default coordinate system as those settings become usable.
-- [ ] Remove greeting/template resources and relocate direct infrastructure dependencies out of `:shared` unless required for composition.
+- [x] Scaffold `feature:constructor`, `feature:library`, and `feature:viewer` and register them in settings.
+- [x] Replace template content with root navigation composed in `:shared`; keep screen behavior inside features.
+- [x] Define global Metro scopes in `core:di`, assemble the graph in `:shared`, and bind platform services through platform entry points.
+- [x] Provide lifecycle-aware ViewModel creation, including dialog-scoped ViewModels for heavy dialogs; avoid manual service passing.
+- [x] Establish one immutable `StateFlow` state per ViewModel and a `Channel` exposed as `Flow` for one-off events. No reducers, stores, or middleware.
+- [x] Implement preference persistence in `core:datastore` for theme and default coordinate system as those settings become usable.
+- [x] Remove greeting/template resources and relocate direct infrastructure dependencies out of `:shared` unless required for composition.
 
 Acceptance: navigation between feature placeholders works on both platforms without feature-to-feature dependencies; rotation/recreation and iOS lifecycle transitions do not duplicate one-off actions.
+
+Implementation details: `7_FEATURE_SHELL.md`. Added `feature:shell` for chrome, theme, and preferences presentation so the umbrella retains only root composition/graph responsibilities. Theme selection is functional; the coordinate identifier persists and is displayed, with alternative CRS selection deferred to Phase 9.
+
+Verification: 9 persistence/ViewModel host tests, the Android navigation/recreation scenario under Robolectric, and 7 iOS simulator ViewModel tests pass. Android debug and instrumentation APK assembly, iOS device Kotlin compilation, simulator framework linking, and the Xcode simulator app build pass. The iOS app was installed and launched on an iPhone 17 Pro simulator; a screenshot confirmed the library shell rendered successfully. Android device execution remains unverified because the emulator refused to start with insufficient disk space; the same UI scenario is available as an instrumentation test. Full iOS navigation/dialog/background interaction remains a manual acceptance check. Xcode reports a bundled ICU object targeting simulator iOS 18.5 while the app deployment target is 18.2; launch was checked on iOS 26.0, not the minimum supported version.
 
 ### Phase 3 — Render the first online map
 
