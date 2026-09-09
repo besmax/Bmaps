@@ -27,8 +27,8 @@ Modules containing Compose Multiplatform screens, ViewModels, and presentation-l
 ## 3. Domain Layer (Business Logic & Contracts)
 Modules containing pure use cases, models, and interface contracts.
 * **`domain:providers`**
-    * **Responsibility:** Provider/style identities, extensible provider definitions, endpoint and credential-reference contracts, configuration, attribution, and online/offline capabilities. Includes the initial provider catalog; does not execute HTTP requests.
-    * **Dependencies:** `core:map-engine` for renderer-independent geometry and tile contracts.
+    * **Responsibility:** Provider/style identities, extensible provider definitions, endpoint and credential-reference contracts, configuration, attribution, and online/offline capabilities. Includes the provider registry, URL builders, and online tile-source adapter. Provider policy remains here; raw HTTP execution belongs to `core:network`.
+    * **Dependencies:** `core:map-engine` for renderer-independent geometry and tile contracts; `core:network` for bounded HTTP, `core:datastore` for encrypted credentials, and `core:di` for Metro contributions.
 * **`domain:map-builder`**
     * **Responsibility:** Offline build planning and execution contracts, versioned package manifests, size policy, lifecycle, library/open/delete contracts, and failures/progress. Owns package-related annotation, elevation, and transfer business contracts as those phases are implemented.
     * **Dependencies:** `domain:providers` for source identities/configuration and `core:map-engine` for geometry/tile contracts. The domain-to-domain dependency is one-way; providers do not depend on map-builder.
@@ -37,19 +37,20 @@ Modules containing pure use cases, models, and interface contracts.
 ## 4. Core Layer (Infrastructure & Data)
 Isolated infrastructure modules. Cross-dependencies within this layer must be minimized.
 * **`core:network`**
-    * **Responsibility:** Ktor HTTP client configuration, interceptors, timeouts, and raw byte downloading capabilities.
+    * **Responsibility:** Ktor HTTP client configuration, interceptors, timeouts, and bounded raw byte downloading capabilities. Depends on `core:di` for application-scoped client bindings; knows nothing about providers.
 * **`core:database`**
     * **Responsibility:** Main application database (Room KMP) for metadata (e.g., saved projects, history).
     * **Constraints:** Custom pagination and complex filtering must be implemented directly here. Do not use Paging 3.
 * **`core:mbtiles`**
     * **Responsibility:** Specialized SQLite driver logic to dynamically read/write tile blobs to `.mbtiles` files on the device filesystem.
 * **`core:datastore`**
-    * **Responsibility:** KMP DataStore implementation for persisting user preferences and system flags (e.g., default coordinate system, theme).
+    * **Responsibility:** KMP DataStore implementation for persisting user preferences and system flags (e.g., default coordinate system, theme), and encrypted provider credentials. Platform encryption keys remain in Android Keystore or iOS Keychain.
     * **Dependencies:** `core:di` for application scope and Metro contributions. Platform DataStore construction remains here; platform entry points supply Android application context through the umbrella graph.
 * **`core:storage`**
     * **Responsibility:** Cross-platform file system management (`kotlinx-io-core`). Handles directory creation, `.mbtiles` packaging, DEM matrix file parsing, and I/O for sharing/importing, also there are classes for working with annotations.db and classes for import/export our map objects (markers, routes, etc.) to/from GEOJson located .
 * **`core:map-engine`**
     * **Responsibility:** Wrappers for `MapComposeMP`. Encapsulates geospatial mathematics, bounding box calculations, and coordinate system transformations (WGS-84, SK-91).
+    * **Phase 3B:** Owns the bounded MapComposeMP raster adapter, source-session cleanup, Web Mercator/XYZ mathematics, and regional tile-pyramid configuration.
     * **Contract ownership:** Renderer-independent coordinates, CRS identifiers, bounds, tile keys, content descriptors, and tile-source/transform interfaces. Public contracts do not expose MapComposeMP types. Tile matrix enumeration belongs to `domain:map-builder`; reusable coordinate mathematics belongs here.
 * **`core:di`**
     * **Responsibility:** Global abstractions and scopes for Metro DI.

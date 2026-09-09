@@ -13,6 +13,7 @@ kotlin {
 }
 dependencies {
     implementation(project(":shared"))
+    androidTestImplementation(project(":core:datastore"))
 
     implementation(libs.androidx.activity.compose)
 

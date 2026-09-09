@@ -28,6 +28,7 @@ androidx-compose-test = "1.11.2"
 robolectric = "4.16.1"
 
 [libraries]
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 androidx-compose-ui-test = { module = "androidx.compose.ui:ui-test-junit4", version.ref = "androidx-compose-test" }
 navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation" }

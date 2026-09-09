@@ -13,6 +13,8 @@ Before proposing any architectural changes, creating new modules, or refactoring
 - `docs/5_IMPLEMENTATION_PLAN.md`
 - `docs/6_CONTRACTS_AND_PACKAGE_FORMAT.md`
 - `docs/7_FEATURE_SHELL.md`
+- `docs/8_PROVIDER_NETWORKING_AND_CREDENTIALS.md`
+- `docs/9_MAP_ENGINE.md`
 
 # Bmaps: AI Agent Core Conventions
 

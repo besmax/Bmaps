@@ -1,6 +1,7 @@
 plugins {
     id("app.android.library")
     id("app.di")
+    id("app.ios.keychain-test")
 }
 
 kotlin {

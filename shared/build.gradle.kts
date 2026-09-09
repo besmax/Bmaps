@@ -5,6 +5,8 @@ plugins {
 kotlin {
     sourceSets.commonMain.dependencies {
         implementation(project(":core:di"))
+        implementation(project(":domain:providers"))
+        implementation(project(":core:network"))
         implementation(project(":core:datastore"))
         implementation(project(":feature:shell"))
         implementation(project(":feature:constructor"))

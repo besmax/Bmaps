@@ -19,4 +19,10 @@ object AndroidPreferencesBindings {
     fun dataStore(context: Context): DataStore<Preferences> = PreferenceDataStoreFactory.create {
         context.applicationContext.preferencesDataStoreFile(PREFERENCES_NAME)
     }
+    @Provides
+    @SingleIn(AppScope::class)
+    @CredentialStorage
+    fun credentialsStore(context: Context): DataStore<Preferences> = PreferenceDataStoreFactory.create {
+        java.io.File(context.applicationContext.noBackupFilesDir, "provider-credentials.preferences_pb")
+    }
 }

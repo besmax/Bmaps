@@ -52,6 +52,7 @@ data class TileProvider(
     val config: ProviderConfig = ProviderConfig(),
     val attribution: List<Attribution>,
     val capabilities: ProviderCapabilities,
+    val requestPolicy: TileRequestPolicy = TileRequestPolicy(),
 ) {
     fun configFor(style: TileStyle): ProviderConfig = style.configOverride ?: config
     fun attributionFor(style: TileStyle): List<Attribution> = style.attributionOverride ?: attribution

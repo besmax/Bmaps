@@ -1,6 +1,6 @@
 # Bmaps Implementation Plan
 
-Planning baseline: 2026-09-08. Status: Phases 1 and 2 implemented. Phase 2 platform verification is recorded below. Phase 0's remaining build/CI work is still pending.
+Planning baseline: 2026-09-08. Status: Phases 1, 2, and 3A implemented. Platform verification and remaining environment limits are recorded below. Phase 0's remaining build/CI work is still pending.
 
 This plan follows `AGENTS.md` and documents 1–4. Checked boxes represent completed deliverables. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats. The table below preserves the original source-inspection baseline; current Phase 1 decisions are recorded in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 
@@ -111,14 +111,44 @@ Verification: 9 persistence/ViewModel host tests, the Android navigation/recreat
 
 Dependencies: Phases 1–2.
 
-- [ ] Implement Ktor configuration in `core:network` with Android OkHttp and iOS Darwin engines, bounded requests, cancellation, timeouts, and typed failures.
-- [ ] Implement the provider registry and approved provider configuration through `domain:providers`; keep provider policy out of generic HTTP infrastructure.
-- [ ] Build the MapComposeMP wrapper in `core:map-engine` with renderer-independent viewport, tile-source, layer, and interaction APIs.
-- [ ] Render one raster source in the constructor with provider selection and visible attribution.
-- [ ] Implement coordinate/tile conversion and explicit behavior at projection limits and the antimeridian; avoid silently clamping unsupported selections.
-- [ ] Verify renderer tile loading, resource cleanup, and cancellation on Android and iOS before building download orchestration.
+#### Phase 3A — Provider registry and tile networking
 
-Acceptance: both apps pan and zoom a real approved provider; deterministic fixture tests cover coordinate/tile conversion; network failures and missing tiles have recoverable UI states. Use fake responses for routine automated tests.
+- [x] Implement extensible provider/style registration and provider URL builders with encoded runtime parameters and credentials.
+- [x] Configure Ktor with Android OkHttp and iOS Darwin engines, bounded requests/payloads, cancellation, timeouts, and typed failures.
+- [x] Apply per-provider attempts, backoff, concurrency, and request pacing; keep provider policy outside generic HTTP infrastructure.
+- [x] Store only encrypted provider credentials in DataStore, using Android Keystore and iOS Keychain-backed encryption keys.
+- [x] Expose a KMP tile-stream boundary compatible with MapComposeMP and test PNG/JPEG, missing tiles, failures, and cancellation using fake responses.
+
+Acceptance: deterministic networking/provider/credential tests pass; platform implementations and Metro graphs compile. No live map UI is required in this step.
+
+Implementation details: `8_PROVIDER_NETWORKING_AND_CREDENTIALS.md`. Provider URL builders preserve Long indices; tile streams use `kotlinx.io.RawSource`. Each provider has independent request policy, with limits shared across its sessions/styles. Credentials are encrypted before entering a separate backup-excluded DataStore; keys remain in Android Keystore or iOS Keychain.
+
+Verification (2026-09-09): 32 Android host tests pass across network, providers, DataStore, and map-builder regression suites. Five iOS simulator credential tests pass, including actual Keychain encryption, tampering/identifier rejection, and the platform encrypted DataStore path. Android debug/test APK assembly, shared iOS device compilation, simulator framework linking, and Metro graph compilation pass. `git diff --check` is clean. The Android Keystore instrumentation test is built but not executed: AGP's connected-test runner cannot resolve UTP artifact `android-test-plugin-host-additional-test-output:32.1.0`; direct APK installation was then blocked by the existing emulator's full guest storage. No provider tile requests were made. Live caching, metadata/account verification, credential UI, and renderer decoding remain in 3B/3C; physical-device security behavior remains unverified.
+
+#### Phase 3B — Coordinates and renderer integration
+
+- [x] Implement coordinate/tile conversions, explicit projection limits, and antimeridian behavior without silently clamping unsupported selections.
+- [x] Build the MapComposeMP wrapper in `core:map-engine` with renderer-independent viewport, tile-source, layer, and interaction APIs.
+- [ ] Render deterministic tile fixtures on Android and iOS; verify stream ownership, cancellation, and renderer cleanup.
+
+Acceptance: coordinate fixtures pass and both native renderers display a fixture map. Verify this integration before expanding map UI.
+
+Verification on 2026-09-09: nine map-engine tests pass on each of Android host and iOS simulator; 15 provider host tests and the Android navigation/recreation test pass. Android debug/instrumentation APK assembly, iOS device compilation, simulator framework linking, and Xcode simulator app build pass. The iPhone 17 Pro simulator displays the offline PNG/JPEG fixture after fixing preview navigation before graph initialization and joining renderer jobs before dispatcher shutdown. Screenshot: `/tmp/bmaps-resume-ios-fixed.png` (temporary local evidence). The existing Android AVD boots in read-only mode but APK installation fails with `INSTALL_FAILED_INSUFFICIENT_STORAGE`; Android visual acceptance remains pending. Native navigation/disposal stress and physical-device performance checks remain pending. Details: `9_MAP_ENGINE.md`.
+
+#### Phase 3C — Online constructor map
+
+- [ ] Connect online tile loading to the constructor, initially with one approved source, then the remaining provider configurations.
+- [ ] Add provider/style selection, visible attribution, initial viewport, and effective scale/level limits.
+- [ ] Resolve provider metadata, caching requirements, credential input, and account-specific availability before enabling each live source.
+
+Acceptance: the constructor displays a real approved provider on both platforms and surfaces recoverable loading failures.
+
+#### Phase 3D — Cross-platform acceptance
+
+- [ ] Verify pan/zoom, provider switching, background/foreground transitions, cancellation, missing tiles, and network recovery on Android and iOS.
+- [ ] Record native runtime results and resolve integration failures before download orchestration.
+
+Acceptance for Phase 3: both apps pan and zoom real approved sources; deterministic coordinate/network tests pass; failures are recoverable and tile resources are released. The 300,000,000-byte package limit is enforced by later offline storage/download work, not online rendering.
 
 ### Phase 4 — Implement package storage and local tile access
 

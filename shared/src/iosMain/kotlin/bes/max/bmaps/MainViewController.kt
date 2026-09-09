@@ -10,4 +10,8 @@ internal interface IosAppGraph : AppGraph
 
 private val appGraph: IosAppGraph by lazy { createGraph<IosAppGraph>() }
 
-fun MainViewController() = ComposeUIViewController { App(appGraph) }
+@OptIn(kotlin.experimental.ExperimentalNativeApi::class)
+fun MainViewController() = ComposeUIViewController {
+    App(appGraph, previewMap = kotlin.native.Platform.isDebugBinary &&
+        platform.Foundation.NSProcessInfo.processInfo.arguments.contains("--preview-map"))
+}

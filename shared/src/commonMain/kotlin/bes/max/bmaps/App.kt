@@ -18,9 +18,10 @@ import bes.max.bmaps.feature.viewer.ViewerScreen
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 
 @Composable
-internal fun App(graph: AppGraph) {
+internal fun App(graph: AppGraph, previewMap: Boolean = false) {
     CompositionLocalProvider(LocalMetroViewModelFactory provides graph.metroViewModelFactory) {
         val navigation = rememberNavController()
+        val startDestination = if (previewMap) ShellDestination.CONSTRUCTOR else ShellDestination.LIBRARY
         val entry by navigation.currentBackStackEntryAsState()
         val route = if (entry?.destination?.route == PreferencesRoute) {
             navigation.previousBackStackEntry?.destination?.route
@@ -32,7 +33,7 @@ internal fun App(graph: AppGraph) {
             onNavigate = navigation::openDestination,
             onPreferences = { navigation.navigate(PreferencesRoute) { launchSingleTop = true } },
         ) { navigate ->
-            NavHost(navController = navigation, startDestination = ShellDestination.LIBRARY.route) {
+            NavHost(navController = navigation, startDestination = startDestination.route) {
                 composable(ShellDestination.LIBRARY.route) {
                     LibraryScreen(onBuildMap = { navigate(ShellDestination.CONSTRUCTOR) })
                 }

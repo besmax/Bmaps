@@ -2,18 +2,18 @@
 
 An offline-first map constructor and viewer for Android and iOS, built with Kotlin and Compose Multiplatform.
 
-The current implementation includes provider/package contracts, feature navigation, Metro dependency injection, and persisted appearance preferences. Map rendering, downloads, and package management are planned in subsequent phases.
+The current implementation includes provider/package contracts, feature navigation, Metro dependency injection, persisted appearance preferences, provider tile networking, and encrypted credential storage. A deterministic offline raster preview is available in the constructor. Live provider rendering, downloads, and package management follow in subsequent phases.
 
 ## Project structure
 
 - `androidApp` and `iosApp`: native application hosts.
 - `shared`: Metro graph assembly, feature navigation composition, and platform entry points. Only this module generates the static iOS framework.
 - `feature`: shell, constructor, library, and viewer presentation. Features do not depend on other features.
-- `domain`: provider and package/build contracts.
+- `domain`: provider registry/online tile adapters and package/build contracts.
 - `core`: infrastructure and renderer-independent contracts.
 - `build-logic`: Gradle convention plugins, with dependencies managed by `gradle/libs.versions.toml`.
 
-Read [AGENTS.md](AGENTS.md) and the [documentation](docs/5_IMPLEMENTATION_PLAN.md) before extending the architecture. See [feature shell details](docs/7_FEATURE_SHELL.md) for graph lifetimes and preferences behavior.
+Read [AGENTS.md](AGENTS.md) and the [documentation](docs/5_IMPLEMENTATION_PLAN.md) before extending the architecture. See [feature shell details](docs/7_FEATURE_SHELL.md) for graph lifetimes and preferences behavior, and [provider networking details](docs/8_PROVIDER_NETWORKING_AND_CREDENTIALS.md) for Phase 3A APIs and verification. [Map engine documentation](docs/9_MAP_ENGINE.md) covers coordinates, renderer limits, ownership, and Phase 3B checks.
 
 ## Build and run
 
