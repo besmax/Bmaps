@@ -1,6 +1,6 @@
 # Provider Networking and Credentials
 
-Phase 3A implements provider registration, URL construction, bounded tile HTTP, and encrypted credential persistence. Phase 3B adds the MapComposeMP renderer wrapper; Phase 3C connects live sources and credential input to the constructor. No map request starts when the application shell opens.
+Phase 3A implements provider registration, URL construction, bounded tile HTTP, and encrypted credential persistence. Phase 3B adds the MapComposeMP renderer wrapper. Phase 3C connects OSM and key-configured Thunderforest to the constructor; the remaining sources are gated below. No map request starts when the application shell opens.
 
 ## Ownership and composition
 
@@ -8,7 +8,7 @@ Phase 3A implements provider registration, URL construction, bounded tile HTTP, 
 - `core:network` owns the application-scoped Ktor client and `HttpTransport`. Android uses OkHttp; iOS uses Darwin. It imports no provider or map types.
 - `core:datastore` owns `ProviderCredentials`, ciphertext persistence, and platform encryption. Its existing `core:di` dependency supplies Metro scopes and bindings.
 - `core:map-engine` owns `TileSource`, the KMP `TileStreamProvider`, and `TileSourceStreamProvider`. No renderer types enter provider APIs.
-- `shared` assembles/exposes these services through the Metro graph. Feature code will inject services when online presentation is implemented.
+- `shared` assembles/exposes these services through the Metro graph. The constructor injects `ProviderRepository` and `OnlineSourceOpener`; its separate credentials dialog injects `ProviderCredentials`.
 
 The registry is fixed for the graph lifetime. Add a `ProviderRegistration` to its composition to register another provider and its styles. A registration accepts a custom `UrlTileBuilderFactory`; the default uses declarative endpoint templates. No core switch on provider IDs is needed. Duplicate provider/style IDs and invalid request capabilities are rejected during registration.
 
@@ -62,16 +62,38 @@ The per-tile response bound is separate from the 300,000,000-byte total offline-
 
 Keys never enter DataStore. This protects stored credentials, not an already-compromised running application; plaintext necessarily exists briefly when constructing authenticated requests. Hardware-backed key availability is platform/device dependent; no Secure Enclave or StrongBox requirement is imposed. Credentials are excluded from ordinary preferences, app backup, package manifests, and diagnostics. Tests use synthetic values. API keys are supplied by callers; there is no embedded production credential.
 
-Theme/coordinate preference persistence and backup behavior remain unchanged. Credential entry UI is deferred to 3C. A lost or invalidated key is an explicit unavailable result; the future UI must offer removal/re-entry.
+The Phase 3C dialog supports saving, replacing, and removing a key. Its masked draft is never saved in navigation arguments or saved-instance state; only the credential identifier is routed. Validation occurs in the dialog ViewModel. Storage failures keep the dialog open with a retryable error. Success clears the draft and emits a Channel event to dismiss; retrying the map opens a fresh source using the new key. Lost or invalidated keys produce an explicit unavailable result.
 
-## Live-source prerequisites
+## Online constructor and provider availability
 
-Built-in endpoint definitions are implemented and tested with fake responses. This does not approve live access for every account. Before enabling live sources in 3C:
+Opening Build loads OSM; the default Library destination does not request map tiles. The selector lists all registered styles. The presentation layer validates projection, square tile dimensions, source levels, geographic coverage support, initial viewport, and scale limits before creating a raster session. Unsupported matrices fail explicitly rather than truncating levels. The current online presentation supports global Web Mercator pyramids representable by the renderer; regional rebasing is still future work.
 
-- OSM needs visible attribution and an identifying User-Agent (the client sends `Bmaps/0.1 (bes.max.bmaps)`), plus policy-compliant HTTP caching. Public OSM offline bulk download remains prohibited. Persistent caching is not implemented in 3A.
-- Resolve ArcGIS levels, content, coverage, and contributor attribution from service metadata.
-- Verify OsmAnd and Thunderforest endpoint/account policies and the requested Thunderforest `tile.thunderforest.com` host; its current documentation uses `api.thunderforest.com`.
-- Supply Yandex/Thunderforest keys. Account-required Yandex signing is not implemented. Validate Yandex projection/scale against the effective tile matrix before constructing the map.
+`OnlineMapViewModel` exposes one immutable state stream. Source factories create independently owned sources only when rendering begins. Switching or Retry creates a new generation; callbacks from retired generations are ignored. Retry retains the last observed viewport, clears the error, and reopens the source. Missing tiles and typed network/authentication failures are visible; the first error remains until Retry or source selection. Successful tile validation ends the initial loading indicator. Renderer disposal owns cancellation and source closure. Durable viewport restoration and the full background/network recovery matrix remain Phase 3D/6 work.
+
+| Source | Current availability | Remaining requirements |
+| --- | --- | --- |
+| OSM / WorldStreetMap | Enabled; source levels 0–19, visible linked attribution, identifying User-Agent, persistent native HTTP cache | Public OSM bulk/offline package downloads remain prohibited. |
+| Thunderforest / Atlas | Configured at `api.thunderforest.com`; levels 0–22; linked Thunderforest and OSM attribution; masked key entry | User account/key required. Authenticated native rendering has not been verified. Offline entitlement must be verified separately. |
+| OsmAnd / OsmAndHd | Listed but unavailable; no HTTP is started | Establish permission for third-party use of the endpoint. OSM's standard-tile policy does not cover it. |
+| ArcGIS / World Imagery | Listed but unavailable; no HTTP is started | Establish licensed access, implement service/contributor attribution and effective coverage, and support regional rendering for the advertised 0–23 pyramid. |
+| Yandex / Map | Listed but unavailable; no HTTP is started | Verify account requirements, signing where required, branding/logo obligations, and the effective projection/image scale before enabling. |
+
+The ArcGIS metadata retrieved on 2026-09-09 advertises JPEG, 256 × 256 tiles, EPSG:3857, and levels 0–23. Its projected extent is approximately ±20,037,507.23 east/west and ±19,971,868.88 north/south. Copyright text names Esri, Vantor, Earthstar Geographics, and the GIS User Community. This is evidence for the future integration, not a runtime metadata resolver or authorization to download. The seed definition continues to leave its effective source limits unresolved until that integration exists.
+
+`OnlineMapAvailability` records integration readiness in the provider domain. Adding a catalog definition does not automatically approve a live source. Provider policy and account requirements must be reviewed alongside its rendering configuration.
+
+## Public HTTP cache
+
+`HttpResourceRequest.cachePublicResponse` defaults to false. The provider request policy opts OSM into caching. `HttpClients` supplies separate uncached and public-cache clients through Metro. Cache-enabled requests with query parameters are rejected so query credentials cannot enter the public cache; credential-bearing providers use the uncached client. Both paths retain the existing response bounds and request gate.
+
+- Android uses OkHttp's 64 MiB disk cache under the app cache directory.
+- iOS uses a dedicated NSURLCache with 8 MiB memory and 64 MiB disk capacity and the native protocol cache policy. The uncached session has no URL cache.
+
+The engines honor HTTP freshness and conditional validation. No default no-cache headers or bulk prefetch are added. Only viewport requests are made. Cache files are disposable OS cache data, separate from encrypted credentials and future offline packages; they do not make a downloaded package or count toward its 300,000,000-byte limit. No Ktor `HttpCache` body-buffering plugin is installed.
+
+The Android native-cache host test uses a local server to verify fresh responses survive client recreation, stale responses send ETag conditional requests and reuse the body after 304, and uncached requests continue to reach the server. Common transport tests verify opt-in routing and rejection of cached query URLs. iOS runtime inspection found 55 persisted OSM responses in its dedicated cache; iOS conditional-revalidation automation remains future verification.
+
+Debug smoke entry points: iOS `--online-map` starts on Build; `--preview-map` retains the offline fixture. Android's debug-only `fixture-map` intent extra selects the fixture for deterministic UI tests without contacting providers. Release entry points ignore these debug switches.
 
 ## Verification
 
@@ -107,4 +129,6 @@ adb shell am instrument -w -e class bes.max.bmaps.AndroidCredentialCipherTest be
 - [Kotlin native Keychain test issue](https://youtrack.jetbrains.com/issue/KT-61470).
 - [OSM tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
 - [Yandex request parameters](https://yandex.ru/maps-api/docs/tiles-api/request.html).
-- [Thunderforest tile API](https://www.thunderforest.com/docs/map-tiles-api/).
+- [Thunderforest tile API](https://www.thunderforest.com/docs/map-tiles-api/) and [terms](https://www.thunderforest.com/terms/), checked 2026-09-09.
+- [ArcGIS service metadata](https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer?f=pjson) and [Esri basemap licensing/attribution requirements](https://developers.arcgis.com/javascript/latest/references/core/layers/WebTileLayer/), checked 2026-09-09.
+- [Apple URLCache](https://developer.apple.com/documentation/foundation/urlcache).

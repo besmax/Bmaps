@@ -31,6 +31,7 @@ object BuiltInProviders {
             ),
         ),
         config = ProviderConfig(levelLimits = LevelLimitsConfig(0, 19)),
+        requestPolicy = TileRequestPolicy(cachePublicResponses = true),
         attribution = listOf(osmAttribution),
         capabilities = ProviderCapabilities(
             offlineDownload = OfflineDownloadPermission.PROHIBITED,
@@ -88,7 +89,7 @@ object BuiltInProviders {
                 id = StyleId("atlas"),
                 name = "Atlas",
                 endpoint = TileEndpoint(
-                    urlTemplate = "https://tile.thunderforest.com/atlas/{z}/{x}/{y}.png",
+                    urlTemplate = "https://api.thunderforest.com/atlas/{z}/{x}/{y}.png",
                     credential = CredentialReference("thunderforest-api-key", "apikey"),
                 ),
                 content = png,

@@ -19,17 +19,24 @@ enum class OnlineSourceFailure {
     UNKNOWN_PROVIDER, UNKNOWN_STYLE, ONLINE_DISABLED, MISSING_CREDENTIAL, CREDENTIAL_UNAVAILABLE, INVALID_CONFIGURATION,
 }
 
+fun interface OnlineSourceOpener {
+    suspend fun open(id: ProviderStyleId): OnlineSourceResult
+}
+
 @Inject
+@dev.zacsweers.metro.ContributesBinding(AppScope::class)
 @SingleIn(AppScope::class)
 class OnlineTileSourceFactory(
     private val registry: ProviderRegistry,
     private val credentials: ProviderCredentials,
     private val transport: HttpTransport,
-) {
+) : OnlineSourceOpener {
+    override suspend fun open(id: ProviderStyleId): OnlineSourceResult = open(id, emptyMap())
+
     private val gates = mutableMapOf<ProviderId, ProviderRequestGate>()
     private val lock = Mutex()
 
-    suspend fun open(id: ProviderStyleId, parameters: Map<String, String> = emptyMap()): OnlineSourceResult {
+    suspend fun open(id: ProviderStyleId, parameters: Map<String, String>): OnlineSourceResult {
         val registration = registry.registration(id.provider)
             ?: return OnlineSourceResult.Failed(OnlineSourceFailure.UNKNOWN_PROVIDER)
         val provider = registration.provider

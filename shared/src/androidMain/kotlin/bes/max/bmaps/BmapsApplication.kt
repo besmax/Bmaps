@@ -24,7 +24,7 @@ internal interface AndroidAppGraph : AppGraph {
 }
 
 @Composable
-fun App() {
+fun App(fixtureMap: Boolean = false) {
     val application = LocalContext.current.applicationContext as BmapsApplication
-    App(application.graph)
+    App(application.graph, fixtureMap = fixtureMap)
 }

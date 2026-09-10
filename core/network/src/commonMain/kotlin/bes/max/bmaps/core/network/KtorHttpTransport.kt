@@ -28,7 +28,8 @@ import kotlinx.io.readByteArray
 @Inject
 @SingleIn(AppScope::class)
 @ContributesBinding(AppScope::class)
-class KtorHttpTransport(private val client: HttpClient) : HttpTransport {
+class KtorHttpTransport(private val clients: HttpClients) : HttpTransport {
+    constructor(client: HttpClient) : this(HttpClients(client, client))
     private val requests = Semaphore(16)
 
     override suspend fun fetch(request: HttpResourceRequest): HttpResourceResult = requests.withPermit {
@@ -37,6 +38,10 @@ class KtorHttpTransport(private val client: HttpClient) : HttpTransport {
             if (url.protocol != URLProtocol.HTTPS || url.user != null || url.password != null || url.fragment.isNotEmpty()) {
                 return@withPermit HttpResourceResult.Failed(HttpFailure.INVALID_REQUEST)
             }
+            if (request.cachePublicResponse && url.encodedQuery.isNotEmpty()) {
+                return@withPermit HttpResourceResult.Failed(HttpFailure.INVALID_REQUEST)
+            }
+            val client = if (request.cachePublicResponse) clients.publicCache else clients.uncached
             client.prepareGet(url) {
                 timeout {
                     requestTimeoutMillis = request.requestTimeoutMillis

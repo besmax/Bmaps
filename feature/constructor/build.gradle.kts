@@ -3,5 +3,9 @@ plugins {
 }
 
 kotlin {
-    sourceSets.commonMain.dependencies { implementation(project(":core:map-engine")) }
+    sourceSets.commonMain.dependencies {
+        implementation(project(":core:map-engine"))
+        implementation(project(":domain:providers"))
+        implementation(project(":core:datastore"))
+    }
 }

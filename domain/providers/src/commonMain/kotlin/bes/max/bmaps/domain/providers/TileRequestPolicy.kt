@@ -13,6 +13,7 @@ data class TileRequestPolicy(
     val connectTimeoutMillis: Long = 5_000,
     val socketTimeoutMillis: Long = 10_000,
     val maxTileBytes: Int = 2_000_000,
+    val cachePublicResponses: Boolean = false,
 ) {
     init {
         require(maxAttempts in 1..10)

@@ -59,6 +59,8 @@ class RasterLayer(val id: String, val source: TileSourceFactory, val opacity: Fl
 }
 
 sealed interface MapEvent {
+    data class TileLoaded(val layerId: String, val key: TileKey) : MapEvent
+    data class TileMissing(val layerId: String, val key: TileKey) : MapEvent
     data class ViewportChanged(val viewport: MapViewport) : MapEvent
     data class Tap(val position: MapPoint) : MapEvent
     data class TileFailed(val layerId: String, val key: TileKey, val failure: TileReadFailure) : MapEvent

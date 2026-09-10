@@ -14,6 +14,23 @@ import kotlinx.coroutines.test.runTest
 
 class KtorHttpTransportTest {
     @Test
+    fun publicCacheIsOptInAndRejectsCredentialQueries() = runTest {
+        var publicCalls = 0
+        var privateCalls = 0
+        val publicClient = HttpClient(MockEngine { publicCalls++; respond("public") }) { configureBmapsHttpClient() }
+        val privateClient = HttpClient(MockEngine { privateCalls++; respond("private") }) { configureBmapsHttpClient() }
+        try {
+            val transport = KtorHttpTransport(HttpClients(privateClient, publicClient))
+            transport.fetch(HttpResourceRequest("https://tiles.test/0.png", cachePublicResponse = true))
+            transport.fetch(HttpResourceRequest("https://tiles.test/0.png?apikey=synthetic"))
+            assertEquals(HttpResourceResult.Failed(HttpFailure.INVALID_REQUEST),
+                transport.fetch(HttpResourceRequest("https://tiles.test/0.png?apikey=synthetic", cachePublicResponse = true)))
+            assertEquals(1, publicCalls)
+            assertEquals(1, privateCalls)
+        } finally { publicClient.close(); privateClient.close() }
+    }
+
+    @Test
     fun readsBytesAndSetsIdentityWithoutFollowingCredentialRedirects() = runTest {
         var calls = 0
         val client = HttpClient(MockEngine { request ->

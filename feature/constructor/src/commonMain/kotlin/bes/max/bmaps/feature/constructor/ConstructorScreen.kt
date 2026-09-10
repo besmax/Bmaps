@@ -14,13 +14,17 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun ConstructorScreen(onOpenLibrary: () -> Unit) {
+fun ConstructorScreen(onOpenLibrary: () -> Unit, onCredentials: (String) -> Unit = {}, showFixture: Boolean = false) {
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Build a map", style = MaterialTheme.typography.headlineLarge)
         Text("Choose a place. Take it offline.", style = MaterialTheme.typography.titleMedium)
-        Text("Map selection and downloads are coming soon.")
-        Text("Sample map · offline preview", style = MaterialTheme.typography.labelMedium)
-        FixtureMap(Modifier.weight(1f).fillMaxWidth().testTag("sample-map"))
+        if (showFixture) {
+            Text("Sample map · offline preview", style = MaterialTheme.typography.labelMedium)
+            FixtureMap(Modifier.weight(1f).fillMaxWidth().testTag("sample-map"))
+        } else {
+            Text("Online preview · downloads are not available yet", style = MaterialTheme.typography.labelMedium)
+            OnlineMapContent(onCredentials, Modifier.weight(1f).fillMaxWidth())
+        }
         TextButton(onClick = onOpenLibrary) { Text("Go to library") }
     }
 }

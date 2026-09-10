@@ -1,6 +1,6 @@
 # Coordinates and Raster Renderer
 
-Phase 3B implements Web Mercator math, a renderer-independent raster API, the MapComposeMP adapter, and a deterministic offline sample in the constructor. Live providers, credential entry, and provider selection remain Phase 3C.
+Phase 3B implements Web Mercator math, a renderer-independent raster API, the MapComposeMP adapter, and a deterministic offline sample in the constructor. Phase 3C now supplies the online constructor, credential entry, and provider selection as described in document 8; the deterministic sample remains a debug/test fixture.
 
 ## Coordinates and coverage
 

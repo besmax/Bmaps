@@ -137,11 +137,17 @@ Verification on 2026-09-09: nine map-engine tests pass on each of Android host a
 
 #### Phase 3C — Online constructor map
 
-- [ ] Connect online tile loading to the constructor, initially with one approved source, then the remaining provider configurations.
-- [ ] Add provider/style selection, visible attribution, initial viewport, and effective scale/level limits.
-- [ ] Resolve provider metadata, caching requirements, credential input, and account-specific availability before enabling each live source.
+- [x] Connect OSM online tile loading to the constructor and configure Thunderforest for runtime API-key entry.
+- [ ] Enable the remaining provider configurations after their prerequisites are resolved.
+- [x] Add provider/style selection, visible attribution, initial viewport, and effective scale/level limits.
+- [x] Implement persistent HTTP caching and secure credential input for enabled sources.
+- [ ] Resolve remaining provider metadata, account-specific availability, and integration requirements.
 
 Acceptance: the constructor displays a real approved provider on both platforms and surfaces recoverable loading failures.
+
+Implementation: OSM is enabled with public HTTP caching; Thunderforest Atlas uses its documented API host and requires a user-supplied key. ArcGIS, Yandex, and OsmAnd remain unavailable with explicit UI messages. ArcGIS metadata was retrieved: source levels 0–23 also require regional rendering beyond the current global engine limits. No source levels are silently truncated. Details and outstanding provider prerequisites are recorded in `8_PROVIDER_NETWORKING_AND_CREDENTIALS.md`.
+
+Verification on 2026-09-09–10: three constructor tests pass on Android host and iOS simulator, seven networking/cache host tests pass, and provider, map-engine, and Android navigation regression tests pass. Android APKs, iOS device compilation, simulator framework linking, and the Xcode simulator build pass. Android displays OSM tiles with attribution using a fresh temporary data image (`/tmp/bmaps-3c-userdata.img`); the existing AVD data was preserved. The iPhone 17 Pro simulator displays OSM tiles with visible attribution (`/tmp/bmaps-3c-ios-osm.png`) and survives app restart; its public cache contained 55 OSM responses, and its UI also displayed the expected Thunderforest missing-key message. Cache tests verify persistence across client recreation, conditional revalidation, and isolation of credential-bearing requests. Authenticated Thunderforest rendering and the broader Phase 3D lifecycle/network acceptance are still pending. Temporary screenshots and logs use `/tmp/bmaps-3c-*` paths.
 
 #### Phase 3D — Cross-platform acceptance
 

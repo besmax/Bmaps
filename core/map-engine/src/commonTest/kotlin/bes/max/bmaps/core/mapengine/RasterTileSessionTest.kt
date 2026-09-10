@@ -26,7 +26,10 @@ class RasterTileSessionTest {
         val second = session.stream("a", 0, 0, 0)!!.buffered()
         first.use { assertContentEquals(bytes, it.readByteArray()) }
         second.use { assertContentEquals(bytes, it.readByteArray()) }
-        mode = 1; assertNull(session.stream("a", 0, 0, 0)); assertTrue(events.isEmpty())
+        assertEquals(2, events.filterIsInstance<MapEvent.TileLoaded>().size)
+        events.clear()
+        mode = 1; assertNull(session.stream("a", 0, 0, 0)); assertIs<MapEvent.TileMissing>(events.single())
+        events.clear()
         mode = 2; assertNull(session.stream("a", 0, 0, 0)); assertIs<MapEvent.TileFailed>(events.single())
         session.close()
         assertNull(session.stream("a", 0, 0, 0))

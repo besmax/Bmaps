@@ -28,9 +28,12 @@ internal class RasterTileSession private constructor(
                     if (bytes.size > 2_000_000 || !matchesFormat(bytes, result.format) || !withContext(Dispatchers.Default) { validate(bytes, pyramid.tileSize) }) {
                         onEvent(MapEvent.TileFailed(layer, key, TileReadFailure.CORRUPT_DATA))
                         null
-                    } else Buffer().apply { write(bytes) }
+                    } else {
+                        onEvent(MapEvent.TileLoaded(layer, key))
+                        Buffer().apply { write(bytes) }
+                    }
                 }
-                TileReadResult.Missing -> null
+                TileReadResult.Missing -> { onEvent(MapEvent.TileMissing(layer, key)); null }
                 is TileReadResult.Failed -> { onEvent(MapEvent.TileFailed(layer, key, result.reason)); null }
             }
         } catch (cancelled: CancellationException) { throw cancelled }

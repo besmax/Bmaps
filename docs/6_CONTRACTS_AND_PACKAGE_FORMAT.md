@@ -1,6 +1,6 @@
 # Phase 1 Contracts and Package Format
 
-Status: Phase 1 contract baseline. Phase 2 preferences/shell and Phase 3A online networking/encrypted credentials are implemented in documents 7–8. Package persistence, renderer integration, validation UI, and download orchestration remain later work.
+Status: Phase 1 contract baseline. Phase 2 preferences/shell and Phase 3A online networking/encrypted credentials are implemented in documents 7–8. The raster renderer is implemented in document 9; document 8 also records the Phase 3C online constructor and credential UI. Package persistence and download orchestration remain later work.
 
 ## Ownership
 
@@ -31,9 +31,9 @@ Each provider has full configuration, attribution, and capabilities. A style may
 | `osm` / `osmand-hd` | `https://tile.osmand.net/hd/{z}/{x}/{y}.png` | 1–19 | PNG, 512 × 512 |
 | `arcgis` / `world-imagery` | `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}` | Resolve from service metadata in Phase 3 | JPEG |
 | `yandex` / `map` | `https://tiles.api-maps.yandex.ru/v1/tiles/` | 0–20 | PNG |
-| `thunderforest` / `atlas` | `https://tile.thunderforest.com/atlas/{z}/{x}/{y}.png` | 0–22 | PNG |
+| `thunderforest` / `atlas` | `https://api.thunderforest.com/atlas/{z}/{x}/{y}.png` | 0–22 | PNG |
 
-The initial endpoint URLs follow the requested catalog. They are not claims that unauthenticated requests succeed or that every geographic area has imagery at every advertised level. ArcGIS format/coverage and exact contributor attribution must be reconciled with service metadata during integration. Thunderforest's current documentation uses `api.thunderforest.com`; verify the requested `tile.thunderforest.com` host during Phase 3.
+The initial endpoint URLs follow the requested catalog. They are not claims that unauthenticated requests succeed or that every geographic area has imagery at every advertised level. ArcGIS format/coverage and exact contributor attribution must be reconciled with service metadata during integration. Phase 3C uses the documented `api.thunderforest.com` host.
 
 `TileEndpoint.address` substitutes only z/x/y and returns an unencoded structured address. It does not perform HTTP, attach keys, validate coordinates, or authorize downloads. The Phase 3A online adapter merges declared endpoint parameters with their defaults, rejects missing mandatory values, resolves `CredentialReference` through platform credential storage, and lets Ktor encode query values exactly once. Keys, signed URLs, and credential values must never enter manifests, progress objects, or logs.
 

@@ -26,7 +26,7 @@ class ProviderContractsTest {
             BuiltInProviders.arcGis.styles.single().endpoint.address(key).url,
         )
         assertEquals(
-            "https://tile.thunderforest.com/atlas/12/1234/567.png",
+            "https://api.thunderforest.com/atlas/12/1234/567.png",
             BuiltInProviders.thunderforest.styles.single().endpoint.address(key).url,
         )
         val yandex = BuiltInProviders.yandex.styles.single().endpoint.address(key)

@@ -15,6 +15,12 @@ abstract class ShellNavigationChecks {
     @get:Rule
     val compose = createAndroidComposeRule<MainActivity>()
 
+    @org.junit.Before
+    fun useOfflineFixture() {
+        compose.activity.intent.putExtra("fixture-map", true)
+        compose.activityRule.scenario.recreate()
+    }
+
     @Test
     fun navigationAndDialogSurviveRecreationWithoutReplayingSave() {
         compose.onNodeWithText("Build", useUnmergedTree = true).performClick()

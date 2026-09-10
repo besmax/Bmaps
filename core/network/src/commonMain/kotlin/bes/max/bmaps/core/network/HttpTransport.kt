@@ -8,6 +8,7 @@ class HttpResourceRequest(
     val connectTimeoutMillis: Long = 5_000,
     val socketTimeoutMillis: Long = 10_000,
     val maxResponseBytes: Int = 2_000_000,
+    val cachePublicResponse: Boolean = false,
 ) {
     init {
         require(requestTimeoutMillis > 0 && connectTimeoutMillis > 0 && socketTimeoutMillis > 0)

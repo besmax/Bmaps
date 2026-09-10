@@ -13,5 +13,6 @@ private val appGraph: IosAppGraph by lazy { createGraph<IosAppGraph>() }
 @OptIn(kotlin.experimental.ExperimentalNativeApi::class)
 fun MainViewController() = ComposeUIViewController {
     App(appGraph, previewMap = kotlin.native.Platform.isDebugBinary &&
-        platform.Foundation.NSProcessInfo.processInfo.arguments.contains("--preview-map"))
+        platform.Foundation.NSProcessInfo.processInfo.arguments.contains("--preview-map"),
+        onlineMap = kotlin.native.Platform.isDebugBinary && platform.Foundation.NSProcessInfo.processInfo.arguments.contains("--online-map"))
 }

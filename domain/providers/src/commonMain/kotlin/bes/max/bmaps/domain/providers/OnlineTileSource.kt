@@ -73,6 +73,7 @@ internal class OnlineTileSource(
             repeat(policy.maxAttempts) { attempt ->
                 val response = gate.execute { transport.fetch(HttpResourceRequest(
                     url, policy.requestTimeoutMillis, policy.connectTimeoutMillis, policy.socketTimeoutMillis, policy.maxTileBytes,
+                    cachePublicResponse = policy.cachePublicResponses,
                 )) }
                 val result = response.toTileResult(content)
                 if (!response.retryable() || attempt == policy.maxAttempts - 1) return@coroutineScope result

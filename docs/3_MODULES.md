@@ -18,6 +18,7 @@ Modules containing Compose Multiplatform screens, ViewModels, and presentation-l
 * **`feature:shell`**
     * **Responsibility:** Application chrome, theme presentation, and preferences dialog with its own ViewModel. Accepts content/navigation callbacks from `:shared`; never imports other features. Theme preferences use `core:datastore` and ViewModel injection uses `core:di`.
 * **`feature:constructor`**
+    * **Phase 3C:** Online map presentation, source/style selection, presentation validation, loading/error/retry state, attribution, and a separate dialog-scoped credentials ViewModel. Uses `domain:providers`, `core:map-engine`, `core:datastore`, and `core:di`.
     * **Responsibility:** UI for the map builder. Handles user interaction for bounding box selection, zoom level toggling, layer opacity control, and initiating the download process.
 * **`feature:library`**
     * **Responsibility:** UI for managing local `.mbtiles` packages. Displays downloaded maps, storage metrics, and handles user actions for deleting or sharing packages.

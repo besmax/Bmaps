@@ -2,7 +2,7 @@
 
 An offline-first map constructor and viewer for Android and iOS, built with Kotlin and Compose Multiplatform.
 
-The current implementation includes provider/package contracts, feature navigation, Metro dependency injection, persisted appearance preferences, provider tile networking, and encrypted credential storage. A deterministic offline raster preview is available in the constructor. Live provider rendering, downloads, and package management follow in subsequent phases.
+The current implementation includes provider/package contracts, feature navigation, Metro dependency injection, persisted appearance preferences, provider tile networking, and encrypted credential storage. The constructor now displays an online OSM map with attribution, persistent HTTP caching, source selection, and recoverable errors. Thunderforest supports secure API-key entry; other providers remain gated by the prerequisites documented below. Downloads and package management are not implemented.
 
 ## Project structure
 
@@ -13,7 +13,7 @@ The current implementation includes provider/package contracts, feature navigati
 - `core`: infrastructure and renderer-independent contracts.
 - `build-logic`: Gradle convention plugins, with dependencies managed by `gradle/libs.versions.toml`.
 
-Read [AGENTS.md](AGENTS.md) and the [documentation](docs/5_IMPLEMENTATION_PLAN.md) before extending the architecture. See [feature shell details](docs/7_FEATURE_SHELL.md) for graph lifetimes and preferences behavior, and [provider networking details](docs/8_PROVIDER_NETWORKING_AND_CREDENTIALS.md) for Phase 3A APIs and verification. [Map engine documentation](docs/9_MAP_ENGINE.md) covers coordinates, renderer limits, ownership, and Phase 3B checks.
+Read [AGENTS.md](AGENTS.md) and the [documentation](docs/5_IMPLEMENTATION_PLAN.md) before extending the architecture. See [feature shell details](docs/7_FEATURE_SHELL.md) for graph lifetimes and preferences behavior, and [provider networking details](docs/8_PROVIDER_NETWORKING_AND_CREDENTIALS.md) for networking, caching, online constructor behavior, provider availability, and verification. [Map engine documentation](docs/9_MAP_ENGINE.md) covers coordinates, renderer limits, ownership, and Phase 3B checks.
 
 ## Build and run
 
