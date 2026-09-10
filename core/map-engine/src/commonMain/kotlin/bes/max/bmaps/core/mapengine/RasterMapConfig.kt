@@ -1,5 +1,7 @@
 package bes.max.bmaps.core.mapengine
 
+import kotlinx.coroutines.flow.receiveAsFlow
+
 /** A rectangular, tile-aligned region at the lowest source level. */
 data class TilePyramid(
     val levels: ZoomRange,
@@ -61,8 +63,18 @@ class RasterLayer(val id: String, val source: TileSourceFactory, val opacity: Fl
 sealed interface MapEvent {
     data class TileLoaded(val layerId: String, val key: TileKey) : MapEvent
     data class TileMissing(val layerId: String, val key: TileKey) : MapEvent
-    data class ViewportChanged(val viewport: MapViewport) : MapEvent
+    data class ViewportChanged(val viewport: MapViewport, val visibleWindow: MapWindow? = null) : MapEvent
     data class Tap(val position: MapPoint) : MapEvent
     data class TileFailed(val layerId: String, val key: TileKey, val failure: TileReadFailure) : MapEvent
     data class Unavailable(val reason: String) : MapEvent
+}
+
+
+data class MapWindow(val left: Double, val top: Double, val right: Double, val bottom: Double)
+
+class RasterMapController {
+    private val commands = kotlinx.coroutines.channels.Channel<Double>(kotlinx.coroutines.channels.Channel.CONFLATED)
+    internal val zooms = commands.receiveAsFlow()
+    fun zoomIn() { commands.trySend(2.0) }
+    fun zoomOut() { commands.trySend(0.5) }
 }

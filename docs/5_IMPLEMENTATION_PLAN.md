@@ -1,6 +1,17 @@
 # Bmaps Implementation Plan
 
-Planning baseline: 2026-09-08. Status: Phases 1, 2, and 3A implemented. Platform verification and remaining environment limits are recorded below. Phase 0's remaining build/CI work is still pending.
+Planning baseline: 2026-09-08. Last updated: 2026-09-10. Phases 1, 2, and 3A are implemented. Phase 3B's renderer and coordinate implementation is in place; Android deterministic-fixture acceptance remains pending. Phase 3C's provider catalog, fullscreen constructor flow, secure credentials dialog, and OSM rendering are implemented; broader provider entitlement and native acceptance remain pending. Phase 3D area selection and save-settings UI are implemented; its full acceptance matrix is pending. Phase 0's remaining build/CI work is also pending.
+
+## Current implementation status
+
+| Area | Implemented and verified | Remaining work |
+| --- | --- | --- |
+| Phase 3B | Coordinate math, raster adapter, source ownership/cancellation tests, and iOS deterministic fixture rendering | Android deterministic-fixture runtime check; broader native cleanup/lifecycle stress |
+| Phase 3C | OSM, ArcGIS World Imagery, OsmAndHd, and credential-gated Thunderforest/Yandex source definitions; provider/style selection, attribution, persistent public HTTP caching, secure credential dialog, and retry/error handling | Authenticated provider entitlement verification; ArcGIS regional rendering/licensing review; Yandex account/branding/signing review; OsmAnd third-party access review |
+| Phase 3D | Initial native rendering evidence is recorded below | Full pan/zoom, switching, lifecycle, missing-tile, and network-recovery acceptance matrix |
+| Phases 4–11 | Contracts and plans only | Package storage, downloads, offline library/viewer, editing, elevation/CRS, sharing, and release hardening |
+
+Next: finish the outstanding provider prerequisites and native acceptance checks. Do not treat Phase 3 as complete or begin download orchestration on the strength of the OSM smoke checks alone.
 
 This plan follows `AGENTS.md` and documents 1–4. Checked boxes represent completed deliverables. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats. The table below preserves the original source-inspection baseline; current Phase 1 decisions are recorded in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 
@@ -129,23 +140,25 @@ Verification (2026-09-09): 32 Android host tests pass across network, providers,
 
 - [x] Implement coordinate/tile conversions, explicit projection limits, and antimeridian behavior without silently clamping unsupported selections.
 - [x] Build the MapComposeMP wrapper in `core:map-engine` with renderer-independent viewport, tile-source, layer, and interaction APIs.
-- [ ] Render deterministic tile fixtures on Android and iOS; verify stream ownership, cancellation, and renderer cleanup.
+- [x] Implement deterministic PNG/JPEG fixtures and verify rendering on iOS.
+- [x] Verify stream ownership, cancellation, and source cleanup with Android host and iOS simulator tests.
+- [ ] Verify the deterministic fixture on the Android native renderer.
 
 Acceptance: coordinate fixtures pass and both native renderers display a fixture map. Verify this integration before expanding map UI.
 
 Verification on 2026-09-09: nine map-engine tests pass on each of Android host and iOS simulator; 15 provider host tests and the Android navigation/recreation test pass. Android debug/instrumentation APK assembly, iOS device compilation, simulator framework linking, and Xcode simulator app build pass. The iPhone 17 Pro simulator displays the offline PNG/JPEG fixture after fixing preview navigation before graph initialization and joining renderer jobs before dispatcher shutdown. Screenshot: `/tmp/bmaps-resume-ios-fixed.png` (temporary local evidence). The existing Android AVD boots in read-only mode but APK installation fails with `INSTALL_FAILED_INSUFFICIENT_STORAGE`; Android visual acceptance remains pending. Native navigation/disposal stress and physical-device performance checks remain pending. Details: `9_MAP_ENGINE.md`.
 
-#### Phase 3C — Online constructor map
+#### Phase 3C — Online constructor map (provider catalog and first UI slice implemented)
 
 - [x] Connect OSM online tile loading to the constructor and configure Thunderforest for runtime API-key entry.
-- [ ] Enable the remaining provider configurations after their prerequisites are resolved.
+- [x] Register ArcGIS World Imagery, OsmAndHd, Yandex Map, and Thunderforest Atlas with explicit availability and credential policies.
 - [x] Add provider/style selection, visible attribution, initial viewport, and effective scale/level limits.
 - [x] Implement persistent HTTP caching and secure credential input for enabled sources.
 - [ ] Resolve remaining provider metadata, account-specific availability, and integration requirements.
 
 Acceptance: the constructor displays a real approved provider on both platforms and surfaces recoverable loading failures.
 
-Implementation: OSM is enabled with public HTTP caching; Thunderforest Atlas uses its documented API host and requires a user-supplied key. ArcGIS, Yandex, and OsmAnd remain unavailable with explicit UI messages. ArcGIS metadata was retrieved: source levels 0–23 also require regional rendering beyond the current global engine limits. No source levels are silently truncated. Details and outstanding provider prerequisites are recorded in `8_PROVIDER_NETWORKING_AND_CREDENTIALS.md`.
+Implementation: OSM is enabled with public HTTP caching; ArcGIS World Imagery and OsmAndHd are selectable; Thunderforest Atlas and Yandex Map use documented hosts and require user-supplied keys. ArcGIS levels 0–23 still require regional rendering beyond current global engine limits. No source levels are silently truncated. Details and outstanding provider prerequisites are recorded in `8_PROVIDER_NETWORKING_AND_CREDENTIALS.md`.
 
 Verification on 2026-09-09–10: three constructor tests pass on Android host and iOS simulator, seven networking/cache host tests pass, and provider, map-engine, and Android navigation regression tests pass. Android APKs, iOS device compilation, simulator framework linking, and the Xcode simulator build pass. Android displays OSM tiles with attribution using a fresh temporary data image (`/tmp/bmaps-3c-userdata.img`); the existing AVD data was preserved. The iPhone 17 Pro simulator displays OSM tiles with visible attribution (`/tmp/bmaps-3c-ios-osm.png`) and survives app restart; its public cache contained 55 OSM responses, and its UI also displayed the expected Thunderforest missing-key message. Cache tests verify persistence across client recreation, conditional revalidation, and isolation of credential-bearing requests. Authenticated Thunderforest rendering and the broader Phase 3D lifecycle/network acceptance are still pending. Temporary screenshots and logs use `/tmp/bmaps-3c-*` paths.
 

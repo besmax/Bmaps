@@ -27,7 +27,7 @@ class OnlineMapViewModelTest {
             assertNull(model.state.value.error)
             val blocked = model.state.value.choices.first { it.provider.id.value == "yandex" }
             model.select(blocked)
-            assertNull(model.state.value.session)
+            assertNotNull(model.state.value.session)
             assertEquals(0, opens)
             model.select(model.state.value.choices.first { it.provider.id.value == "thunderforest" })
             val keyed = assertNotNull(model.state.value.session)
@@ -41,7 +41,7 @@ class OnlineMapViewModelTest {
         assertEquals(22, rasterConfig(BuiltInProviders.thunderforest.config)?.pyramid?.levels?.max)
         assertEquals(22, rasterConfig(ProviderConfig(levelLimits = LevelLimitsConfig(22, 22)))?.pyramid?.levels?.min)
         assertNull(rasterConfig(ProviderConfig()))
-        assertNull(rasterConfig(ProviderConfig(levelLimits = LevelLimitsConfig(0, 23))))
+        assertEquals(23, rasterConfig(ProviderConfig(levelLimits = LevelLimitsConfig(0, 23)), MapViewport(MapPoint(0.5, 0.5), 65536.0))?.pyramid?.levels?.max)
         assertNull(rasterConfig(BuiltInProviders.osm.config.copy(tileMatrix = TileMatrixConfig(tileHeight = 512))))
         assertNull(rasterConfig(BuiltInProviders.osm.config.copy(initialViewport = InitScaleAndScrollConfig(scale = Double.NaN))))
     }

@@ -1,6 +1,8 @@
 package bes.max.bmaps.feature.shell
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,6 +48,7 @@ fun AppShell(
     destination: ShellDestination,
     onNavigate: (ShellDestination) -> Unit,
     onPreferences: () -> Unit,
+    fullScreen: Boolean = false,
     viewModel: ShellViewModel = metroViewModel(),
     content: @Composable ((ShellDestination) -> Unit) -> Unit,
 ) {
@@ -70,14 +73,15 @@ fun AppShell(
     }
     MaterialTheme(colorScheme = if (darkTheme) DarkColors else LightColors) {
         Scaffold(
+            contentWindowInsets = if (fullScreen) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
             topBar = {
-                TopAppBar(
+                if (!fullScreen) TopAppBar(
                     title = { Text("Bmaps") },
                     actions = { TextButton(onClick = viewModel::openPreferences) { Text("Preferences") } },
                 )
             },
             bottomBar = {
-                NavigationBar {
+                if (!fullScreen) NavigationBar {
                     ShellDestination.entries.forEach { item ->
                         NavigationBarItem(
                             selected = destination == item,
@@ -90,7 +94,7 @@ fun AppShell(
             },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
-                if (state.preferencesUnavailable) {
+                if (!fullScreen && state.preferencesUnavailable) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -100,7 +104,7 @@ fun AppShell(
                         TextButton(onClick = viewModel::retryPreferences) { Text("Retry") }
                     }
                 }
-                if (state.preferences == null && !state.preferencesUnavailable) {
+                if (!fullScreen && state.preferences == null && !state.preferencesUnavailable) {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
                 content(viewModel::navigateTo)

@@ -51,7 +51,8 @@ object BuiltInProviders {
                 content = TileContentDescriptor(rasterFormats = setOf(RasterTileFormat.JPEG)),
             ),
         ),
-        attribution = listOf(Attribution("Esri and imagery contributors", "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer")),
+        config = ProviderConfig(levelLimits = LevelLimitsConfig(0, 23)),
+        attribution = listOf(Attribution("Esri, Vantor, Earthstar Geographics, and the GIS User Community", "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer")),
         capabilities = ProviderCapabilities(policyUrl = "https://www.esri.com/en-us/legal/terms/full-master-agreement"),
     )
 

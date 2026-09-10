@@ -39,9 +39,20 @@ internal fun FixtureMap(modifier: Modifier = Modifier) {
     val model = metroViewModel<FixtureViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
     val layers = remember { listOf(RasterLayer("sample", TileSourceFactory {
+        openFixtureTileSource()
+    })) }
+    androidx.compose.foundation.layout.Box(modifier) {
+        RasterMap(RasterMapConfig(TilePyramid(ZoomRange(0, 3))), layers,
+            Modifier.matchParentSize(), onEvent = model::onEvent)
+        state.error?.let { androidx.compose.material3.Text(it) }
+    }
+}
+
+@OptIn(ExperimentalResourceApi::class)
+internal suspend fun openFixtureTileSource(): TileSource {
         val png = ByteString(Res.readBytes("files/fixture.png"))
         val jpeg = ByteString(Res.readBytes("files/fixture.jpg"))
-        object : TileSource {
+        return object : TileSource {
             private val closed = MutableStateFlow(false)
             override suspend fun read(key: TileKey): TileReadResult = when {
                 closed.value -> TileReadResult.Failed(TileReadFailure.CLOSED)
@@ -50,10 +61,4 @@ internal fun FixtureMap(modifier: Modifier = Modifier) {
             }
             override suspend fun close() { closed.value = true }
         }
-    })) }
-    androidx.compose.foundation.layout.Box(modifier) {
-        RasterMap(RasterMapConfig(TilePyramid(ZoomRange(0, 3))), layers,
-            Modifier.matchParentSize(), model::onEvent)
-        state.error?.let { androidx.compose.material3.Text(it) }
-    }
 }

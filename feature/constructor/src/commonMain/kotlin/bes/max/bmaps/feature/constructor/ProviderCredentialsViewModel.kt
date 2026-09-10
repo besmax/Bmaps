@@ -15,7 +15,13 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class ProviderCredentialsState(val draft: String = "", val saving: Boolean = false, val error: String? = null) {
+data class ProviderCredentialsState(
+    val draft: String = "",
+    val loading: Boolean = false,
+    val hasSavedCredential: Boolean = false,
+    val saving: Boolean = false,
+    val error: String? = null,
+) {
     override fun toString() = "ProviderCredentialsState(<redacted>)"
 }
 
@@ -28,8 +34,26 @@ class ProviderCredentialsViewModel(private val credentials: ProviderCredentials)
     private val completed = Channel<Unit>(Channel.BUFFERED)
     val events = completed.receiveAsFlow()
 
+    fun load(identifier: String) {
+        if (state.value.loading || state.value.hasSavedCredential) return
+        mutableState.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            try {
+                val result = credentials.read(identifier)
+                mutableState.update {
+                    it.copy(
+                        loading = false,
+                        hasSavedCredential = result is CredentialResult.Available,
+                        error = if (result is CredentialResult.Unavailable) "Saved key is unavailable. Replace it to continue." else null,
+                    )
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { mutableState.update { it.copy(loading = false, error = "Saved key is unavailable. Replace it to continue.") } }
+        }
+    }
+
     fun edit(value: String) {
-        if (!state.value.saving) mutableState.value = ProviderCredentialsState(value.take(4096))
+        if (!state.value.saving) mutableState.update { it.copy(draft = value.take(4096), error = null) }
     }
 
     fun save(identifier: String, remove: Boolean = false) {
@@ -44,7 +68,7 @@ class ProviderCredentialsViewModel(private val credentials: ProviderCredentials)
             try {
                 val result = if (remove) credentials.remove(identifier) else credentials.write(identifier, draft)
                 if (result == CredentialWriteResult.SUCCESS) {
-                    mutableState.value = ProviderCredentialsState()
+                    mutableState.value = ProviderCredentialsState(hasSavedCredential = !remove)
                     completed.send(Unit)
                 } else mutableState.update { it.copy(saving = false, error = "Secure storage is unavailable. Try again.") }
             } catch (cancelled: CancellationException) { throw cancelled }

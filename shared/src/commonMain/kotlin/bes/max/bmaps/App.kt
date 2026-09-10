@@ -3,6 +3,7 @@ package bes.max.bmaps
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.savedstate.read
 import androidx.navigation.compose.NavHost
@@ -10,6 +11,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
+import bes.max.bmaps.feature.constructor.FullScreenMap
+import bes.max.bmaps.feature.constructor.MapSaveSettingsContent
 import bes.max.bmaps.feature.constructor.ConstructorScreen
 import bes.max.bmaps.feature.constructor.ProviderCredentialsContent
 import bes.max.bmaps.feature.library.LibraryScreen
@@ -32,6 +35,7 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
         }
         AppShell(
             destination = ShellDestination.entries.firstOrNull { it.route == route } ?: ShellDestination.LIBRARY,
+            fullScreen = route == MapRoute || route == MapSettingsRoute,
             onNavigate = navigation::openDestination,
             onPreferences = { navigation.navigate(PreferencesRoute) { launchSingleTop = true } },
         ) { navigate ->
@@ -41,7 +45,20 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
                 }
                 composable(ShellDestination.CONSTRUCTOR.route) {
                     ConstructorScreen(onOpenLibrary = { navigate(ShellDestination.LIBRARY) },
-                        onCredentials = { navigation.navigate("provider-credentials/$it") }, showFixture = previewMap || fixtureMap)
+                        onCredentials = { navigation.navigate("provider-credentials/$it") },
+                        onOpenMap = { provider, style -> navigation.navigate("map/$provider/$style") })
+                }
+                composable(MapRoute) { mapEntry ->
+                    val provider = mapEntry.arguments?.read { getString("provider") }.orEmpty()
+                    val style = mapEntry.arguments?.read { getString("style") }.orEmpty()
+                    FullScreenMap(provider, style, previewMap || fixtureMap,
+                        onBack = { navigation.popBackStack() },
+                        onSettings = { navigation.navigate(MapSettingsRoute) { launchSingleTop = true } },
+                        onCredentials = { navigation.navigate("provider-credentials/$it") })
+                }
+                dialog(MapSettingsRoute) {
+                    val mapEntry = remember(it) { navigation.getBackStackEntry(MapRoute) }
+                    MapSaveSettingsContent(mapEntry) { navigation.popBackStack() }
                 }
                 composable(ShellDestination.VIEWER.route) {
                     ViewerScreen(onOpenLibrary = { navigate(ShellDestination.LIBRARY) })
@@ -67,3 +84,6 @@ private fun NavHostController.openDestination(destination: ShellDestination) {
 }
 
 private const val PreferencesRoute = "preferences"
+
+private const val MapRoute = "map/{provider}/{style}"
+private const val MapSettingsRoute = "map-settings"

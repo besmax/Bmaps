@@ -31,6 +31,7 @@ data class OnlineMapState(
     val selected: MapChoice? = null,
     val session: OnlineMapSession? = null,
     val loading: Boolean = true,
+    val visibleWindow: MapWindow? = null,
     val error: String? = null,
 )
 
@@ -60,6 +61,13 @@ class OnlineMapViewModel(private val providers: ProviderRepository, private val 
         start(choice)
     }
 
+    fun retainViewport() {
+        val world = viewport ?: return
+        mutableState.update { current -> current.copy(session = current.session?.let {
+            it.copy(config = it.config.copy(initialViewport = it.config.pyramid.localViewport(world)))
+        }) }
+    }
+
     fun retry() {
         val choice = state.value.selected
         if (choice == null) loadChoices() else start(choice)
@@ -67,7 +75,7 @@ class OnlineMapViewModel(private val providers: ProviderRepository, private val 
 
     private fun start(choice: MapChoice) {
         val token = ++generation
-        val config = rasterConfig(choice.provider.configFor(choice.style), viewport)
+        val config = rasterConfig(choice.provider.configFor(choice.style), viewport, state.value.session?.config?.pyramid)
         val reason = choice.unavailableReason ?: if (config == null) "This source's tile matrix or display limits are not supported." else null
         if (reason != null) {
             mutableState.update { it.copy(selected = choice, session = null, loading = false, error = reason) }
@@ -92,7 +100,15 @@ class OnlineMapViewModel(private val providers: ProviderRepository, private val 
 
     fun onEvent(token: Int, event: MapEvent) {
         if (state.value.session?.generation != token) return
-        if (event is MapEvent.ViewportChanged) { viewport = event.viewport; return }
+        if (event is MapEvent.ViewportChanged) {
+            val session = state.value.session ?: return
+            viewport = session.config.pyramid.worldViewport(event.viewport)
+            mutableState.update { it.copy(visibleWindow = event.visibleWindow?.let(session.config.pyramid::worldWindow)) }
+            val choice = state.value.selected ?: return
+            val desired = rasterConfig(choice.provider.configFor(choice.style), viewport, session.config.pyramid)
+            if (desired != null && desired.pyramid != session.config.pyramid) start(choice)
+            return
+        }
         val error = when (event) {
             is MapEvent.TileFailed -> when (event.failure) {
                 TileReadFailure.AUTHENTICATION -> "The source rejected access. Check your API key and account."
@@ -108,16 +124,14 @@ class OnlineMapViewModel(private val providers: ProviderRepository, private val 
     }
 }
 
-internal fun rasterConfig(config: ProviderConfig, viewport: MapViewport? = null): RasterMapConfig? = try {
+internal fun rasterConfig(config: ProviderConfig, viewport: MapViewport? = null, previous: TilePyramid? = null): RasterMapConfig? = try {
     val matrix = config.tileMatrix
     val levels = config.levelLimits
     require(matrix.coordinateSystem == CoordinateSystemId.WebMercator && matrix.tileWidth == matrix.tileHeight)
-    require(config.boundaries.boundingBoxList.isEmpty())
-    require(levels.levelMin in 0..30)
-    val pyramid = TilePyramid(ZoomRange(levels.levelMin, requireNotNull(levels.levelMax)),
-        columns = 1 shl levels.levelMin, rows = 1 shl levels.levelMin, tileSize = matrix.tileWidth)
-    require(pyramid.engineSize() != null)
-    RasterMapConfig(pyramid,
-        viewport ?: MapViewport(MapPoint(config.initialViewport.scrollX, config.initialViewport.scrollY), config.initialViewport.scale),
-        minScale = config.scaleLimits.minScale ?: 1.0, maxScale = config.scaleLimits.maxScale)
+    val world = viewport ?: MapViewport(MapPoint(config.initialViewport.scrollX, config.initialViewport.scrollY), config.initialViewport.scale)
+    val pyramid = requireNotNull(worldTileWindow(ZoomRange(levels.levelMin, requireNotNull(levels.levelMax)), matrix.tileWidth, world, previous))
+    val fraction = pyramid.columns.toDouble() / (1L shl pyramid.levels.min)
+    RasterMapConfig(pyramid, pyramid.localViewport(world),
+        minScale = (config.scaleLimits.minScale ?: 1.0) * fraction,
+        maxScale = config.scaleLimits.maxScale?.times(fraction))
 } catch (_: IllegalArgumentException) { null }

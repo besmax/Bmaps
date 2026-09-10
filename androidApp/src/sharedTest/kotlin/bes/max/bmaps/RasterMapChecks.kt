@@ -17,12 +17,15 @@ abstract class RasterMapChecks {
 
     @Test fun fixturePixelsRenderAfterNavigationAndRecreation() {
         compose.onNodeWithText("Build", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Open map").performClick()
         assertFixtureRendered()
         compose.activityRule.scenario.recreate()
         assertFixtureRendered()
+        compose.onNodeWithText("Back").performClick()
         compose.onNodeWithText("Library", useUnmergedTree = true).performClick()
         compose.onNodeWithText("Your maps").assertIsDisplayed()
         compose.onNodeWithText("Build", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Open map").performClick()
         assertFixtureRendered()
     }
 

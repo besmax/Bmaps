@@ -1,6 +1,6 @@
 # Provider Networking and Credentials
 
-Phase 3A implements provider registration, URL construction, bounded tile HTTP, and encrypted credential persistence. Phase 3B adds the MapComposeMP renderer wrapper. Phase 3C connects OSM and key-configured Thunderforest to the constructor; the remaining sources are gated below. No map request starts when the application shell opens.
+Phase 3A implements provider registration, URL construction, bounded tile HTTP, and encrypted credential persistence. Phase 3B adds the MapComposeMP renderer wrapper. Phase 3C connects OSM, ArcGIS, OsmAndHd, Thunderforest, and Yandex to the constructor; credentialed sources use runtime secure key storage. No map request starts when the application shell opens.
 
 ## Ownership and composition
 
@@ -74,11 +74,11 @@ Opening Build loads OSM; the default Library destination does not request map ti
 | --- | --- | --- |
 | OSM / WorldStreetMap | Enabled; source levels 0–19, visible linked attribution, identifying User-Agent, persistent native HTTP cache | Public OSM bulk/offline package downloads remain prohibited. |
 | Thunderforest / Atlas | Configured at `api.thunderforest.com`; levels 0–22; linked Thunderforest and OSM attribution; masked key entry | User account/key required. Authenticated native rendering has not been verified. Offline entitlement must be verified separately. |
-| OsmAnd / OsmAndHd | Listed but unavailable; no HTTP is started | Establish permission for third-party use of the endpoint. OSM's standard-tile policy does not cover it. |
-| ArcGIS / World Imagery | Listed but unavailable; no HTTP is started | Establish licensed access, implement service/contributor attribution and effective coverage, and support regional rendering for the advertised 0–23 pyramid. |
-| Yandex / Map | Listed but unavailable; no HTTP is started | Verify account requirements, signing where required, branding/logo obligations, and the effective projection/image scale before enabling. |
+| OsmAnd / OsmAndHd | Configured and selectable; no embedded credential | Establish permission for third-party use of the endpoint. OSM's standard-tile policy does not cover it. |
+| ArcGIS / World Imagery | Configured and selectable; JPEG source levels 0–23 and service attribution | Verify licensed access, effective coverage, and regional rendering beyond the current global engine limits. |
+| Yandex / Map | Configured and selectable; masked runtime API-key entry and Yandex attribution/logo | Verify account requirements, signing where required, branding obligations, and effective projection/image scale. |
 
-The ArcGIS metadata retrieved on 2026-09-09 advertises JPEG, 256 × 256 tiles, EPSG:3857, and levels 0–23. Its projected extent is approximately ±20,037,507.23 east/west and ±19,971,868.88 north/south. Copyright text names Esri, Vantor, Earthstar Geographics, and the GIS User Community. This is evidence for the future integration, not a runtime metadata resolver or authorization to download. The seed definition continues to leave its effective source limits unresolved until that integration exists.
+The ArcGIS metadata retrieved on 2026-09-09 advertises JPEG, 256 × 256 tiles, EPSG:3857, and levels 0–23. Its projected extent is approximately ±20,037,507.23 east/west and ±19,971,868.88 north/south. Copyright text names Esri, Vantor, Earthstar Geographics, and the GIS User Community. The current source definition uses this metadata and attribution; runtime metadata resolution, licensing verification, and regional rebasing remain future work.
 
 `OnlineMapAvailability` records integration readiness in the provider domain. Adding a catalog definition does not automatically approve a live source. Provider policy and account requirements must be reviewed alongside its rendering configuration.
 
