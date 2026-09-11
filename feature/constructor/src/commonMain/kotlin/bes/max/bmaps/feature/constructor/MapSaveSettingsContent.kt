@@ -7,6 +7,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -40,18 +42,22 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onDismiss: () -> Unit)
         }
     }
     AlertDialog(
+        shape = MaterialTheme.shapes.medium,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 0.dp,
         onDismissRequest = onDismiss,
         title = { Text(stringResource(Res.string.map_settings_title)) },
         text = {
             Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(state.name, model::name, label = { Text(stringResource(Res.string.map_name)) }, singleLine = true)
+                OutlinedTextField(state.name, model::name, label = { Text(stringResource(Res.string.map_name)) }, singleLine = true, shape = MaterialTheme.shapes.small)
                 Text(stringResource(Res.string.zoom_levels), style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.availableLevels.forEach { level ->
                         FilterChip(selected = level in state.selectedLevels, onClick = { model.toggle(level) }, label = { Text(level.toString()) })
                     }
                 }
-                Text(stringResource(Res.string.estimated_size_mb, formatMegabytes(state.estimate?.estimatedPackageBytes) ?: stringResource(Res.string.unavailable)))
+                Text(stringResource(Res.string.estimated_size_mb, formatMegabytes(state.estimate?.estimatedPackageBytes) ?: stringResource(Res.string.unavailable)),
+                    style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.tertiary)
                 Text(stringResource(Res.string.tile_count_estimate, state.estimate?.tileCount ?: 0), style = MaterialTheme.typography.bodySmall)
                 if ((state.estimate?.estimatedPackageBytes ?: 0) > 300_000_000L) Text(stringResource(Res.string.package_size_limit_exceeded), color = MaterialTheme.colorScheme.error)
                 if (source?.provider?.capabilitiesFor(source.style)?.offlineDownload == OfflineDownloadPermission.PROHIBITED) {
@@ -61,7 +67,8 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onDismiss: () -> Unit)
                 state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
             }
         },
-        confirmButton = { TextButton(onClick = model::confirm) { Text(stringResource(Res.string.save_settings)) } },
+        confirmButton = { Button(onClick = model::confirm, modifier = Modifier.heightIn(min = 48.dp), shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = Color.White)) { Text(stringResource(Res.string.save_settings)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },
     )
 }

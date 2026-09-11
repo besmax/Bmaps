@@ -324,3 +324,17 @@ Compared the RAMap ProviderViewModel, TileStreamBuilder, OSM provider, and deleg
 The renderer runner now belongs to viewModelScope, retaining the existing engine, viewport, and decoded tiles during background/foreground transitions. Actual content or nonzero container-size changes still replace the session; clearing the ViewModel releases it. Default provider concurrency is eight with no start delay, matching the existing eight renderer workers; native per-host limits are also eight, and the transport global limit remains sixteen. Explicit provider capability limits, retry bounds, and response-size limits remain enforced. Header and dimension checks replace the duplicate full validation decode; MapComposeMP performs the display decode.
 
 Builds, tests, and runtime performance measurements remain assigned to the user at their request. No measured speedup or process-death restoration is claimed.
+
+
+## API-key dialog crash — 2026-09-11
+
+The reported Android AbstractMethodError occurs in OutlinedTextFieldDefaults while applying the experimental Foundation CustomStyle interface, before the credential repository is invoked. The catalog selected Compose Material3 1.11.0-alpha07, whose Android variant is Material3 1.5.0-alpha17 and whose metadata requests Foundation 1.11.0-beta02. The app's Compose Multiplatform 1.11.1 dependency requests Android Foundation 1.11.2. The exception identifies the failing styling implementation in the outlined text-field defaults. This is a binary linkage failure in the UI dependencies, not a credential-validation or storage failure.
+
+Pinned Compose Material3 strictly to 1.9.0 in the central version catalog. Its published Android dependency is stable Material3 1.4.0. This removes the alpha CustomStyle implementation from the text-field path for both API-key entry and map-name entry, without changing the credential-storage flow. The strict common-artifact version prevents a transitive dependency silently selecting a newer Material3 alpha. Existing convention plugins consume the catalog entry without additional module configuration.
+
+Source: [published Material3 1.9.0 metadata](https://central.sonatype.com/artifact/org.jetbrains.compose.material3/material3/1.9.0). Builds and runtime verification remain with the user at their request. Rebuild and reinstall the app to replace the packaged dependency; no application-data reset is required.
+
+
+## Bmaps styling — 2026-09-11
+
+Applied the supplied dark palette, derived light colors, bundled Inter fonts, tabular typography, rounded shapes, vector navigation icons, floating map controls, responsive margins, amber selection visuals, and themed dialogs. Current functionality and theme preferences are preserved. Glass surfaces use translucency rather than backdrop blur. See `10_BMAPS_DESIGN.md`. Builds and runtime verification remain with the user.

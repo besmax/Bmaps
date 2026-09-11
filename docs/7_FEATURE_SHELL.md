@@ -54,3 +54,8 @@ Android stores the file in the application's DataStore directory. iOS uses Appli
 Host coverage includes real DataStore file reopening, preservation of unrelated keys, load/save failures and retry, cancellation on ViewModel clearing, discarded dialog drafts, live theme observation, and single delivery across event-collector restart. The shared Android UI scenario checks navigation, activity recreation, dialog draft retention, background/foreground transitions, save completion, reopening, and Cancel behavior. It is runnable under Robolectric or on an Android device.
 
 Native smoke checks should open each destination, save a theme, dismiss/reopen preferences, background/foreground the app, and relaunch to verify persisted appearance. Runtime/device results are tracked in the implementation plan separately from compilation.
+
+
+## Bmaps visual system
+
+`BmapsTheme.kt` now owns the palette, bundled Inter font family, responsive typography, and shapes applied by AppShell. All destinations inherit the theme without feature-to-feature imports. Implementation details and mappings from the supplied Stitch design are recorded in `10_BMAPS_DESIGN.md`.

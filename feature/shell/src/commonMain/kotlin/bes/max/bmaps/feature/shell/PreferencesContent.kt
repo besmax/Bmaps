@@ -13,6 +13,10 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -48,7 +52,8 @@ fun PreferencesContent(onDismiss: () -> Unit, viewModel: PreferencesViewModel = 
             }
         }
     }
-    Surface(shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.widthIn(max = 420.dp)) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.widthIn(max = 360.dp)) {
         Column(
             modifier = Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -91,6 +96,8 @@ fun PreferencesContent(onDismiss: () -> Unit, viewModel: PreferencesViewModel = 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
                 Button(
+                    modifier = Modifier.heightIn(min = 48.dp), shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = Color.White),
                     onClick = viewModel::save,
                     enabled = !state.isLoading && !state.isSaving && state.error != PreferencesError.LOAD,
                 ) { Text(if (state.isSaving) stringResource(Res.string.saving) else stringResource(Res.string.save)) }

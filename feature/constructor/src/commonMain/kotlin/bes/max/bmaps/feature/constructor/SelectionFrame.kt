@@ -3,6 +3,7 @@ package bes.max.bmaps.feature.constructor
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Surface
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun SelectionFrame(frame: SelectionRectangle, onDrag: (SelectionHandle, Float, Float) -> Unit) {
+    val amber = MaterialTheme.colorScheme.primaryContainer
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val width = constraints.maxWidth.toFloat()
         val height = constraints.maxHeight.toFloat()
@@ -41,7 +43,8 @@ internal fun SelectionFrame(frame: SelectionRectangle, onDrag: (SelectionHandle,
             drawRect(shade, Offset(0f, bottom), Size(size.width, size.height - bottom))
             drawRect(shade, Offset(0f, y), Size(x, bottom - y))
             drawRect(shade, Offset(right, y), Size(size.width - right, bottom - y))
-            drawRect(Color.White, Offset(x, y), Size(right - x, bottom - y), style = Stroke(3.dp.toPx()))
+            drawRect(amber.copy(alpha = 0.12f), Offset(x, y), Size(right - x, bottom - y))
+            drawRect(amber, Offset(x, y), Size(right - x, bottom - y), style = Stroke(2.dp.toPx()))
         }
         SelectionDragTarget(SelectionHandle.MOVE, width, height, onDrag,
             Modifier.offset(left, top).size(frameWidth, frameHeight))
@@ -55,9 +58,15 @@ internal fun SelectionFrame(frame: SelectionRectangle, onDrag: (SelectionHandle,
             SelectionDragTarget(handle, width, height, onDrag,
                 Modifier.offset(x - 24.dp, y - 24.dp).size(48.dp))
         }
-        Text(stringResource(Res.string.selection_instructions), color = Color.White,
-            style = MaterialTheme.typography.labelMedium,
-            modifier = Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(top = 76.dp, start = 16.dp, end = 16.dp))
+        Surface(
+            modifier = Modifier.align(Alignment.TopCenter).safeDrawingPadding()
+                .padding(top = 76.dp, start = 16.dp, end = 16.dp).widthIn(max = 360.dp),
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
+        ) {
+            Text(stringResource(Res.string.selection_instructions), style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(12.dp))
+        }
     }
 }
 
@@ -69,6 +78,8 @@ private fun SelectionDragTarget(
     onDrag: (SelectionHandle, Float, Float) -> Unit,
     modifier: Modifier,
 ) {
+    val amber = MaterialTheme.colorScheme.primaryContainer
+    val outline = MaterialTheme.colorScheme.onPrimaryContainer
     val description = stringResource(when (handle) {
         SelectionHandle.MOVE -> Res.string.move_selected_area
         SelectionHandle.TOP_LEFT -> Res.string.resize_top_left
@@ -95,8 +106,9 @@ private fun SelectionDragTarget(
         }
     }) {
         if (handle != SelectionHandle.MOVE) {
-            drawCircle(Color.White, 8.dp.toPx())
-            drawCircle(Color.DarkGray, 8.dp.toPx(), style = Stroke(2.dp.toPx()))
+            drawCircle(amber.copy(alpha = 0.2f), 12.dp.toPx())
+            drawCircle(amber, 8.dp.toPx())
+            drawCircle(outline, 8.dp.toPx(), style = Stroke(1.dp.toPx()))
         }
     }
 }
