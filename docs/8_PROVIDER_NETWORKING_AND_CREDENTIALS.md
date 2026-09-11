@@ -32,12 +32,12 @@ Only declared endpoint parameters are accepted. Required missing parameters and 
 | --- | --- |
 | Maximum attempts, including the first | 3 |
 | Initial / maximum exponential retry delay | 500 / 10,000 ms |
-| Concurrent requests per provider | 4 |
-| Minimum interval between request starts | 100 ms |
+| Concurrent requests per provider | 8 |
+| Minimum interval between request starts | 0 ms |
 | Request / connection / socket timeout | 15,000 / 5,000 / 10,000 ms |
 | Maximum response size per tile | 2,000,000 bytes |
 
-Provider capability limits can tighten concurrency and pacing. All styles/sessions of a provider share its gate; creating another source does not reset the limit. The generic transport also limits total active requests to 16. These are conservative application defaults, not claims about a provider account's quota.
+Provider capability limits can tighten concurrency and pacing. All styles/sessions of a provider share its gate; creating another source does not reset the limit. The generic transport also limits total active requests to 16. The Android dispatcher allows eight concurrent requests per host; the iOS session allows up to eight connections per host. Explicit provider request-rate limits still pace starts. There is no default pacing delay before native cache lookup. These are application defaults, not claims about a provider account's quota.
 
 Transient network/timeouts, HTTP 408/429, and 500/502/503/504 retry up to the configured attempt count. Backoff is cancellable and exponential. `Retry-After` seconds and HTTP dates are supported; a server delay above the configured maximum returns the failure instead of retrying earlier than requested. Missing tiles, authentication failures, other HTTP errors, oversized responses, and invalid image responses do not retry. OkHttp connection retries are disabled so the provider loop controls application attempts. No generic Ktor retry plugin is installed.
 
@@ -68,7 +68,7 @@ The Phase 3C dialog supports saving, replacing, and removing a key. Its masked d
 
 Opening Build loads OSM; the default Library destination does not request map tiles. The selector lists all registered styles. The presentation layer validates projection, square tile dimensions, source levels, geographic coverage support, initial viewport, and scale limits before creating a raster session. Unsupported matrices fail explicitly rather than truncating levels. The current online presentation supports global Web Mercator pyramids representable by the renderer; regional rebasing is still future work.
 
-`OnlineMapViewModel` exposes one immutable state stream. Source factories create independently owned sources only when rendering begins. Switching or Retry creates a new generation; callbacks from retired generations are ignored. Retry retains the last observed viewport, clears the error, and reopens the source. Missing tiles and typed network/authentication failures are visible; the first error remains until Retry or source selection. Successful tile validation ends the initial loading indicator. Renderer disposal owns cancellation and source closure. Durable viewport restoration and the full background/network recovery matrix remain Phase 3D/6 work.
+`OnlineMapViewModel` exposes one immutable state stream. Source factories create independently owned sources only when rendering begins. Switching or Retry creates a new generation; callbacks from retired generations are ignored. Retry retains the last observed viewport, clears the error, and reopens the source. Missing tiles and typed network/authentication failures are visible; the first error remains until Retry or source selection. Successful tile validation ends the initial loading indicator. The ViewModel-owned renderer keeps the engine and decoded tiles across background/foreground transitions. Cancellation when the ViewModel is cleared owns engine shutdown and source closure. Durable viewport restoration and the full background/network recovery matrix remain Phase 3D/6 work.
 
 | Source | Current availability | Remaining requirements |
 | --- | --- | --- |

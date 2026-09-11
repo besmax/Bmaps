@@ -308,3 +308,19 @@ Apply these constraints to every work item:
 Split each phase into reviewable changes around coherent behavior. Each implementation change records its affected modules, user-visible outcome, verification performed, and remaining limitations. Do not add tests that merely mirror boilerplate or reversible documentation edits.
 
 A phase is complete only when its deliverables and acceptance criteria pass and the documentation reflects the result. Track deviations with rationale rather than silently narrowing the MVP. Following Phase 1, finish the remaining Phase 0 foundation work before feature-shell and renderer integration.
+
+
+## UI ownership and selection follow-up — 2026-09-11
+
+Moved feature labels, parameterized text, accessibility descriptions, and presentation errors to Compose string resources. MapState, the event Channel, controls, and viewport retention now belong to a ViewModel-owned renderer; composables handle observation, layout, lifecycle attachment, and drawing. Source menu and link-error state also moved to the ViewModel. The area frame now supports movement, corner resizing, and directional accessibility actions, with geographic bounds derived from its current rectangle. Existing tests were adapted to resource-valued errors and typed renderer failures.
+
+Build and runtime verification are left to the user at their request. No successful build or test run is claimed for this follow-up.
+
+
+## Background retention and online tile throughput — 2026-09-11
+
+Compared the RAMap ProviderViewModel, TileStreamBuilder, OSM provider, and delegated HTTP provider with the Bmaps pipeline and cached MapComposeMP source. RAMap owns MapState in its ViewModel and uses 16 tile workers without a request-start pacing gate. Bmaps was shutting down its engine below STARTED, pacing all requests (including native cache hits) by 100 ms, and decoding each tile twice.
+
+The renderer runner now belongs to viewModelScope, retaining the existing engine, viewport, and decoded tiles during background/foreground transitions. Actual content or nonzero container-size changes still replace the session; clearing the ViewModel releases it. Default provider concurrency is eight with no start delay, matching the existing eight renderer workers; native per-host limits are also eight, and the transport global limit remains sixteen. Explicit provider capability limits, retry bounds, and response-size limits remain enforced. Header and dimension checks replace the duplicate full validation decode; MapComposeMP performs the display decode.
+
+Builds, tests, and runtime performance measurements remain assigned to the user at their request. No measured speedup or process-death restoration is claimed.

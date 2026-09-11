@@ -1,5 +1,7 @@
 package bes.max.bmaps.feature.constructor
 
+import bmaps.feature.constructor.generated.resources.*
+import org.jetbrains.compose.resources.StringResource
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
@@ -16,12 +18,11 @@ import kotlinx.coroutines.launch
 
 data class MapChoice(val provider: TileProvider, val style: TileStyle) {
     val id get() = ProviderStyleId(provider.id, style.id)
-    val label get() = "${provider.name} · ${style.name}"
-    val unavailableReason: String? get() = when (id.onlineMapAvailability()) {
+    val unavailableReason: StringResource? get() = when (id.onlineMapAvailability()) {
         OnlineMapAvailability.AVAILABLE, OnlineMapAvailability.ACCOUNT_KEY_REQUIRED -> null
-        OnlineMapAvailability.PROVIDER_PERMISSION_REQUIRED -> "Third-party tile access needs provider permission."
-        OnlineMapAvailability.ESRI_LICENSE_REQUIRED -> "ArcGIS is not available in this version. Choose another source."
-        OnlineMapAvailability.YANDEX_INTEGRATION_REQUIRED -> "Yandex is not available in this version. Choose another source."
+        OnlineMapAvailability.PROVIDER_PERMISSION_REQUIRED -> Res.string.provider_permission_required
+        OnlineMapAvailability.ESRI_LICENSE_REQUIRED -> Res.string.arcgis_unavailable
+        OnlineMapAvailability.YANDEX_INTEGRATION_REQUIRED -> Res.string.yandex_unavailable
     }
 }
 
@@ -31,8 +32,10 @@ data class OnlineMapState(
     val selected: MapChoice? = null,
     val session: OnlineMapSession? = null,
     val loading: Boolean = true,
+    val sourceMenuExpanded: Boolean = false,
+    val linkError: Boolean = false,
     val visibleWindow: MapWindow? = null,
-    val error: String? = null,
+    val error: StringResource? = null,
 )
 
 @Inject
@@ -44,7 +47,29 @@ class OnlineMapViewModel(private val providers: ProviderRepository, private val 
     private var generation = 0
     private var viewport: MapViewport? = null
 
-    init { loadChoices() }
+    val renderer = RasterMapRenderer()
+    private val fixtureLayers = listOf(RasterLayer("fixture", TileSourceFactory { openFixtureTileSource() }))
+    private var showFixture = false
+
+    init {
+        viewModelScope.launch { renderer.run() }
+        viewModelScope.launch { renderer.events.collect { onEvent(it.generation, it.event) } }
+        loadChoices()
+    }
+
+    fun sourceMenu(expanded: Boolean) { mutableState.update { it.copy(sourceMenuExpanded = expanded) } }
+    fun linkFailed() { mutableState.update { it.copy(linkError = true) } }
+    fun display(provider: String, style: String, fixture: Boolean) {
+        showFixture = fixture
+        val choice = state.value.choices.find { it.provider.id.value == provider && it.style.id.value == style } ?: return
+        if (choice != state.value.selected) select(choice) else updateRenderer()
+    }
+
+    private fun updateRenderer() {
+        val session = state.value.session
+        if (session == null) renderer.clearContent()
+        else renderer.setContent(session.generation, session.config, if (showFixture) fixtureLayers else session.layers)
+    }
 
     private fun loadChoices() = viewModelScope.launch {
         try {
@@ -52,20 +77,14 @@ class OnlineMapViewModel(private val providers: ProviderRepository, private val 
             mutableState.update { it.copy(choices = choices, loading = false) }
             choices.firstOrNull()?.let(::select)
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { mutableState.update { it.copy(loading = false, error = "Map sources could not be loaded.") } }
+        catch (_: Exception) { mutableState.update { it.copy(loading = false, error = Res.string.map_sources_unavailable) } }
     }
 
     fun select(choice: MapChoice) {
         if (choice !in state.value.choices) return
         viewport = null
+        mutableState.update { it.copy(sourceMenuExpanded = false, linkError = false, visibleWindow = null) }
         start(choice)
-    }
-
-    fun retainViewport() {
-        val world = viewport ?: return
-        mutableState.update { current -> current.copy(session = current.session?.let {
-            it.copy(config = it.config.copy(initialViewport = it.config.pyramid.localViewport(world)))
-        }) }
     }
 
     fun retry() {
@@ -76,9 +95,10 @@ class OnlineMapViewModel(private val providers: ProviderRepository, private val 
     private fun start(choice: MapChoice) {
         val token = ++generation
         val config = rasterConfig(choice.provider.configFor(choice.style), viewport, state.value.session?.config?.pyramid)
-        val reason = choice.unavailableReason ?: if (config == null) "This source's tile matrix or display limits are not supported." else null
+        val reason = choice.unavailableReason ?: if (config == null) Res.string.unsupported_source_configuration else null
         if (reason != null) {
             mutableState.update { it.copy(selected = choice, session = null, loading = false, error = reason) }
+            updateRenderer()
             return
         }
         val layer = RasterLayer("online", TileSourceFactory {
@@ -86,9 +106,9 @@ class OnlineMapViewModel(private val providers: ProviderRepository, private val 
                 is OnlineSourceResult.Available -> result.source
                 is OnlineSourceResult.Failed -> {
                     val message = when (result.reason) {
-                        OnlineSourceFailure.MISSING_CREDENTIAL -> "Add an API key for this source, then retry."
-                        OnlineSourceFailure.CREDENTIAL_UNAVAILABLE -> "The saved API key is unavailable. Remove or replace it, then retry."
-                        else -> "This map source could not be opened."
+                        OnlineSourceFailure.MISSING_CREDENTIAL -> Res.string.provider_key_required
+                        OnlineSourceFailure.CREDENTIAL_UNAVAILABLE -> Res.string.provider_saved_key_unavailable
+                        else -> Res.string.map_source_open_error
                     }
                     mutableState.update { if (it.session?.generation == token) it.copy(loading = false, error = message) else it }
                     throw IllegalStateException("Online source unavailable")
@@ -96,6 +116,7 @@ class OnlineMapViewModel(private val providers: ProviderRepository, private val 
             }
         })
         mutableState.update { it.copy(selected = choice, session = OnlineMapSession(token, checkNotNull(config), listOf(layer)), loading = true, error = null) }
+        updateRenderer()
     }
 
     fun onEvent(token: Int, event: MapEvent) {
@@ -111,13 +132,13 @@ class OnlineMapViewModel(private val providers: ProviderRepository, private val 
         }
         val error = when (event) {
             is MapEvent.TileFailed -> when (event.failure) {
-                TileReadFailure.AUTHENTICATION -> "The source rejected access. Check your API key and account."
-                TileReadFailure.RATE_LIMITED -> "The source is busy or your request allowance was reached. Try again later."
-                TileReadFailure.NETWORK, TileReadFailure.TIMEOUT -> "Could not load tiles. Check your connection and retry."
-                else -> "Some map tiles could not be loaded. Retry to try again."
+                TileReadFailure.AUTHENTICATION -> Res.string.provider_access_denied
+                TileReadFailure.RATE_LIMITED -> Res.string.provider_rate_limited
+                TileReadFailure.NETWORK, TileReadFailure.TIMEOUT -> Res.string.tile_connection_error
+                else -> Res.string.tile_load_error
             }
-            is MapEvent.TileMissing -> "This source has no tile for part of the visible area."
-            is MapEvent.Unavailable -> "The map could not be displayed. Retry or choose another source."
+            is MapEvent.TileMissing -> Res.string.visible_tile_missing
+            is MapEvent.Unavailable -> Res.string.map_display_error
             else -> null
         }
         mutableState.update { it.copy(loading = false, error = it.error ?: error) }

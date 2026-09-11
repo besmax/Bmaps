@@ -7,6 +7,7 @@ import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
 import android.content.Context
 import java.io.File
+import okhttp3.Dispatcher
 import okhttp3.Cache
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -27,6 +28,10 @@ private fun client(cache: Cache?): HttpClient = HttpClient(OkHttp) {
     configureBmapsHttpClient()
     engine {
         config {
+            dispatcher(Dispatcher().apply {
+                maxRequests = 16
+                maxRequestsPerHost = 8
+            })
             retryOnConnectionFailure(false)
             cache(cache)
         }

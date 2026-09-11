@@ -36,3 +36,11 @@ To prevent UI jank and frame drops during heavy map rendering operations:
 * **DO NOT** create `Reducer`, `Store`, or `Middleware` classes. Keep the UDF loop simple within the ViewModel.
 * **DO NOT** use `StateFlow` or `MutableState` for one-off events. Always use a `Channel` for events that should only be consumed once.
 * **DO NOT** leak Domain or Data layer validation into business use cases. Input validation (e.g., checking if a user-defined map name is empty) must happen inside the ViewModel before calling down to the Domain layer.
+
+## 6. Resources and map selection
+
+User-facing labels, accessibility descriptions, and error messages belong in each feature's `commonMain/composeResources/values/strings.xml`. ViewModel error state carries a `StringResource` reference; composables resolve it with `stringResource` so locale changes do not require recreating error state. Parameterized messages use resource placeholders. Provider identities, attribution data, protocol values, and diagnostic exceptions remain data rather than UI translations.
+
+Map renderer state, tile events, and zoom controls belong to the ViewModel-owned `RasterMapRenderer`, not composable `remember` blocks. Source menu visibility and link failures belong to `OnlineMapState`. The ViewModel runs the renderer in its own scope; observing UI lifecycle changes must not destroy the engine or decoded tiles. Compose retains only framework UI mechanisms such as scroll position and updated effect callbacks.
+
+`AreaSelectionViewModel` owns a normalized selection rectangle and computes bounds from that rectangle and the visible world window. Dragging inside the rectangle moves it; dragging a corner resizes it. Movement stays within the viewport and resizing enforces a minimum extent. Areas outside the frame pass gestures to the map. Each corner has a 48 dp touch target and directional accessibility actions. Accepted bounds are a snapshot, independent of subsequent drags and map movement.

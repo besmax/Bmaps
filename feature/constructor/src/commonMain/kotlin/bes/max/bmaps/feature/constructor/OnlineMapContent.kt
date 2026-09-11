@@ -1,15 +1,17 @@
 package bes.max.bmaps.feature.constructor
 
+import bmaps.feature.constructor.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import bes.max.bmaps.core.mapengine.RasterMap
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
 @Composable
@@ -17,22 +19,26 @@ fun ProviderCredentialsContent(identifier: String, onDismiss: () -> Unit) {
     val model = metroViewModel<ProviderCredentialsViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(identifier) { model.load(identifier) }
-    LaunchedEffect(model) { model.events.collect { onDismiss() } }
+    val dismiss by rememberUpdatedState(onDismiss)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(model, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { model.events.collect { dismiss() } }
+    }
     AlertDialog(
         onDismissRequest = { if (!state.saving) onDismiss() },
-        title = { Text("Provider API key") },
+        title = { Text(stringResource(Res.string.provider_api_key)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Use a key from your provider account. After saving or removing it, retry the map.")
+                Text(stringResource(Res.string.provider_key_instructions))
                 if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                if (state.hasSavedCredential) Text("A key is saved securely.", style = MaterialTheme.typography.bodySmall)
-                OutlinedTextField(state.draft, model::edit, label = { Text(if (state.hasSavedCredential) "Replace API key" else "API key") }, singleLine = true,
+                if (state.hasSavedCredential) Text(stringResource(Res.string.key_saved_securely), style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(state.draft, model::edit, label = { Text(if (state.hasSavedCredential) stringResource(Res.string.replace_api_key) else stringResource(Res.string.api_key)) }, singleLine = true,
                     visualTransformation = PasswordVisualTransformation(), enabled = !state.saving && !state.loading)
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                TextButton(onClick = { model.save(identifier, remove = true) }, enabled = !state.saving) { Text("Remove saved key") }
+                state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { model.save(identifier, remove = true) }, enabled = !state.saving) { Text(stringResource(Res.string.remove_saved_key)) }
             }
         },
-        confirmButton = { TextButton(onClick = { model.save(identifier) }, enabled = !state.saving) { Text("Save") } },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !state.saving) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = { model.save(identifier) }, enabled = !state.saving) { Text(stringResource(Res.string.save)) } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !state.saving) { Text(stringResource(Res.string.cancel)) } },
     )
 }

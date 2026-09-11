@@ -1,0 +1,20 @@
+<resources>
+    <string name="appearance">Appearance</string>
+    <string name="bmaps">Bmaps</string>
+    <string name="build">Build</string>
+    <string name="cancel">Cancel</string>
+    <string name="changes_could_not_be_saved_please_try_again">Changes could not be saved. Please try again.</string>
+    <string name="dark">Dark</string>
+    <string name="default_coordinate_system">Default coordinate system</string>
+    <string name="library">Library</string>
+    <string name="light">Light</string>
+    <string name="preferences">Preferences</string>
+    <string name="preferences_could_not_be_loaded">Preferences could not be loaded.</string>
+    <string name="retry">Retry</string>
+    <string name="save">Save</string>
+    <string name="saving">Saving…</string>
+    <string name="use_device_setting">Use device setting</string>
+    <string name="viewer">Viewer</string>
+    <string name="wgs_84">WGS 84</string>
+    <string name="your_preferences_could_not_be_loaded">Your preferences could not be loaded.</string>
+</resources>

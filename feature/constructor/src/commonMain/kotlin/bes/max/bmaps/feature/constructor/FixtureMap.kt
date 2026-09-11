@@ -6,7 +6,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
-import bmaps.feature.constructor.generated.resources.Res
+import bmaps.feature.constructor.generated.resources.*
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -16,7 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.io.bytestring.ByteString
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 
-data class FixtureState(val error: String? = null)
+data class FixtureState(val error: StringResource? = null)
 
 @Inject
 @ViewModelKey
@@ -24,10 +28,19 @@ data class FixtureState(val error: String? = null)
 class FixtureViewModel : ViewModel() {
     private val mutableState = MutableStateFlow(FixtureState())
     val state = mutableState.asStateFlow()
-    fun onEvent(event: MapEvent) {
+    val renderer = RasterMapRenderer()
+
+    init {
+        viewModelScope.launch { renderer.run() }
+        renderer.setContent(0, RasterMapConfig(TilePyramid(ZoomRange(0, 3))),
+            listOf(RasterLayer("sample", TileSourceFactory { openFixtureTileSource() })))
+        viewModelScope.launch { renderer.events.collect { onEvent(it.event) } }
+    }
+
+    private fun onEvent(event: MapEvent) {
         when (event) {
-            is MapEvent.Unavailable -> mutableState.value = FixtureState("Sample map unavailable")
-            is MapEvent.TileFailed -> mutableState.value = FixtureState("Sample tile unavailable")
+            is MapEvent.Unavailable -> mutableState.value = FixtureState(Res.string.sample_map_unavailable)
+            is MapEvent.TileFailed -> mutableState.value = FixtureState(Res.string.sample_tile_unavailable)
             else -> Unit
         }
     }
@@ -38,13 +51,9 @@ class FixtureViewModel : ViewModel() {
 internal fun FixtureMap(modifier: Modifier = Modifier) {
     val model = metroViewModel<FixtureViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
-    val layers = remember { listOf(RasterLayer("sample", TileSourceFactory {
-        openFixtureTileSource()
-    })) }
     androidx.compose.foundation.layout.Box(modifier) {
-        RasterMap(RasterMapConfig(TilePyramid(ZoomRange(0, 3))), layers,
-            Modifier.matchParentSize(), onEvent = model::onEvent)
-        state.error?.let { androidx.compose.material3.Text(it) }
+        RasterMap(model.renderer, Modifier.matchParentSize())
+        state.error?.let { androidx.compose.material3.Text(stringResource(it)) }
     }
 }
 

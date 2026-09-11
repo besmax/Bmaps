@@ -1,5 +1,7 @@
 package bes.max.bmaps.feature.constructor
 
+import bmaps.feature.constructor.generated.resources.*
+import org.jetbrains.compose.resources.StringResource
 import androidx.lifecycle.ViewModel
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
@@ -20,7 +22,7 @@ import kotlin.time.Clock
 data class MapSaveSettings(val name: String, val bounds: BoundingBox, val levels: Set<Int>)
 data class MapSaveSettingsState(
     val name: String = "", val availableLevels: List<Int> = emptyList(), val selectedLevels: Set<Int> = emptySet(),
-    val estimate: BuildEstimate? = null, val error: String? = null,
+    val estimate: BuildEstimate? = null, val error: StringResource? = null,
 )
 
 @Inject
@@ -36,7 +38,7 @@ class MapSaveSettingsViewModel : ViewModel() {
     fun initialize(area: BoundingBox, range: ZoomRange, previous: MapSaveSettings? = null) {
         if (bounds != null) return
         if (WebMercator.splitBounds(area) == null || range.min !in 0..30 || range.max !in range.min..30) {
-            mutableState.value = state.value.copy(error = "This area or zoom range is not supported.")
+            mutableState.value = state.value.copy(error = Res.string.unsupported_area_or_zoom)
             return
         }
         bounds = area
@@ -57,9 +59,9 @@ class MapSaveSettingsViewModel : ViewModel() {
         val area = bounds ?: return
         val name = current.name.trim()
         val error = when {
-            name.isBlank() || name.any { it.code < 32 } -> "Enter a map name."
-            current.selectedLevels.isEmpty() -> "Select at least one zoom level."
-            current.estimate?.estimatedPackageBytes == null -> "This selection is too large to estimate."
+            name.isBlank() || name.any { it.code < 32 } -> Res.string.invalid_map_name
+            current.selectedLevels.isEmpty() -> Res.string.zoom_selection_required
+            current.estimate?.estimatedPackageBytes == null -> Res.string.selection_estimate_unavailable
             else -> null
         }
         mutableState.value = current.copy(error = error)

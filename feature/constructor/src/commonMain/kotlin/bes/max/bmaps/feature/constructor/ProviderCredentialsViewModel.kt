@@ -1,5 +1,7 @@
 package bes.max.bmaps.feature.constructor
 
+import bmaps.feature.constructor.generated.resources.*
+import org.jetbrains.compose.resources.StringResource
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.datastore.*
@@ -20,7 +22,7 @@ data class ProviderCredentialsState(
     val loading: Boolean = false,
     val hasSavedCredential: Boolean = false,
     val saving: Boolean = false,
-    val error: String? = null,
+    val error: StringResource? = null,
 ) {
     override fun toString() = "ProviderCredentialsState(<redacted>)"
 }
@@ -44,11 +46,11 @@ class ProviderCredentialsViewModel(private val credentials: ProviderCredentials)
                     it.copy(
                         loading = false,
                         hasSavedCredential = result is CredentialResult.Available,
-                        error = if (result is CredentialResult.Unavailable) "Saved key is unavailable. Replace it to continue." else null,
+                        error = if (result is CredentialResult.Unavailable) Res.string.saved_key_unavailable else null,
                     )
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { mutableState.update { it.copy(loading = false, error = "Saved key is unavailable. Replace it to continue.") } }
+            catch (_: Exception) { mutableState.update { it.copy(loading = false, error = Res.string.saved_key_unavailable) } }
         }
     }
 
@@ -60,7 +62,7 @@ class ProviderCredentialsViewModel(private val credentials: ProviderCredentials)
         if (state.value.saving) return
         val draft = state.value.draft.trim()
         if (!remove && (draft.isBlank() || draft.any { it.isWhitespace() || it.code < 32 })) {
-            mutableState.update { it.copy(error = "Enter a valid API key without spaces.") }
+            mutableState.update { it.copy(error = Res.string.invalid_api_key) }
             return
         }
         mutableState.update { it.copy(saving = true, error = null) }
@@ -70,9 +72,9 @@ class ProviderCredentialsViewModel(private val credentials: ProviderCredentials)
                 if (result == CredentialWriteResult.SUCCESS) {
                     mutableState.value = ProviderCredentialsState(hasSavedCredential = !remove)
                     completed.send(Unit)
-                } else mutableState.update { it.copy(saving = false, error = "Secure storage is unavailable. Try again.") }
+                } else mutableState.update { it.copy(saving = false, error = Res.string.secure_storage_unavailable) }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { mutableState.update { it.copy(saving = false, error = "Secure storage is unavailable. Try again.") } }
+            catch (_: Exception) { mutableState.update { it.copy(saving = false, error = Res.string.secure_storage_unavailable) } }
         }
     }
 }

@@ -1,5 +1,7 @@
 package bes.max.bmaps.feature.shell
 
+import bmaps.feature.shell.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,14 +53,14 @@ fun PreferencesContent(onDismiss: () -> Unit, viewModel: PreferencesViewModel = 
             modifier = Modifier.verticalScroll(rememberScrollState()).padding(24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Preferences", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(Res.string.preferences), style = MaterialTheme.typography.headlineSmall)
             if (state.isLoading) {
                 CircularProgressIndicator()
             } else if (state.error == PreferencesError.LOAD) {
-                Text("Your preferences could not be loaded.")
-                TextButton(onClick = viewModel::loadPreferences) { Text("Retry") }
+                Text(stringResource(Res.string.your_preferences_could_not_be_loaded))
+                TextButton(onClick = viewModel::loadPreferences) { Text(stringResource(Res.string.retry)) }
             } else {
-                Text("Appearance", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(Res.string.appearance), style = MaterialTheme.typography.titleMedium)
                 Column(Modifier.selectableGroup()) {
                     ThemePreference.entries.forEach { theme ->
                         Row(
@@ -73,25 +75,25 @@ fun PreferencesContent(onDismiss: () -> Unit, viewModel: PreferencesViewModel = 
                         ) {
                             RadioButton(selected = state.selectedTheme == theme, onClick = null, enabled = !state.isSaving)
                             Text(when (theme) {
-                                ThemePreference.SYSTEM -> "Use device setting"
-                                ThemePreference.LIGHT -> "Light"
-                                ThemePreference.DARK -> "Dark"
+                                ThemePreference.SYSTEM -> stringResource(Res.string.use_device_setting)
+                                ThemePreference.LIGHT -> stringResource(Res.string.light)
+                                ThemePreference.DARK -> stringResource(Res.string.dark)
                             })
                         }
                     }
                 }
-                Text("Default coordinate system", style = MaterialTheme.typography.titleMedium)
-                Text(if (state.defaultCoordinateSystem == "EPSG:4326") "WGS 84" else state.defaultCoordinateSystem)
+                Text(stringResource(Res.string.default_coordinate_system), style = MaterialTheme.typography.titleMedium)
+                Text(if (state.defaultCoordinateSystem == "EPSG:4326") stringResource(Res.string.wgs_84) else state.defaultCoordinateSystem)
                 if (state.error == PreferencesError.SAVE) {
-                    Text("Changes could not be saved. Please try again.", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(Res.string.changes_could_not_be_saved_please_try_again), color = MaterialTheme.colorScheme.error)
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
                 Button(
                     onClick = viewModel::save,
                     enabled = !state.isLoading && !state.isSaving && state.error != PreferencesError.LOAD,
-                ) { Text(if (state.isSaving) "Saving…" else "Save") }
+                ) { Text(if (state.isSaving) stringResource(Res.string.saving) else stringResource(Res.string.save)) }
             }
         }
     }

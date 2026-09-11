@@ -47,14 +47,14 @@ internal class RasterTileSession private constructor(
             active.forEach { it.cancel() }
             active.joinAll()
             sources.values.forEach {
-                try { it.close() } catch (_: Exception) { onEvent(MapEvent.Unavailable("Tile source cleanup failed")) }
+                try { it.close() } catch (_: Exception) { onEvent(MapEvent.Unavailable(MapUnavailableReason.SOURCE_CLEANUP)) }
             }
         }
     }
 
     companion object {
         suspend fun open(pyramid: TilePyramid, layers: List<RasterLayer>, onEvent: (MapEvent) -> Unit,
-                         validate: (ByteArray, Int) -> Boolean = ::validRasterImage): RasterTileSession {
+                         validate: (ByteArray, Int) -> Boolean = ::hasExpectedRasterDimensions): RasterTileSession {
             require(layers.isNotEmpty() && layers.map { it.id }.distinct().size == layers.size)
             val sources = linkedMapOf<String, TileSource>()
             try {
@@ -69,7 +69,7 @@ internal class RasterTileSession private constructor(
     }
 }
 
-internal expect fun validRasterImage(bytes: ByteArray, tileSize: Int): Boolean
+internal expect fun hasExpectedRasterDimensions(bytes: ByteArray, tileSize: Int): Boolean
 
 private fun matchesFormat(bytes: ByteArray, format: RasterTileFormat): Boolean = when (format) {
     RasterTileFormat.PNG -> bytes.size >= 8 && bytes.copyOfRange(0, 8).contentEquals(byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10))

@@ -1,5 +1,6 @@
 package bes.max.bmaps.feature.constructor
 
+import bmaps.feature.constructor.generated.resources.*
 import bes.max.bmaps.core.mapengine.*
 import bes.max.bmaps.domain.providers.*
 import kotlinx.coroutines.*
@@ -19,11 +20,11 @@ class OnlineMapViewModelTest {
             val viewport = MapViewport(MapPoint(0.4, 0.6), 2.0)
             model.onEvent(first.generation, MapEvent.ViewportChanged(viewport))
             model.onEvent(first.generation, MapEvent.TileFailed("online", TileKey(0, 0, 0), TileReadFailure.NETWORK))
-            assertContains(assertNotNull(model.state.value.error), "connection")
+            assertEquals(Res.string.tile_connection_error, model.state.value.error)
             model.retry()
             val retry = assertNotNull(model.state.value.session)
             assertEquals(viewport, retry.config.initialViewport)
-            model.onEvent(first.generation, MapEvent.Unavailable("old"))
+            model.onEvent(first.generation, MapEvent.Unavailable(MapUnavailableReason.INITIALIZATION))
             assertNull(model.state.value.error)
             val blocked = model.state.value.choices.first { it.provider.id.value == "yandex" }
             model.select(blocked)
@@ -32,7 +33,7 @@ class OnlineMapViewModelTest {
             model.select(model.state.value.choices.first { it.provider.id.value == "thunderforest" })
             val keyed = assertNotNull(model.state.value.session)
             assertFailsWith<IllegalStateException> { keyed.layers.single().source.open() }
-            assertContains(assertNotNull(model.state.value.error), "API key")
+            assertEquals(Res.string.provider_key_required, model.state.value.error)
         } finally { Dispatchers.resetMain() }
     }
 

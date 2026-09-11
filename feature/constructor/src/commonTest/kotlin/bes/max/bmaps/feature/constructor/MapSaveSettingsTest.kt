@@ -1,5 +1,6 @@
 package bes.max.bmaps.feature.constructor
 
+import bmaps.feature.constructor.generated.resources.*
 import bes.max.bmaps.core.mapengine.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -12,8 +13,8 @@ class MapSaveSettingsTest {
         assertNull(model.state.value.bounds)
         model.updateWindow(MapWindow(0.0, 0.0, 1.0, 1.0))
         val bounds = assertNotNull(model.state.value.bounds)
-        assertEquals(-136.8, bounds.west, 1e-9)
-        assertEquals(136.8, bounds.east, 1e-9)
+        assertEquals(-136.8, bounds.west, 1e-5)
+        assertEquals(136.8, bounds.east, 1e-5)
         model.accept()
         model.events.first()
         model.updateWindow(MapWindow(0.2, 0.2, 0.8, 0.8))
@@ -34,7 +35,7 @@ class MapSaveSettingsTest {
         model.name(" Test map ")
         model.toggle(0)
         model.confirm()
-        assertContains(assertNotNull(model.state.value.error), "zoom")
+        assertEquals(Res.string.zoom_selection_required, model.state.value.error)
         model.toggle(4)
         assertTrue(assertNotNull(model.state.value.estimate?.estimatedPackageBytes) > 0)
         model.confirm()

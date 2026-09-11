@@ -1,5 +1,8 @@
 package bes.max.bmaps.feature.shell
 
+import bmaps.feature.shell.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.StringResource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.ScaffoldDefaults
@@ -36,10 +39,10 @@ import androidx.lifecycle.repeatOnLifecycle
 import bes.max.bmaps.core.datastore.ThemePreference
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
-enum class ShellDestination(val route: String, val label: String, val symbol: String) {
-    LIBRARY("library", "Library", "▤"),
-    CONSTRUCTOR("constructor", "Build", "+"),
-    VIEWER("viewer", "Viewer", "◎"),
+enum class ShellDestination(val route: String, val label: StringResource, val symbol: String) {
+    LIBRARY("library", Res.string.library, "▤"),
+    CONSTRUCTOR("constructor", Res.string.build, "+"),
+    VIEWER("viewer", Res.string.viewer, "◎"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,8 +79,8 @@ fun AppShell(
             contentWindowInsets = if (fullScreen) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
             topBar = {
                 if (!fullScreen) TopAppBar(
-                    title = { Text("Bmaps") },
-                    actions = { TextButton(onClick = viewModel::openPreferences) { Text("Preferences") } },
+                    title = { Text(stringResource(Res.string.bmaps)) },
+                    actions = { TextButton(onClick = viewModel::openPreferences) { Text(stringResource(Res.string.preferences)) } },
                 )
             },
             bottomBar = {
@@ -87,7 +90,7 @@ fun AppShell(
                             selected = destination == item,
                             onClick = { viewModel.navigateTo(item) },
                             icon = { Text(item.symbol, modifier = Modifier.clearAndSetSemantics { }) },
-                            label = { Text(item.label) },
+                            label = { Text(stringResource(item.label)) },
                         )
                     }
                 }
@@ -100,8 +103,8 @@ fun AppShell(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("Preferences could not be loaded.", modifier = Modifier.weight(1f))
-                        TextButton(onClick = viewModel::retryPreferences) { Text("Retry") }
+                        Text(stringResource(Res.string.preferences_could_not_be_loaded), modifier = Modifier.weight(1f))
+                        TextButton(onClick = viewModel::retryPreferences) { Text(stringResource(Res.string.retry)) }
                     }
                 }
                 if (!fullScreen && state.preferences == null && !state.preferencesUnavailable) {

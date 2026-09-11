@@ -1,5 +1,7 @@
 package bes.max.bmaps.feature.constructor
 
+import bmaps.feature.constructor.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -39,32 +41,32 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onDismiss: () -> Unit)
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Save map settings") },
+        title = { Text(stringResource(Res.string.map_settings_title)) },
         text = {
             Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(state.name, model::name, label = { Text("Map name") }, singleLine = true)
-                Text("Zoom levels", style = MaterialTheme.typography.titleSmall)
+                OutlinedTextField(state.name, model::name, label = { Text(stringResource(Res.string.map_name)) }, singleLine = true)
+                Text(stringResource(Res.string.zoom_levels), style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.availableLevels.forEach { level ->
                         FilterChip(selected = level in state.selectedLevels, onClick = { model.toggle(level) }, label = { Text(level.toString()) })
                     }
                 }
-                Text("Estimated size: ${formatMegabytes(state.estimate?.estimatedPackageBytes)} MB")
-                Text("${state.estimate?.tileCount ?: 0} tiles · rough estimate using 32 KB per tile plus storage overhead. Actual size varies.", style = MaterialTheme.typography.bodySmall)
-                if ((state.estimate?.estimatedPackageBytes ?: 0) > 300_000_000L) Text("Estimate exceeds the 300 MB package limit. Choose a smaller area or fewer levels.", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(Res.string.estimated_size_mb, formatMegabytes(state.estimate?.estimatedPackageBytes) ?: stringResource(Res.string.unavailable)))
+                Text(stringResource(Res.string.tile_count_estimate, state.estimate?.tileCount ?: 0), style = MaterialTheme.typography.bodySmall)
+                if ((state.estimate?.estimatedPackageBytes ?: 0) > 300_000_000L) Text(stringResource(Res.string.package_size_limit_exceeded), color = MaterialTheme.colorScheme.error)
                 if (source?.provider?.capabilitiesFor(source.style)?.offlineDownload == OfflineDownloadPermission.PROHIBITED) {
-                    Text("This source does not permit offline downloads.", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(Res.string.offline_download_prohibited), color = MaterialTheme.colorScheme.error)
                 }
-                Text("Downloading is not available yet. Save settings keeps this draft for the current map session.", style = MaterialTheme.typography.bodySmall)
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                Text(stringResource(Res.string.download_draft_notice), style = MaterialTheme.typography.bodySmall)
+                state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
             }
         },
-        confirmButton = { TextButton(onClick = model::confirm) { Text("Save settings") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = model::confirm) { Text(stringResource(Res.string.save_settings)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },
     )
 }
 
-internal fun formatMegabytes(bytes: Long?): String = bytes?.let {
+internal fun formatMegabytes(bytes: Long?): String? = bytes?.let {
     val tenths = it / 100_000
     "${tenths / 10}.${tenths % 10}"
-} ?: "unavailable"
+}

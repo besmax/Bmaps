@@ -1,5 +1,7 @@
 package bes.max.bmaps.feature.viewer
 
+import bmaps.feature.viewer.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,9 +16,9 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun ViewerScreen(onOpenLibrary: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Map viewer", style = MaterialTheme.typography.headlineLarge)
-        Text("A place for your next adventure.", style = MaterialTheme.typography.titleMedium)
-        Text("Your offline map will open here when viewing is available.")
-        TextButton(onClick = onOpenLibrary) { Text("Go to library") }
+        Text(stringResource(Res.string.map_viewer), style = MaterialTheme.typography.headlineLarge)
+        Text(stringResource(Res.string.a_place_for_your_next_adventure), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(Res.string.your_offline_map_will_open_here_when_viewing_is_available))
+        TextButton(onClick = onOpenLibrary) { Text(stringResource(Res.string.go_to_library)) }
     }
 }

@@ -27,6 +27,7 @@ object IosHttpBindings {
         configureBmapsHttpClient()
         engine {
             configureSession {
+                HTTPMaximumConnectionsPerHost = 8
                 URLCache = cache
                 requestCachePolicy = NSURLRequestUseProtocolCachePolicy
             }

@@ -1,5 +1,7 @@
 package bes.max.bmaps.feature.constructor
 
+import bmaps.feature.constructor.generated.resources.*
+import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,35 +20,33 @@ fun ConstructorScreen(onOpenLibrary: () -> Unit, onCredentials: (String) -> Unit
     val model = metroViewModel<OnlineMapViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
     val uri = LocalUriHandler.current
-    var expanded by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Build a map", style = MaterialTheme.typography.headlineLarge)
-        Text("Choose a place. Take it offline.", style = MaterialTheme.typography.titleMedium)
-        Text("Choose a source, then open the map to select your area.")
+        Text(stringResource(Res.string.build_a_map), style = MaterialTheme.typography.headlineLarge)
+        Text(stringResource(Res.string.constructor_subtitle), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(Res.string.choose_source_instructions))
         Box {
-            OutlinedButton(onClick = { expanded = true }) { Text(state.selected?.label ?: "Choose map source") }
-            DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
+            OutlinedButton(onClick = { model.sourceMenu(true) }) { Text(state.selected?.let { stringResource(Res.string.map_source_label, it.provider.name, it.style.name) } ?: stringResource(Res.string.choose_map_source)) }
+            DropdownMenu(state.sourceMenuExpanded, onDismissRequest = { model.sourceMenu(false) }) {
                 state.choices.forEach { choice ->
-                    DropdownMenuItem(text = { Text(choice.label) }, onClick = { expanded = false; model.select(choice) })
+                    DropdownMenuItem(text = { Text(stringResource(Res.string.map_source_label, choice.provider.name, choice.style.name)) }, onClick = { model.sourceMenu(false); model.select(choice) })
                 }
             }
         }
         state.selected?.let { choice ->
             TextButton(onClick = {
                 try { uri.openUri(choice.provider.capabilitiesFor(choice.style).policyUrl) }
-                catch (_: Exception) { error = "The source terms could not be opened." }
-            }) { Text("Source terms") }
+                catch (_: Exception) { model.linkFailed() }
+            }) { Text(stringResource(Res.string.source_terms)) }
             choice.style.endpoint.credential?.let {
-                OutlinedButton(onClick = { onCredentials(it.key) }) { Text("Manage API key") }
+                OutlinedButton(onClick = { onCredentials(it.key) }) { Text(stringResource(Res.string.manage_api_key)) }
             }
-            choice.unavailableReason?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            choice.unavailableReason?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
             if (choice.id.onlineMapAvailability() == OnlineMapAvailability.ACCOUNT_KEY_REQUIRED) {
-                Text("Use an API key from an account with access to this source.", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(Res.string.provider_account_instructions), style = MaterialTheme.typography.bodySmall)
             }
-            Button(onClick = { onOpenMap(choice.provider.id.value, choice.style.id.value) }, enabled = choice.unavailableReason == null) { Text("Open map") }
+            Button(onClick = { onOpenMap(choice.provider.id.value, choice.style.id.value) }, enabled = choice.unavailableReason == null) { Text(stringResource(Res.string.open_map)) }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-        TextButton(onClick = onOpenLibrary) { Text("Go to library") }
+        if (state.linkError) Text(stringResource(Res.string.link_unavailable), color = MaterialTheme.colorScheme.error)
+        TextButton(onClick = onOpenLibrary) { Text(stringResource(Res.string.go_to_library)) }
     }
 }

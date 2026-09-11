@@ -66,7 +66,7 @@ sealed interface MapEvent {
     data class ViewportChanged(val viewport: MapViewport, val visibleWindow: MapWindow? = null) : MapEvent
     data class Tap(val position: MapPoint) : MapEvent
     data class TileFailed(val layerId: String, val key: TileKey, val failure: TileReadFailure) : MapEvent
-    data class Unavailable(val reason: String) : MapEvent
+    data class Unavailable(val reason: MapUnavailableReason) : MapEvent
 }
 
 
@@ -78,3 +78,5 @@ class RasterMapController {
     fun zoomIn() { commands.trySend(2.0) }
     fun zoomOut() { commands.trySend(0.5) }
 }
+
+enum class MapUnavailableReason { PYRAMID_DIMENSIONS, VIEWPORT_PRECISION, INITIALIZATION, SOURCE_CLEANUP }

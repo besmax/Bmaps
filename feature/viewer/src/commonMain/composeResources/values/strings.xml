@@ -1,0 +1,6 @@
+<resources>
+    <string name="a_place_for_your_next_adventure">A place for your next adventure.</string>
+    <string name="go_to_library">Go to library</string>
+    <string name="map_viewer">Map viewer</string>
+    <string name="your_offline_map_will_open_here_when_viewing_is_available">Your offline map will open here when viewing is available.</string>
+</resources>

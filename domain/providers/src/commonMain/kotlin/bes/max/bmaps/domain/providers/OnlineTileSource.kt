@@ -27,9 +27,11 @@ internal class ProviderRequestGate(provider: TileProvider, private val timeSourc
     private var lastStart: kotlin.time.TimeMark? = null
 
     suspend fun <T> execute(block: suspend () -> T): T = requests.withPermit {
-        pace.withLock {
-            lastStart?.let { delay((interval - it.elapsedNow().inWholeMilliseconds).coerceAtLeast(0)) }
-            lastStart = timeSource.markNow()
+        if (interval > 0) {
+            pace.withLock {
+                lastStart?.let { delay((interval - it.elapsedNow().inWholeMilliseconds).coerceAtLeast(0)) }
+                lastStart = timeSource.markNow()
+            }
         }
         block()
     }
