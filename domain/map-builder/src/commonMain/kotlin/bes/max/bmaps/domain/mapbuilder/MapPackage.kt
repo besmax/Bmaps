@@ -42,6 +42,8 @@ data class PackageLayer(
     val visible: Boolean = true,
     val opacity: Double = 1.0,
     val attribution: List<Attribution> = emptyList(),
+    val zoomLevels: Set<Int> = emptySet(),
+    val tileCount: Long? = null,
 )
 
 @Serializable
@@ -80,8 +82,14 @@ enum class PackageState { BUILDING, PAUSED, FINALIZING, READY, FAILED, DELETING,
 data class PackageSummary(
     val id: PackageId,
     val name: String,
-    val bounds: BoundingBox,
+    val bounds: BoundingBox?,
     val state: PackageState,
     val sizeBytes: Long,
     val updatedAtEpochMillis: Long,
-)
+    val hasElevationData: Boolean = false,
+    val totalTiles: Long = 0,
+    val downloadedTiles: Long = 0,
+    val failedTiles: Long = 0,
+) {
+    val missingTiles: Long get() = (totalTiles - downloadedTiles).coerceAtLeast(0)
+}

@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.Flow
 
 data class PackageQuery(
     val nameContains: String = "",
-    val states: Set<PackageState> = setOf(PackageState.READY),
+    val states: Set<PackageState> = PackageState.entries.toSet(),
     val limit: Int = 50,
     val cursor: String? = null,
 )

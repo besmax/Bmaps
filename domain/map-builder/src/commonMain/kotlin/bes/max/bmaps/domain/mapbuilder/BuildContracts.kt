@@ -15,6 +15,7 @@ data class BuildLayerRequest(
     val config: ProviderConfig,
     val zoomRange: ZoomRange,
     val endpointParameters: Map<String, String> = emptyMap(),
+    val zoomLevels: Set<Int> = emptySet(),
 )
 
 @Serializable
@@ -38,6 +39,7 @@ interface DownloadPlanner {
 @Serializable
 data class BuildJobId(val value: String)
 
+@Serializable
 enum class BuildJobState { QUEUED, RUNNING, PAUSED, FINALIZING, COMPLETED, CANCELLED, FAILED }
 
 data class BuildProgress(
@@ -50,7 +52,9 @@ data class BuildProgress(
     val receivedBytes: Long,
     val packageBytes: Long,
     val failure: PackageFailure? = null,
-)
+) {
+    val missingTiles: Long get() = (totalTiles - completedTiles).coerceAtLeast(0)
+}
 
 enum class PartialPackageRetention { KEEP_FOR_RESUME, DELETE }
 

@@ -19,4 +19,6 @@ dependencies {
     implementation(plugin(libs.plugins.composeCompiler))
     implementation(plugin(libs.plugins.metro))
     implementation(plugin(libs.plugins.kotlinSerialization))
+    implementation(plugin(libs.plugins.ksp))
+    implementation(plugin(libs.plugins.room))
 }

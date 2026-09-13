@@ -1,6 +1,6 @@
 # Provider Networking and Credentials
 
-Phase 3A implements provider registration, URL construction, bounded tile HTTP, and encrypted credential persistence. Phase 3B adds the MapComposeMP renderer wrapper. Phase 3C connects OSM, ArcGIS, OsmAndHd, Thunderforest, and Yandex to the constructor; credentialed sources use runtime secure key storage. No map request starts when the application shell opens.
+Phase 3A implements provider registration, URL construction, bounded tile HTTP, and encrypted credential persistence. Phase 3B adds the MapComposeMP renderer wrapper. Phase 3C connects OSM, ArcGIS, OsmAndHd, Thunderforest, and Yandex to the constructor; credentialed sources use runtime secure key storage. Opening the shell on a fresh install starts no map requests. Phase 5 may resume explicitly queued downloads during application startup; see `12_DOWNLOAD_PIPELINE.md`.
 
 ## Ownership and composition
 

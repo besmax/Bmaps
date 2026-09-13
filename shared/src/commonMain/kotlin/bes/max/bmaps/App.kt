@@ -58,7 +58,12 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
                 }
                 dialog(MapSettingsRoute) {
                     val mapEntry = remember(it) { navigation.getBackStackEntry(MapRoute) }
-                    MapSaveSettingsContent(mapEntry) { navigation.popBackStack() }
+                    MapSaveSettingsContent(mapEntry,
+                        onStarted = { navigation.navigate(ShellDestination.LIBRARY.route) {
+                            popUpTo(ShellDestination.LIBRARY.route)
+                            launchSingleTop = true
+                        } },
+                        onDismiss = { navigation.popBackStack() })
                 }
                 composable(ShellDestination.VIEWER.route) {
                     ViewerScreen(onOpenLibrary = { navigate(ShellDestination.LIBRARY) })

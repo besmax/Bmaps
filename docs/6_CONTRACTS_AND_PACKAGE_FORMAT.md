@@ -1,6 +1,6 @@
 # Phase 1 Contracts and Package Format
 
-Status: Phase 1 contract baseline. Phase 2 preferences/shell and Phase 3A online networking/encrypted credentials are implemented in documents 7–8. The raster renderer is implemented in document 9; document 8 also records the Phase 3C online constructor and credential UI. Package persistence and download orchestration remain later work.
+Status: Phase 1 contract baseline. Phase 2 preferences/shell and Phase 3A online networking/encrypted credentials are implemented in documents 7–8. The raster renderer is implemented in document 9; document 8 also records the Phase 3C online constructor and credential UI. Phase 4 package persistence is implemented in `11_PACKAGE_STORAGE.md`; Phase 5 download orchestration is implemented in `12_DOWNLOAD_PIPELINE.md`. Phase 4–5 builds and tests are unrun at the user’s request.
 
 ## Ownership
 
@@ -89,11 +89,11 @@ The central metadata state is independent of the final manifest:
 | DELETING | Close handles and remove assets, then remove metadata |
 | CORRUPT / MISSING | Existing metadata points to invalid/absent package data; offer recovery/removal |
 
-The default library query shows READY packages. Explicit state filters can expose incomplete/recovery entries. `open` returns `NotReady` for partial data; missing and damaged packages produce explicit failures. Query ordering is updated timestamp descending with package ID as a stable tie-breaker. Cursors are opaque, bound to query filters; implementations in `core:database` own filtering/pagination. A filter change resets the cursor.
+The default library query now includes all package states so incomplete/recovery entries are visible. Explicit state filters can request READY-only entries. `open` returns `NotReady` for partial data; missing and damaged packages produce explicit failures. Query ordering is updated timestamp descending with package ID as a stable tie-breaker. Cursors are opaque, bound to query filters; implementations in `core:database` own filtering/pagination. A filter change resets the cursor.
 
 Filesystem and Room updates cannot form a shared transaction. Phase 4 must stage writes, close/checkpoint databases, write the final manifest, promote files on the same filesystem, and only then mark READY. Startup reconciliation detects abandoned staging, final files without metadata, READY rows without files, and interrupted deletion. A valid orphan final package may be reindexed; an incomplete package must never be inferred READY solely from its directory name.
 
-Download start is idempotent by package ID for the same request; conflicting active requests return `Conflict`. Pause retains checkpoints. Cancel with `KEEP_FOR_RESUME` stops execution while retaining recoverable work; cancel with `DELETE` removes partial work. Resume is defined for paused/failed/retained-cancelled jobs, never completed or deleted jobs. The future executor persists the exact request and completed logical tile identities.
+Download start is idempotent by package ID for the same request; conflicting active requests return `Conflict`. Pause retains checkpoints. Cancel with `KEEP_FOR_RESUME` stops execution while retaining recoverable work; cancel with `DELETE` removes partial work. Resume is defined for paused/failed/retained-cancelled jobs, never completed or deleted jobs. The executor persists the exact request and skips completed logical tile identities during restore. Restart reconciliation queues interrupted active work while preserving explicit paused, failed, and retained-cancelled states. Finalization can retry without reopening the provider when every tile is already committed.
 
 Progress is an immutable snapshot. Completed tiles count unique successful writes, failed tiles count unresolved failures, total tiles count all requested layer/tile pairs, and received bytes may include retries. COMPLETED requires all required tiles and finalization; failure must accompany FAILED. Observing a job must never start or cancel it. Cancelling a collector only ends that observation; explicit executor methods change durable job state.
 
@@ -111,3 +111,10 @@ Commands:
 ```
 
 Both commands passed, with 10 host tests and no test failures. Apps were not launched and native tests were not executed. Existing build warnings report Compose runtime/plugin version skew, compile SDK 37 beyond AGP 9.1.0's tested range, and an inferred shared framework bundle ID. Phase 0 should align and validate the stack before renderer/device integration. Successful contract compilation does not resolve those runtime compatibility warnings.
+
+
+## Phase 4 additions — 2026-09-12
+
+`BuildLayerRequest.zoomLevels` and `PackageLayer.zoomLevels` preserve non-contiguous selection. Empty sets retain the original inclusive-range semantics. Final layers record their verified `tileCount`; a null count identifies a draft or a package requiring import validation. New package writes explicitly serialize `elevation: null`; no DEM is currently included. Summaries expose elevation availability and durable tile counters; bounds may be null for corrupt orphan entries without readable metadata.
+
+`PackageBuildStorage` supplies durable request lookup, bounded batch storage, existence checks for resume, state/checkpoint persistence, progress observation, finalization, and reconciliation. It performs no network scheduling. Tile blobs and unresolved failure identities share each layer database transaction; Room counts follow and can be rebuilt. Package opening/deletion now have local implementations and owned tile sources. Paths, size limits, completeness, and native verification limitations are detailed in `11_PACKAGE_STORAGE.md`.

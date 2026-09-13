@@ -28,7 +28,7 @@ class MapSaveSettingsTest {
     @Test fun invalidNameAndEmptyLevelsCannotBeConfirmed() = runTest {
         val model = MapSaveSettingsViewModel()
         model.initialize(BoundingBox(-10.0, -10.0, 10.0, 10.0), ZoomRange(0, 4))
-        assertTrue(Regex("\\d{4}\\.\\d{2}\\.\\d{2} \\d{2}:\\d{2}").matches(model.state.value.name))
+        assertTrue(Regex("\\d{4}-\\d{2}-\\d{2}_\\d{2}:\\d{2}").matches(model.state.value.name))
         model.name("  ")
         model.confirm()
         assertNotNull(model.state.value.error)

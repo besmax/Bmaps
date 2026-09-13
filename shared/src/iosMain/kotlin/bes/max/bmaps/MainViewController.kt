@@ -10,6 +10,8 @@ internal interface IosAppGraph : AppGraph
 
 private val appGraph: IosAppGraph by lazy { createGraph<IosAppGraph>() }
 
+fun initializeDownloadScheduling() { appGraph.downloadScheduler.initialize() }
+
 @OptIn(kotlin.experimental.ExperimentalNativeApi::class)
 fun MainViewController() = ComposeUIViewController {
     App(appGraph, previewMap = kotlin.native.Platform.isDebugBinary &&

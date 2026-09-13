@@ -6,6 +6,9 @@ kotlin {
     sourceSets.commonMain.dependencies {
         implementation(project(":core:di"))
         implementation(project(":domain:providers"))
+        implementation(project(":domain:map-builder"))
+        implementation(project(":core:database"))
+        implementation(project(":core:storage"))
         implementation(project(":core:network"))
         implementation(project(":core:datastore"))
         implementation(project(":feature:shell"))

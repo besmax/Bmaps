@@ -1,17 +1,19 @@
 # Bmaps Implementation Plan
 
-Planning baseline: 2026-09-08. Last updated: 2026-09-10. Phases 1, 2, and 3A are implemented. Phase 3B's renderer and coordinate implementation is in place; Android deterministic-fixture acceptance remains pending. Phase 3C's provider catalog, fullscreen constructor flow, secure credentials dialog, and OSM rendering are implemented; broader provider entitlement and native acceptance remain pending. Phase 3D area selection and save-settings UI are implemented; its full acceptance matrix is pending. Phase 0's remaining build/CI work is also pending.
+Planning baseline: 2026-09-08. Last updated: 2026-09-13. Phases 1, 2, and 3A are implemented. Phase 3B's renderer and coordinate implementation is in place; Android deterministic-fixture acceptance remains pending. Phase 3C's provider catalog, fullscreen constructor flow, secure credentials dialog, and OSM rendering are implemented; broader provider entitlement and native acceptance remain pending. Phase 3D area selection and save-settings UI are implemented; its full acceptance matrix is pending. Phase 0's remaining build/CI work is also pending.
 
 ## Current implementation status
 
-| Area | Implemented and verified | Remaining work |
+| Area | Implementation / evidence | Remaining work |
 | --- | --- | --- |
 | Phase 3B | Coordinate math, raster adapter, source ownership/cancellation tests, and iOS deterministic fixture rendering | Android deterministic-fixture runtime check; broader native cleanup/lifecycle stress |
 | Phase 3C | OSM, ArcGIS World Imagery, OsmAndHd, and credential-gated Thunderforest/Yandex source definitions; provider/style selection, attribution, persistent public HTTP caching, secure credential dialog, and retry/error handling | Authenticated provider entitlement verification; ArcGIS regional rendering/licensing review; Yandex account/branding/signing review; OsmAnd third-party access review |
 | Phase 3D | Initial native rendering evidence is recorded below | Full pan/zoom, switching, lifecycle, missing-tile, and network-recovery acceptance matrix |
-| Phases 4–11 | Contracts and plans only | Package storage, downloads, offline library/viewer, editing, elevation/CRS, sharing, and release hardening |
+| Phase 4 | Package storage, Room catalog/checkpoints, MBTiles access, finalization/reconciliation implemented; not built or tested | User-run compilation, generated schema review, and native persistence acceptance |
+| Phase 5 | Durable download pipeline, native scheduling, settings submission, library progress and missing-tile restore implemented; not built or tested | User-run compilation and native download/recovery acceptance; see document 12 |
+| Phases 6–11 | Library list/progress subset implemented; other contracts and plans | Offline viewer, library details/filters/deletion, editing, elevation/CRS, sharing, and release hardening |
 
-Next: finish the outstanding provider prerequisites and native acceptance checks. Do not treat Phase 3 as complete or begin download orchestration on the strength of the OSM smoke checks alone.
+Current work: Phase 5 implementation is ready for user verification; current state and handoff are in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Builds and all test execution are assigned to the user.
 
 This plan follows `AGENTS.md` and documents 1–4. Checked boxes represent completed deliverables. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats. The table below preserves the original source-inspection baseline; current Phase 1 decisions are recorded in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 
@@ -59,7 +61,7 @@ Record decisions in the relevant existing architecture/product document. These a
 | Multiple raster layers | Proposed package layout: retain `map_data.mbtiles` for the base layer and add `layers/<layer-id>.mbtiles`, referenced by `config.json`. Resolve the current single-file example before multi-layer writes. | Phase 1 |
 | Package identity | Use stable IDs and safe storage directory names; treat the user-visible name as metadata. Version the package manifest from the first package. | Phase 1 |
 | Provider availability | Choose actual providers after verifying current download rights, attribution, authentication, caching, and request limits from their official documentation. The OSM example is not authorization to bulk-download any particular endpoint. | Phase 3 |
-| Download lifecycle | First slice: foreground execution with durable checkpoints. Define behavior on suspension and termination; automatic background completion requires a separate platform feasibility decision. | Phase 5 |
+| Download lifecycle | Durable Phase 4 checkpoints; Phase 5 Android WorkManager with foreground progress, plus iOS BGProcessingTask opportunities and foreground lifetime extension. Preserve missing tiles and expose user restore, top-of-library progress, and platform progress/completion surfaces. See document 11. | Phase 5 |
 | CRS support | Specify the exact SK-91 definition, applicable region, parameters/grids, reference fixtures, and accuracy target before implementing its transformation. A name alone is insufficient. | Phase 9 |
 | DEM support | Define accepted TIFF/GeoTIFF encodings, compression, CRS, no-data rules, and size limits after a bounded reader spike on both platforms. | Phase 9 |
 | Transfer format | Proposed versioned archive of a consistent package snapshot, with a manifest and integrity metadata. Define standalone MBTiles and GeoJSON import behavior separately. | Phase 10 |
@@ -75,7 +77,7 @@ Dependencies: none.
 - [x] Remove framework creation from `app.kmp.library`; retain platform targets there and configure framework generation exclusively for `:shared` through umbrella-specific build configuration.
 - [ ] Add an Android application convention and move reusable Android application settings into build logic.
 - [ ] Add catalog entries and convention support for the code-generation, serialization, coroutines, and test dependencies actually required by subsequent phases. Verify compatibility before selecting additions.
-- [ ] Configure Room generation and schema export through a persistence convention when introducing the first database; do not apply Room tooling to unrelated modules.
+- [x] Configure Room generation and schema export through a persistence convention when introducing the first database; do not apply Room tooling to unrelated modules. Implemented in Phase 4; build/schema-generation verification remains pending.
 - [x] Verify Metro compilation for Android and iOS with a minimal binding and graph.
 - [ ] Discover and document actual Gradle tasks for common/host tests, Android assembly, and iOS framework linking. Establish CI with an appropriate macOS job for iOS.
 - [x] Correct the duplicated persistence heading in document 2, resolve its broad MVI wording in favor of document 4's MVVM+ rule, and update the template README to describe the umbrella architecture.
@@ -173,36 +175,43 @@ Acceptance for Phase 3: both apps pan and zoom real approved sources; determinis
 
 Dependencies: Phase 1; can proceed independently of online UI after contracts stabilize.
 
-- [ ] Implement app-private directories, streaming file IO, temporary workspaces, finalization, and cleanup in `core:storage` using `kotlinx-io-core` with platform adapters where necessary.
-- [ ] Implement custom MBTiles read/write access in `core:mbtiles`: metadata, tile blobs, XYZ/TMS row conversion, transactions, and explicit handle ownership.
-- [ ] Define serialized writes and safe reads during package construction, with bounded batches and resource cleanup.
-- [ ] Implement the central Room database for package metadata and durable job/checkpoint information; exclude annotation geometry.
-- [ ] Implement stable custom pagination and filtering directly in `core:database`, with deterministic ordering and tie-breakers.
-- [ ] Implement manifest serialization and reopening; define a finalize/reconcile protocol because filesystem and metadata writes are not one atomic transaction.
-- [ ] Handle disk exhaustion, interrupted writes, missing assets, duplicate IDs, and stale metadata without exposing partial packages as ready.
+- [x] Implement app-private directories, streaming file IO, temporary workspaces, finalization, and cleanup in `core:storage` using `kotlinx-io-core` with platform adapters where necessary.
+- [x] Implement custom MBTiles read/write access in `core:mbtiles`: metadata, tile blobs, XYZ/TMS row conversion, transactions, and explicit handle ownership.
+- [x] Define serialized writes and safe reads during package construction, with bounded batches and resource cleanup.
+- [x] Implement the central Room database for package metadata and durable job/checkpoint information; exclude annotation geometry.
+- [x] Implement stable custom pagination and filtering directly in `core:database`, with deterministic ordering and tie-breakers.
+- [x] Implement manifest serialization and reopening; define a finalize/reconcile protocol because filesystem and metadata writes are not one atomic transaction.
+- [x] Handle disk exhaustion, interrupted writes, missing assets, duplicate IDs, and stale metadata without exposing partial packages as ready.
 
 Acceptance: a fixture package survives write-close-reopen and returns expected tile bytes; pagination has no duplicates or gaps in a stable dataset; failure fixtures demonstrate cleanup and recovery. Verify SQLite behavior on both platforms.
+
+Implementation: `11_PACKAGE_STORAGE.md`. Native fixture scenarios are authored but unrun. Phase 4 acceptance is pending the user’s builds, generated Room schema review, and Android/iOS execution. No phase-completion verification is claimed.
 
 ### Phase 5 — Build the offline constructor and durable download pipeline
 
 Dependencies: Phases 3–4.
 
-- [ ] Add map-name input, bounding-box selection, zoom controls, tile count, estimated size, and destination capacity feedback.
-- [ ] Invoke presentation validation independently for name, bounds, zoom range, and provider constraints before submitting a request.
-- [ ] Implement tile enumeration/counting in `domain:map-builder` using the shared geospatial primitives; iterate large plans without materializing every tile in memory.
-- [ ] Implement bounded download concurrency, provider-specific limits, retry/backoff, and separate handling of unavailable tiles versus transient failures.
-- [ ] Persist job parameters, completed work, counters, and status transitions so resume does not restart completed work.
-- [ ] Implement start, pause, resume, and cancel behavior with explicit retention/cleanup policy for partial packages.
-- [ ] Finalize assets and manifest, then reconcile/update library metadata using the Phase 4 protocol.
-- [ ] Define user-facing completeness rules: do not label a package complete when required tiles failed silently.
+- [x] Add map-name input, bounding-box selection, zoom controls, tile count, estimated size, and destination capacity feedback.
+- [x] Invoke presentation validation independently for name, bounds, zoom range, and provider constraints before submitting a request.
+- [x] Implement tile enumeration/counting in `domain:map-builder` using the shared geospatial primitives; iterate large plans without materializing every tile in memory.
+- [x] Implement bounded download concurrency, provider-specific limits, retry/backoff, and separate handling of unavailable tiles versus transient failures.
+- [x] Persist job parameters, completed work, counters, and status transitions so resume does not restart completed work.
+- [x] Implement start, pause, resume, and cancel behavior with explicit retention/cleanup policy for partial packages.
+- [x] Finalize assets and manifest, then reconcile/update library metadata using the Phase 4 protocol.
+- [x] Define user-facing completeness rules: do not label a package complete when required tiles failed silently.
 
 Acceptance: download a small known region, interrupt connectivity and process execution, resume without duplicate logical tiles, and finalize a readable package. Cancellation closes resources. Capacity and provider errors remain actionable.
+
+Implementation: `12_DOWNLOAD_PIPELINE.md`, 2026-09-13. The dialog submits actual downloads with name, exact zoom selection, estimated decimal MB, capacity feedback, and explicit absence of elevation. Android uses WorkManager foreground progress; iOS uses BGProcessingTask with foreground lifetime extension and completion/failure notifications. The library exposes durable progress and missing-tile restore. Deterministic test scenarios are authored but unrun. Checked deliverables indicate source implementation; Phase 5 acceptance remains pending user builds and native execution.
 
 ### Phase 6 — Deliver the library and offline viewer
 
 Dependencies: Phases 2, 4–5.
 
-- [ ] Implement package list, details, size/status display, filters, and incremental loading using the custom database queries.
+The package list, incremental loading, size/status/elevation labels, incomplete warnings, and restore controls are already implemented with Phase 5. Details, filter controls, deletion UI, and offline viewing remain.
+
+- [ ] Implement package list, details, size/status/elevation availability display, filters, and incremental loading using the custom database queries. Include incomplete maps by default with warnings and a Restore / Download missing tiles action.
+- [x] Show ongoing download progress at the top of the library; connect restore/pause/cancel to the Phase 5 scheduler. Implemented with Phase 5; native verification pending.
 - [ ] Open packages through domain operations and adapt local MBTiles sources to the renderer wrapper.
 - [ ] Display geographic bounds, supported zooms, loading/empty states, and missing/corrupt package errors.
 - [ ] Implement package deletion with handle closure, file cleanup, metadata reconciliation, and appropriate UI confirmation.

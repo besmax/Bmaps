@@ -34,7 +34,7 @@ object BuiltInProviders {
         requestPolicy = TileRequestPolicy(cachePublicResponses = true),
         attribution = listOf(osmAttribution),
         capabilities = ProviderCapabilities(
-            offlineDownload = OfflineDownloadPermission.PROHIBITED,
+            offlineDownload = OfflineDownloadPermission.ALLOWED,
             policyUrl = "https://operations.osmfoundation.org/policies/tiles/",
             requiresIdentifyingUserAgent = true,
         ),

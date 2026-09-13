@@ -1,0 +1,5 @@
+<resources>
+    <string name="download_channel">Map downloads</string>
+    <string name="download_progress">%1$d of %2$d tiles downloaded</string>
+    <string name="download_pause">Pause</string>
+</resources>

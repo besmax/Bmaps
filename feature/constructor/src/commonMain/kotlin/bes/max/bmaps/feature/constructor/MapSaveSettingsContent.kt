@@ -22,54 +22,72 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onDismiss: () -> Unit) {
+fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit, onDismiss: () -> Unit) {
     val map = metroViewModel<OnlineMapViewModel>(mapOwner)
     val area = metroViewModel<AreaSelectionViewModel>(mapOwner)
     val model = metroViewModel<MapSaveSettingsViewModel>()
+    val submission = metroViewModel<DownloadSubmissionViewModel>()
+    val download by submission.state.collectAsStateWithLifecycle()
+    val authorizeNotifications = rememberDownloadNotificationPermission()
     val state by model.state.collectAsStateWithLifecycle()
     val selection by area.state.collectAsStateWithLifecycle()
     val source = map.state.value.selected
     LaunchedEffect(model, selection.acceptedBounds, source) {
         val bounds = selection.acceptedBounds ?: return@LaunchedEffect
-        val limits = source?.provider?.configFor(source.style)?.levelLimits ?: return@LaunchedEffect
+        val choice = source ?: return@LaunchedEffect
+        val limits = choice.provider.configFor(choice.style).levelLimits
         model.initialize(bounds, ZoomRange(limits.levelMin, limits.levelMax ?: limits.levelMin), selection.settings)
+        submission.configure(choice)
     }
     val dismiss by rememberUpdatedState(onDismiss)
+    val started by rememberUpdatedState(onStarted)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(model, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            model.events.collect { area.retain(it); dismiss() }
+            model.events.collect { settings -> source?.let { choice ->
+                area.retain(settings)
+                authorizeNotifications { submission.start(settings, choice) }
+            } }
         }
+    }
+    LaunchedEffect(submission, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { submission.events.collect { started() } }
     }
     AlertDialog(
         shape = MaterialTheme.shapes.medium,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 0.dp,
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!download.busy) dismiss() },
         title = { Text(stringResource(Res.string.map_settings_title)) },
         text = {
             Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(state.name, model::name, label = { Text(stringResource(Res.string.map_name)) }, singleLine = true, shape = MaterialTheme.shapes.small)
+                OutlinedTextField(state.name, model::name, enabled = !download.busy, label = { Text(stringResource(Res.string.map_name)) }, singleLine = true, shape = MaterialTheme.shapes.small)
                 Text(stringResource(Res.string.zoom_levels), style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     state.availableLevels.forEach { level ->
-                        FilterChip(selected = level in state.selectedLevels, onClick = { model.toggle(level) }, label = { Text(level.toString()) })
+                        FilterChip(selected = level in state.selectedLevels, onClick = { model.toggle(level) }, enabled = !download.busy, label = { Text(level.toString()) })
                     }
                 }
                 Text(stringResource(Res.string.estimated_size_mb, formatMegabytes(state.estimate?.estimatedPackageBytes) ?: stringResource(Res.string.unavailable)),
                     style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.tertiary)
                 Text(stringResource(Res.string.tile_count_estimate, state.estimate?.tileCount ?: 0), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(Res.string.map_without_elevation), style = MaterialTheme.typography.bodySmall)
                 if ((state.estimate?.estimatedPackageBytes ?: 0) > 300_000_000L) Text(stringResource(Res.string.package_size_limit_exceeded), color = MaterialTheme.colorScheme.error)
                 if (source?.provider?.capabilitiesFor(source.style)?.offlineDownload == OfflineDownloadPermission.PROHIBITED) {
                     Text(stringResource(Res.string.offline_download_prohibited), color = MaterialTheme.colorScheme.error)
                 }
-                Text(stringResource(Res.string.download_draft_notice), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(Res.string.download_available_mb, formatMegabytes(download.availableBytes) ?: stringResource(Res.string.unavailable)))
+                TextButton(onClick = submission::refreshCapacity, enabled = !download.busy) { Text(stringResource(Res.string.download_refresh_capacity)) }
+                download.policyError?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+                download.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
                 state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
             }
         },
-        confirmButton = { Button(onClick = model::confirm, modifier = Modifier.heightIn(min = 48.dp), shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = Color.White)) { Text(stringResource(Res.string.save_settings)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },
+        confirmButton = { Button(onClick = model::confirm, enabled = !download.busy && download.policyError == null,
+            modifier = Modifier.heightIn(min = 48.dp), shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = Color.White)) {
+            Text(stringResource(if (download.busy) Res.string.download_starting else Res.string.download_start)) } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !download.busy) { Text(stringResource(Res.string.cancel)) } },
     )
 }
 

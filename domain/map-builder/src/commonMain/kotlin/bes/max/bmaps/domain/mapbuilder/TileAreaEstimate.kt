@@ -1,26 +1,22 @@
 package bes.max.bmaps.domain.mapbuilder
 
-import bes.max.bmaps.core.mapengine.*
-import kotlin.math.ceil
-import kotlin.math.floor
+import bes.max.bmaps.core.mapengine.BoundingBox
+import bes.max.bmaps.core.mapengine.ZoomRange
 
 object TileAreaEstimate {
     fun estimate(bounds: BoundingBox, levels: Set<Int>, averageTileBytes: Long): BuildEstimate {
-        val regions = checkNotNull(WebMercator.splitBounds(bounds))
-        var count = 0L
-        for (level in levels) {
-            val side = 1L shl level
-            val north = checkNotNull(WebMercator.normalized(GeographicCoordinate(bounds.north, 0.0))).y
-            val south = checkNotNull(WebMercator.normalized(GeographicCoordinate(bounds.south, 0.0))).y
-            val rows = ceil(south * side).toLong() - floor(north * side).toLong()
-            val columns = regions.sumOf { region ->
-                ceil((region.east + 180) / 360 * side).toLong() - floor((region.west + 180) / 360 * side).toLong()
-            }.coerceAtMost(side)
-            if (columns != 0L && rows > (Long.MAX_VALUE - count) / columns) return BuildEstimate(Long.MAX_VALUE, null)
-            count += columns * rows
-        }
-        val perTile = averageTileBytes + 256L
-        val bytes = if (count > (Long.MAX_VALUE - 4096L) / perTile) null else count * perTile + 4096L
-        return BuildEstimate(count, bytes)
+        require(averageTileBytes in 0..Long.MAX_VALUE - 256)
+        if (levels.isEmpty()) return BuildEstimate(0, METADATA_BYTES)
+        val coverage = try { PackageTileCoverage(bounds, ZoomRange(levels.min(), levels.max()), levels) }
+        catch (_: IllegalArgumentException) { return BuildEstimate(Long.MAX_VALUE, null) }
+        return estimate(coverage.count, averageTileBytes)
     }
+
+    internal fun estimate(count: Long, averageTileBytes: Long = 32_000): BuildEstimate {
+        val perTile = averageTileBytes + 256
+        return BuildEstimate(count, if (count <= (Long.MAX_VALUE - METADATA_BYTES) / perTile)
+            count * perTile + METADATA_BYTES else null)
+    }
+
+    private const val METADATA_BYTES = 1_048_576L
 }

@@ -37,7 +37,7 @@ class MapSaveSettingsViewModel : ViewModel() {
 
     fun initialize(area: BoundingBox, range: ZoomRange, previous: MapSaveSettings? = null) {
         if (bounds != null) return
-        if (WebMercator.splitBounds(area) == null || range.min !in 0..30 || range.max !in range.min..30) {
+        if (WebMercator.splitBounds(area) == null || range.min !in 0..52 || range.max !in range.min..52) {
             mutableState.value = state.value.copy(error = Res.string.unsupported_area_or_zoom)
             return
         }
@@ -76,5 +76,5 @@ class MapSaveSettingsViewModel : ViewModel() {
 internal fun defaultMapName(): String {
     val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
     fun Int.two() = toString().padStart(2, '0')
-    return "${now.year}.${now.month.number.two()}.${now.day.two()} ${now.hour.two()}:${now.minute.two()}"
+    return "${now.year}-${now.month.number.two()}-${now.day.two()}_${now.hour.two()}:${now.minute.two()}"
 }

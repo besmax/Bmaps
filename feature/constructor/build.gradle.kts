@@ -10,4 +10,5 @@ kotlin {
         implementation(libs.kotlinx.datetime)
         implementation(project(":core:datastore"))
     }
+    sourceSets.androidMain.dependencies { implementation(libs.androidx.activity.compose) }
 }

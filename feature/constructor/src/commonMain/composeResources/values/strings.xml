@@ -1,4 +1,14 @@
 <resources>
+    <string name="download_permission_unverified">Offline downloads are not verified for this provider. Choose a provider with approved offline access.</string>
+    <string name="download_storage_unavailable">Available storage could not be read. Try again.</string>
+    <string name="download_insufficient_storage">Not enough free space for the map and temporary download files.</string>
+    <string name="download_credentials_required">Add or update this provider’s credentials before retrying.</string>
+    <string name="download_start_failed">The download could not be started. Try again or check the map list.</string>
+    <string name="download_available_mb">Available storage: %1$s MB</string>
+    <string name="download_refresh_capacity">Refresh available storage</string>
+    <string name="download_start">Download map</string>
+    <string name="download_starting">Starting…</string>
+    <string name="map_without_elevation">Elevation data is not included.</string>
     <string name="tile_count_estimate">%1$d tiles · rough estimate using 32 KB per tile plus storage overhead. Actual size varies.</string>
     <string name="key_saved_securely">A key is saved securely.</string>
     <string name="accept">Accept</string>

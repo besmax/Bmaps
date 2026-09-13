@@ -5,5 +5,6 @@ plugins {
 kotlin {
     sourceSets.commonMain.dependencies {
         implementation(libs.androidx.sqlite.bundled)
+        implementation(libs.kotlinx.coroutines.core)
     }
 }

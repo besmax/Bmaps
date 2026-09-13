@@ -32,8 +32,8 @@ Modules containing pure use cases, models, and interface contracts.
     * **Dependencies:** `core:map-engine` for renderer-independent geometry and tile contracts; `core:network` for bounded HTTP, `core:datastore` for encrypted credentials, and `core:di` for Metro contributions.
 * **`domain:map-builder`**
     * **Responsibility:** Offline build planning and execution contracts, versioned package manifests, size policy, lifecycle, library/open/delete contracts, and failures/progress. Owns package-related annotation, elevation, and transfer business contracts as those phases are implemented.
-    * **Dependencies:** `domain:providers` for source identities/configuration and `core:map-engine` for geometry/tile contracts. The domain-to-domain dependency is one-way; providers do not depend on map-builder.
-    * **Implementation ownership:** Domain adapters implement domain repositories using lower-level core APIs; core modules never import domain contracts. Metro bindings are assembled in `:shared`. No persistence or download implementation exists in Phase 1.
+    * **Dependencies:** `domain:providers` for source identities/configuration and `core:map-engine` for geometry/tile contracts. Phase 4 adds `core:storage`, `core:mbtiles`, `core:database`, and `core:di` for the package repository adapter. The domain-to-domain dependency is one-way; providers do not depend on map-builder.
+    * **Implementation ownership:** Domain adapters implement domain repositories using lower-level core APIs; core modules never import domain contracts. Metro bindings are assembled in `:shared`. Phase 4 implements persistence and reconciliation through `LocalPackageRepository`; Phase 5 adds streaming tile planning, durable execution, Android WorkManager and iOS BGProcessingTask adapters. The constructor owns submission validation; the library owns list/progress/recovery presentation. `core:map-engine` exposes raster dimension validation without renderer types. See `12_DOWNLOAD_PIPELINE.md`.
 
 ## 4. Core Layer (Infrastructure & Data)
 Isolated infrastructure modules. Cross-dependencies within this layer must be minimized.
@@ -42,13 +42,16 @@ Isolated infrastructure modules. Cross-dependencies within this layer must be mi
 * **`core:database`**
     * **Responsibility:** Main application database (Room KMP) for metadata (e.g., saved projects, history).
     * **Constraints:** Custom pagination and complex filtering must be implemented directly here. Do not use Paging 3.
+    * **Phase 4:** Room package/job schema, typed core records, transactional checkpoints, and filter-bound keyset pagination. Depends only on `core:di` for application scope; persistence tooling is in `app.persistence`.
 * **`core:mbtiles`**
     * **Responsibility:** Specialized SQLite driver logic to dynamically read/write tile blobs to `.mbtiles` files on the device filesystem.
+    * **Phase 4:** Custom bundled-SQLite adapter, XYZ/TMS conversion, bounded atomic tile/failure batches, integrity checks, and serialized handle access. No core-to-core dependencies.
 * **`core:datastore`**
     * **Responsibility:** KMP DataStore implementation for persisting user preferences and system flags (e.g., default coordinate system, theme), and encrypted provider credentials. Platform encryption keys remain in Android Keystore or iOS Keychain.
     * **Dependencies:** `core:di` for application scope and Metro contributions. Platform DataStore construction remains here; platform entry points supply Android application context through the umbrella graph.
 * **`core:storage`**
-    * **Responsibility:** Cross-platform file system management (`kotlinx-io-core`). Handles directory creation, `.mbtiles` packaging, DEM matrix file parsing, and I/O for sharing/importing, also there are classes for working with annotations.db and classes for import/export our map objects (markers, routes, etc.) to/from GEOJson located .
+    * **Responsibility:** Cross-platform file system management (`kotlinx-io-core`). Handles directory creation, `.mbtiles` packaging, DEM matrix file parsing, and I/O for sharing/importing, Future annotation and GeoJSON file operations also belong here.
+    * **Phase 4:** Private staging/final directories, bounded streaming, synchronization, capacity/size checks, path safety, and cleanup. Depends only on `core:di` for platform location bindings. DEM parsing and transfer IO remain future work.
 * **`core:map-engine`**
     * **Responsibility:** Wrappers for `MapComposeMP`. Encapsulates geospatial mathematics, bounding box calculations, and coordinate system transformations (WGS-84, SK-91).
     * **Phase 3B:** Owns the bounded MapComposeMP raster adapter, source-session cleanup, Web Mercator/XYZ mathematics, and regional tile-pyramid configuration.
