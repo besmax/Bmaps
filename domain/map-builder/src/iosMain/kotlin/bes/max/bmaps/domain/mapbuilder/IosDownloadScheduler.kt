@@ -45,11 +45,11 @@ class IosDownloadScheduler(private val runner: DownloadRunner, private val stora
                 finally {
                     withContext(NonCancellable) {
                         owned.filter { it.isActive }.forEach { it.cancelAndJoin() }
-                        task.setTaskCompletedWithSuccess(success)
+                        task?.setTaskCompletedWithSuccess(success)
                     }
                 }
             }
-            task.expirationHandler = { scope.launch { execution.cancel() } }
+            task?.expirationHandler = { scope.launch { execution.cancel() } }
             execution.start()
         }
         NSNotificationCenter.defaultCenter.addObserverForName(
@@ -133,8 +133,8 @@ class IosDownloadScheduler(private val runner: DownloadRunner, private val stora
     private suspend fun notifyCompletion(id: BuildJobId, success: Boolean) {
         val request = storage.request(PackageId(id.value))
         val content = UNMutableNotificationContent()
-        content.title = (request as? PackageResult.Success)?.value?.name ?: "Bmaps"
-        content.body = NSBundle.mainBundle.localizedStringForKey(if (success) "download_complete" else "download_needs_attention", null, null)
+        content.setTitle((request as? PackageResult.Success)?.value?.name ?: "Bmaps")
+        content.setBody(NSBundle.mainBundle.localizedStringForKey(if (success) "download_complete" else "download_needs_attention", null, null))
         UNUserNotificationCenter.currentNotificationCenter().addNotificationRequest(
             UNNotificationRequest.requestWithIdentifier(id.value, content, null), null,
         )
