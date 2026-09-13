@@ -4,7 +4,8 @@ import bes.max.bmaps.core.mapengine.RasterTileFormat
 import bes.max.bmaps.core.mapengine.TileContentDescriptor
 
 object BuiltInProviders {
-    private val osmAttribution = Attribution("© OpenStreetMap contributors", "https://www.openstreetmap.org/copyright")
+    private val osmAttribution =
+        Attribution("© OpenStreetMap contributors", "https://www.openstreetmap.org/copyright")
     private val png = TileContentDescriptor(rasterFormats = setOf(RasterTileFormat.PNG))
 
     val osm = TileProvider(
@@ -26,7 +27,10 @@ object BuiltInProviders {
                     levelLimits = LevelLimitsConfig(1, 19),
                     tileMatrix = TileMatrixConfig(tileWidth = 512, tileHeight = 512),
                 ),
-                attributionOverride = listOf(osmAttribution, Attribution("OsmAnd", "https://osmand.net/")),
+                attributionOverride = listOf(
+                    osmAttribution,
+                    Attribution("OsmAnd", "https://osmand.net/")
+                ),
                 capabilitiesOverride = ProviderCapabilities(policyUrl = "https://osmand.net/docs/user/map/raster-maps/"),
             ),
         ),
@@ -51,9 +55,17 @@ object BuiltInProviders {
                 content = TileContentDescriptor(rasterFormats = setOf(RasterTileFormat.JPEG)),
             ),
         ),
-        config = ProviderConfig(levelLimits = LevelLimitsConfig(0, 23)),
-        attribution = listOf(Attribution("Esri, Vantor, Earthstar Geographics, and the GIS User Community", "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer")),
-        capabilities = ProviderCapabilities(policyUrl = "https://www.esri.com/en-us/legal/terms/full-master-agreement"),
+        config = ProviderConfig(levelLimits = LevelLimitsConfig(0, 19)),
+        attribution = listOf(
+            Attribution(
+                "Esri, Vantor, Earthstar Geographics, and the GIS User Community",
+                "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"
+            )
+        ),
+        capabilities = ProviderCapabilities(
+            offlineDownload = OfflineDownloadPermission.ALLOWED,
+            policyUrl = "https://www.esri.com/en-us/legal/terms/full-master-agreement"
+        ),
     )
 
     val yandex = TileProvider(
@@ -78,8 +90,17 @@ object BuiltInProviders {
             ),
         ),
         config = ProviderConfig(levelLimits = LevelLimitsConfig(0, 20)),
-        attribution = listOf(Attribution("© Yandex", "https://yandex.com/maps/", requiresLogo = true)),
-        capabilities = ProviderCapabilities(policyUrl = "https://yandex.com/legal/maps_api/"),
+        attribution = listOf(
+            Attribution(
+                "© Yandex",
+                "https://yandex.com/maps/",
+                requiresLogo = true
+            )
+        ),
+        capabilities = ProviderCapabilities(
+            offlineDownload = OfflineDownloadPermission.ALLOWED,
+            policyUrl = "https://yandex.com/legal/maps_api/"
+        ),
     )
 
     val thunderforest = TileProvider(
@@ -97,8 +118,14 @@ object BuiltInProviders {
             ),
         ),
         config = ProviderConfig(levelLimits = LevelLimitsConfig(0, 22)),
-        attribution = listOf(Attribution("© Thunderforest", "https://www.thunderforest.com/"), osmAttribution),
-        capabilities = ProviderCapabilities(policyUrl = "https://www.thunderforest.com/terms/"),
+        attribution = listOf(
+            Attribution("© Thunderforest", "https://www.thunderforest.com/"),
+            osmAttribution
+        ),
+        capabilities = ProviderCapabilities(
+            offlineDownload = OfflineDownloadPermission.ALLOWED,
+            policyUrl = "https://www.thunderforest.com/terms/"
+        ),
     )
 
     val all: List<TileProvider> = listOf(osm, arcGis, yandex, thunderforest)
