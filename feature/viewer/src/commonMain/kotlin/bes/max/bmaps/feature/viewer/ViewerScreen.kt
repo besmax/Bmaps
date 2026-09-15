@@ -29,6 +29,8 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val uriHandler = LocalUriHandler.current
+    val attribution = state.manifest?.layers?.firstOrNull()?.attribution.orEmpty()
 
     LaunchedEffect(packageId, model) { model.open(packageId) }
 
@@ -66,20 +68,43 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
                 contentDescription = stringResource(Res.string.viewer_zoom_out),
             )
         }
-        val uriHandler = LocalUriHandler.current
-        val attribution = state.manifest?.layers?.firstOrNull()?.attribution.orEmpty()
-        Surface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(8.dp),
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f), shape = MaterialTheme.shapes.small) {
-            Column(Modifier.padding(8.dp)) {
+        if (attribution.isNotEmpty()) MapIconButton(
+            onClick = { model.showAttribution(true) },
+            iconResId = Res.drawable.ic_info,
+            contentDescription = stringResource(Res.string.viewer_attribution),
+            modifier = Modifier.align(Alignment.BottomEnd).safeDrawingPadding().padding(16.dp),
+        )
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+    }
+    if (state.attributionVisible) AlertDialog(
+        onDismissRequest = { model.showAttribution(false) },
+        title = { Text(stringResource(Res.string.viewer_attribution)) },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(stringResource(Res.string.viewer_attribution_hint))
                 attribution.forEach { entry ->
-                    TextButton(onClick = { model.openLink(entry.url, uriHandler::openUri) }) {
-                        Text(entry.text, style = MaterialTheme.typography.labelSmall)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(entry.text, style = MaterialTheme.typography.bodyMedium)
+                        Text(entry.url, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = {
+                            model.showAttribution(false)
+                            model.openLink(entry.url, uriHandler::openUri)
+                        }) {
+                            Text(stringResource(Res.string.viewer_open_link))
+                        }
                     }
                 }
             }
-        }
-        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
-    }
+        },
+        confirmButton = {
+            TextButton(onClick = { model.showAttribution(false) }) {
+                Text(stringResource(Res.string.viewer_done))
+            }
+        },
+    )
     if (state.details) AlertDialog(
         onDismissRequest = { model.showDetails(false) },
         title = { Text(state.summary?.name ?: stringResource(Res.string.viewer_details)) },

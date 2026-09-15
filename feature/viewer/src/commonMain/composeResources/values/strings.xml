@@ -39,4 +39,7 @@
     <string name="viewer_dateline_west">West of date line</string>
     <string name="viewer_dateline_east">East of date line</string>
     <string name="viewer_link_error">This attribution link could not be opened.</string>
+    <string name="viewer_attribution">Map attribution</string>
+    <string name="viewer_attribution_hint">Visit the links below to learn more about the map sources and their terms of use.</string>
+    <string name="viewer_open_link">Open link</string>
 </resources>

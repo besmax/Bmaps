@@ -26,6 +26,7 @@ data class ViewerState(
     val region: Int = 0,
     val regionCount: Int = 1,
     val details: Boolean = false,
+    val attributionVisible: Boolean = false,
     val busy: Boolean = false,
 )
 
@@ -173,6 +174,7 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
         catch (_: Exception) { channel.trySend(Res.string.viewer_link_error) }
     }
 
+    fun showAttribution(show: Boolean) { mutableState.update { it.copy(attributionVisible = show) } }
     fun showDetails(show: Boolean) { mutableState.update { it.copy(details = show) } }
     fun favourite() = change { packages.setFavourite(it, !(state.value.summary?.favourite ?: false)) }
     fun avatar(value: MapAvatar) = change { packages.setAvatar(it, value) }
