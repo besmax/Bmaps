@@ -1,25 +1,135 @@
 package bes.max.bmaps.feature.viewer
 
 import bmaps.feature.viewer.generated.resources.*
-import org.jetbrains.compose.resources.stringResource
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import bes.max.bmaps.core.mapengine.RasterMap
+import bes.max.bmaps.domain.mapbuilder.*
+import dev.zacsweers.metrox.viewmodel.metroViewModel
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+import org.jetbrains.compose.resources.getString
 
 @Composable
-fun ViewerScreen(onOpenLibrary: () -> Unit) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val margin = if (maxWidth < 600.dp) 16.dp else 24.dp
-        Column(Modifier.align(Alignment.TopCenter).widthIn(max = 720.dp).fillMaxSize().padding(margin), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(stringResource(Res.string.map_viewer), style = MaterialTheme.typography.headlineLarge)
-            Text(stringResource(Res.string.a_place_for_your_next_adventure), style = MaterialTheme.typography.titleMedium)
-            Text(stringResource(Res.string.your_offline_map_will_open_here_when_viewing_is_available))
-            TextButton(onClick = onOpenLibrary) { Text(stringResource(Res.string.go_to_library)) }
+fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
+    val model = metroViewModel<ViewerViewModel>()
+    val state by model.state.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(packageId, model) { model.open(packageId) }
+    LaunchedEffect(model, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            model.events.collect { snackbar.showSnackbar(getString(it)) }
         }
     }
+    Box(Modifier.fillMaxSize()) {
+        RasterMap(model.renderer, Modifier.fillMaxSize())
+        Surface(Modifier.statusBarsPadding().padding(16.dp).align(Alignment.TopCenter).widthIn(max = 720.dp),
+            shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f)) {
+            Column(Modifier.padding(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onBack) { Text(stringResource(Res.string.viewer_back)) }
+                    Text(state.summary?.name ?: stringResource(Res.string.map_viewer), Modifier.weight(1f), maxLines = 2,
+                        style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = model::favourite, enabled = state.summary != null && !state.busy) {
+                        Text(stringResource(if (state.summary?.favourite == true) Res.string.viewer_unfavourite else Res.string.viewer_favourite))
+                    }
+                }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (state.automaticAvailable) FilterChip(selected = state.selectedLevel == null,
+                        onClick = { model.selectLevel(null) }, label = { Text(stringResource(Res.string.viewer_auto)) })
+                    state.levels.forEach { level ->
+                        FilterChip(selected = state.selectedLevel == level, onClick = { model.selectLevel(level) },
+                            label = { Text(stringResource(Res.string.viewer_level, level)) })
+                    }
+                }
+                if (state.regionCount > 1) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    repeat(state.regionCount) { region ->
+                        FilterChip(selected = state.region == region, onClick = { model.selectRegion(region) },
+                            label = { Text(stringResource(if (region == 0) Res.string.viewer_dateline_west else Res.string.viewer_dateline_east)) })
+                    }
+                }
+                TextButton(onClick = { model.showDetails(true) }) { Text(stringResource(Res.string.viewer_details)) }
+                if (state.loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                state.error?.let {
+                    Text(stringResource(it), color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = model::retry) { Text(stringResource(Res.string.viewer_retry)) }
+                }
+                state.tileWarning?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
+            }
+        }
+        Column(Modifier.align(Alignment.CenterEnd).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilledTonalButton(onClick = model.renderer.controller::zoomIn) { Text(stringResource(Res.string.viewer_zoom_in)) }
+            FilledTonalButton(onClick = model.renderer.controller::zoomOut) { Text(stringResource(Res.string.viewer_zoom_out)) }
+        }
+        val uriHandler = LocalUriHandler.current
+        val attribution = state.manifest?.layers?.firstOrNull()?.attribution.orEmpty()
+        Surface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(8.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f), shape = MaterialTheme.shapes.small) {
+            Column(Modifier.padding(8.dp)) {
+                attribution.forEach { entry ->
+                    TextButton(onClick = { model.openLink(entry.url, uriHandler::openUri) }) {
+                        Text(entry.text, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+    }
+    if (state.details) AlertDialog(
+        onDismissRequest = { model.showDetails(false) },
+        title = { Text(state.summary?.name ?: stringResource(Res.string.viewer_details)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                state.manifest?.let { manifest ->
+                    Text(stringResource(Res.string.viewer_bounds, manifest.bounds.south.toString(), manifest.bounds.west.toString(),
+                        manifest.bounds.north.toString(), manifest.bounds.east.toString()))
+                    Text(stringResource(Res.string.viewer_levels, state.levels.joinToString()))
+                    Text(stringResource(if (manifest.elevation == null) Res.string.viewer_no_elevation else Res.string.viewer_elevation))
+                }
+                state.summary?.let { Text(stringResource(Res.string.viewer_size, it.sizeBytes)) }
+                Text(stringResource(Res.string.viewer_avatar), style = MaterialTheme.typography.titleSmall)
+                MapAvatar.entries.chunked(2).forEach { avatars ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        avatars.forEach { avatar ->
+                            FilterChip(selected = state.summary?.avatarKey == avatar.storageKey, enabled = !state.busy,
+                                onClick = { model.avatar(avatar) },
+                                leadingIcon = { Icon(painterResource(avatarIcon(avatar)), null, Modifier.size(20.dp)) }, label = { Text(stringResource(avatarLabel(avatar))) })
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { model.showDetails(false) }) { Text(stringResource(Res.string.viewer_done)) } },
+    )
+}
+
+private fun avatarLabel(avatar: MapAvatar) = when (avatar) {
+    MapAvatar.MAP -> Res.string.avatar_map
+    MapAvatar.MOUNTAIN -> Res.string.avatar_mountain
+    MapAvatar.FOREST -> Res.string.avatar_forest
+    MapAvatar.WATER -> Res.string.avatar_water
+    MapAvatar.CITY -> Res.string.avatar_city
+    MapAvatar.CAMP -> Res.string.avatar_camp
+}
+
+private fun avatarIcon(avatar: MapAvatar) = when (avatar) {
+    MapAvatar.MAP -> Res.drawable.avatar_map
+    MapAvatar.MOUNTAIN -> Res.drawable.avatar_mountain
+    MapAvatar.FOREST -> Res.drawable.avatar_forest
+    MapAvatar.WATER -> Res.drawable.avatar_water
+    MapAvatar.CITY -> Res.drawable.avatar_city
+    MapAvatar.CAMP -> Res.drawable.avatar_camp
 }

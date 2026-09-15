@@ -1,6 +1,6 @@
 # Download pipeline and current state
 
-Phase 5 implementation, 2026-09-13. Source review only: no builds, test execution, simulator/device runs, or live tile downloads were performed. Compilation and acceptance remain assigned to the user. Phase 6 offline viewing is still pending.
+Phase 5 implementation, 2026-09-13. Source review only: no builds, test execution, simulator/device runs, or live tile downloads were performed. Compilation and acceptance remain assigned to the user. Phase 6 offline viewing and library management are now implemented, with verification pending; see `13_LIBRARY_AND_OFFLINE_VIEWER.md`.
 
 ## User flow
 

@@ -8,6 +8,7 @@ data class PackageQuery(
     val states: Set<PackageState> = PackageState.entries.toSet(),
     val limit: Int = 50,
     val cursor: String? = null,
+    val favouritesOnly: Boolean = false,
 )
 
 data class PackagePage(val items: List<PackageSummary>, val nextCursor: String?)
@@ -17,6 +18,8 @@ interface PackageRepository {
     fun observe(id: PackageId): Flow<PackageResult<PackageSummary>>
     suspend fun open(id: PackageId): PackageResult<OpenedPackage>
     suspend fun delete(id: PackageId): PackageResult<Unit>
+    suspend fun setFavourite(id: PackageId, favourite: Boolean): PackageResult<Unit>
+    suspend fun setAvatar(id: PackageId, avatar: MapAvatar): PackageResult<Unit>
 }
 
 interface OpenedPackage {

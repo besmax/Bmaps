@@ -78,6 +78,10 @@ fun PackageManifest.compatibility(): ManifestCompatibility = when {
 @Serializable
 enum class PackageState { BUILDING, PAUSED, FINALIZING, READY, FAILED, DELETING, CORRUPT, MISSING }
 
+enum class MapAvatar(val storageKey: String) {
+    MAP("map"), MOUNTAIN("mountain"), FOREST("forest"), WATER("water"), CITY("city"), CAMP("camp")
+}
+
 @Serializable
 data class PackageSummary(
     val id: PackageId,
@@ -90,6 +94,9 @@ data class PackageSummary(
     val totalTiles: Long = 0,
     val downloadedTiles: Long = 0,
     val failedTiles: Long = 0,
+    val favourite: Boolean = false,
+    val avatarKey: String = "map",
+    val zoomLevels: Set<Int> = emptySet(),
 ) {
     val missingTiles: Long get() = (totalTiles - downloadedTiles).coerceAtLeast(0)
 }

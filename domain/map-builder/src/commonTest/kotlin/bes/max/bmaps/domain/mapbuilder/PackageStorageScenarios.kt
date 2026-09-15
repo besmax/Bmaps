@@ -31,12 +31,16 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             assertEquals(1L, progress.completedTiles)
             assertEquals(1L, progress.failedTiles)
             assertIs<PackageResult.Failure>(repository.finalize(id))
+            repository.setFavourite(id, true).success()
+            repository.setAvatar(id, MapAvatar.MOUNTAIN).success()
             repository.setState(id, BuildJobState.FAILED, PackageFailure.NetworkUnavailable).success()
             db.close()
             db = database(Path(root, "catalog.db").toString())
             repository = LocalPackageRepository(PackageCatalog(db), files)
             val summary = repository.observe(PackageQuery()).first().success().items.single()
             assertEquals(PackageState.FAILED, summary.state)
+            assertTrue(summary.favourite)
+            assertEquals(MapAvatar.MOUNTAIN.storageKey, summary.avatarKey)
             assertEquals(1L, summary.failedTiles)
             assertFalse(summary.hasElevationData)
             assertIs<PackageResult.Failure>(repository.open(id))
@@ -59,6 +63,9 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             db.close()
             db = database(Path(root, "catalog.db").toString())
             repository = LocalPackageRepository(PackageCatalog(db), files)
+            val ready = repository.observe(PackageQuery(favouritesOnly = true)).first().success().items.single()
+            assertTrue(ready.favourite)
+            assertEquals(MapAvatar.MOUNTAIN.storageKey, ready.avatarKey)
             val opened = repository.open(id).success()
             val source = opened.openTiles(layer).success()
             assertEquals(bytes, assertIs<TileReadResult.Available>(source.read(first)).bytes)
@@ -66,6 +73,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             assertEquals(TileReadResult.Failed(TileReadFailure.CLOSED), source.read(first))
             opened.close()
             assertTrue(repository.observe(PackageQuery()).first().success().items.isEmpty())
+            assertNull(db.packages().preferences(id.value))
         } finally { db.close() }
     }
 
@@ -107,6 +115,13 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             assertEquals(listOf("c"), second.items.map { it.id })
             assertNull(second.nextCursor)
             assertFailsWith<IllegalArgumentException> { catalog.observe(PackageFilter("changed"), 2, first.nextCursor) }
+            catalog.records.putPreferences(PackagePreferencesRecord("b", favourite = true, avatar = "forest"))
+            catalog.records.putPreferences(PackagePreferencesRecord("c", favourite = true))
+            val favourites = filter.copy(favouritesOnly = true)
+            val favouritePage = catalog.observe(favourites, 1, null).first()
+            assertEquals(listOf("b"), favouritePage.items.map { it.id })
+            assertEquals(listOf("c"), catalog.observe(favourites, 1, favouritePage.nextCursor).first().items.map { it.id })
+            assertFailsWith<IllegalArgumentException> { catalog.observe(favourites, 2, first.nextCursor) }
             val tiles = MbTiles.create(Path(root, "fixture.mbtiles").toString(), mapOf("format" to "png"))
             try {
                 val address = TileAddress(2, 1, 0)

@@ -17,4 +17,5 @@
     <string name="viewer">Viewer</string>
     <string name="wgs_84">WGS 84</string>
     <string name="your_preferences_could_not_be_loaded">Your preferences could not be loaded.</string>
+    <string name="back">Back</string>
 </resources>

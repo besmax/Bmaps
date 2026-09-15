@@ -10,7 +10,7 @@ Typography maps the supplied headline, title, body, and label styles to Material
 
 Shapes use 8, 16, 24, 32, and 48 dp corners. Floating controls and primary buttons use full circular/stadium shapes with at least 48 dp touch targets. Screen margins are 16 dp below 600 dp and 24 dp on expanded layouts. Non-map content is centered within a 720 dp width; floating map panels cap at 360 dp and the expanded-layout selection action docks at the bottom right.
 
-Map chrome uses translucent surface tiers, subtle borders, and elevation shadows. The implementation does not apply a true backdrop blur: foreground blur would blur controls rather than the map behind them, and no new rendering dependency is introduced for that effect. Attribution remains visible and linked. Existing navigation destinations use vector icons in a floating rounded bar.
+Map chrome uses translucent surface tiers, subtle borders, and elevation shadows. The implementation does not apply a true backdrop blur: foreground blur would blur controls rather than the map behind them, and no new rendering dependency is introduced for that effect. Attribution remains visible and linked. Phase 6 removes navigation bars. The home library uses an amber constructor FAB, a top-bar gear, and vector package avatars; the viewer uses floating map controls and Back navigation.
 
 The area selector retains its ViewModel-owned movement and resizing behavior. Its visual treatment is a 12% amber fill, a 2 dp amber boundary, and 8 dp corner circles within 48 dp gesture targets. Instructions use a translucent rounded surface. No dummy search, GPS, recording, telemetry, offline-ready, or 3D controls are introduced for unimplemented features.
 

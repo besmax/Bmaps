@@ -21,9 +21,9 @@ Modules containing Compose Multiplatform screens, ViewModels, and presentation-l
     * **Phase 3C:** Online map presentation, source/style selection, presentation validation, loading/error/retry state, attribution, and a separate dialog-scoped credentials ViewModel. Uses `domain:providers`, `core:map-engine`, `core:datastore`, and `core:di`.
     * **Responsibility:** UI for the map builder. Handles user interaction for bounding box selection, zoom level toggling, layer opacity control, and initiating the download process.
 * **`feature:library`**
-    * **Responsibility:** UI for managing local `.mbtiles` packages. Displays downloaded maps, storage metrics, and handles user actions for deleting or sharing packages.
+    * **Responsibility:** Home UI for local packages, constructor FAB, search/status/favourite filters, incremental loading, details, avatar preferences, and confirmed deletion. Retains download progress and recovery actions. Sharing remains Phase 10.
 * **`feature:viewer`**
-    * **Responsibility:** The offline map rendering screen. Integrates with the local `TileStreamProvider` to render `.mbtiles` databases, apply polygon/marker annotations, and render DEM altitude overlays.
+    * **Responsibility:** The offline map rendering screen. Phase 6 owns package sessions, regional raster configuration, exact-level selection, lifecycle viewport retention, details, and favourite/avatar editing. Depends on `domain:map-builder`, `core:map-engine`, and `core:di`. Layer composition, annotation managers, and DEM overlays remain subsequent phases.
 
 ## 3. Domain Layer (Business Logic & Contracts)
 Modules containing pure use cases, models, and interface contracts.
@@ -42,7 +42,7 @@ Isolated infrastructure modules. Cross-dependencies within this layer must be mi
 * **`core:database`**
     * **Responsibility:** Main application database (Room KMP) for metadata (e.g., saved projects, history).
     * **Constraints:** Custom pagination and complex filtering must be implemented directly here. Do not use Paging 3.
-    * **Phase 4:** Room package/job schema, typed core records, transactional checkpoints, and filter-bound keyset pagination. Depends only on `core:di` for application scope; persistence tooling is in `app.persistence`.
+    * **Phase 4:** Room package/job schema, typed core records, transactional checkpoints, and filter-bound keyset pagination. Phase 6 adds a migrated package preference table, favourite filtering, and preference-aware observations. Depends only on `core:di` for application scope; persistence tooling is in `app.persistence`.
 * **`core:mbtiles`**
     * **Responsibility:** Specialized SQLite driver logic to dynamically read/write tile blobs to `.mbtiles` files on the device filesystem.
     * **Phase 4:** Custom bundled-SQLite adapter, XYZ/TMS conversion, bounded atomic tile/failure batches, integrity checks, and serialized handle access. No core-to-core dependencies.

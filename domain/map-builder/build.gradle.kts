@@ -22,7 +22,4 @@ kotlin {
         implementation(libs.androidx.core.ktx)
         implementation(libs.kotlinx.coroutines.guava)
     }
-    sourceSets.named("androidDeviceTest").dependencies {
-        implementation(libs.androidx.testExt.junit)
-    }
 }

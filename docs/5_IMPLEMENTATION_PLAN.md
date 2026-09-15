@@ -1,6 +1,6 @@
 # Bmaps Implementation Plan
 
-Planning baseline: 2026-09-08. Last updated: 2026-09-13. Phases 1, 2, and 3A are implemented. Phase 3B's renderer and coordinate implementation is in place; Android deterministic-fixture acceptance remains pending. Phase 3C's provider catalog, fullscreen constructor flow, secure credentials dialog, and OSM rendering are implemented; broader provider entitlement and native acceptance remain pending. Phase 3D area selection and save-settings UI are implemented; its full acceptance matrix is pending. Phase 0's remaining build/CI work is also pending.
+Planning baseline: 2026-09-08. Last updated: 2026-09-14. Phases 1, 2, and 3A are implemented. Phase 3B's renderer and coordinate implementation is in place; Android deterministic-fixture acceptance remains pending. Phase 3C's provider catalog, fullscreen constructor flow, secure credentials dialog, and OSM rendering are implemented; broader provider entitlement and native acceptance remain pending. Phase 3D area selection and save-settings UI are implemented; its full acceptance matrix is pending. Phase 0's remaining build/CI work is also pending.
 
 ## Current implementation status
 
@@ -11,9 +11,10 @@ Planning baseline: 2026-09-08. Last updated: 2026-09-13. Phases 1, 2, and 3A are
 | Phase 3D | Initial native rendering evidence is recorded below | Full pan/zoom, switching, lifecycle, missing-tile, and network-recovery acceptance matrix |
 | Phase 4 | Package storage, Room catalog/checkpoints, MBTiles access, finalization/reconciliation implemented; not built or tested | User-run compilation, generated schema review, and native persistence acceptance |
 | Phase 5 | Durable download pipeline, native scheduling, settings submission, library progress and missing-tile restore implemented; not built or tested | User-run compilation and native download/recovery acceptance; see document 12 |
-| Phases 6–11 | Library list/progress subset implemented; other contracts and plans | Offline viewer, library details/filters/deletion, editing, elevation/CRS, sharing, and release hardening |
+| Phase 6 | Home library/FAB navigation, local offline viewer, details, filters, deletion, favourite/avatar persistence implemented; not built or tested | User-run Room migration/schema verification and offline/native acceptance; see document 13 |
+| Phases 7–11 | Contracts and plans | Editing, elevation/CRS, sharing, and release hardening |
 
-Current work: Phase 5 implementation is ready for user verification; current state and handoff are in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Builds and all test execution are assigned to the user.
+Current work: Phase 6 implementation is ready for user verification; current state and handoff are in `13_LIBRARY_AND_OFFLINE_VIEWER.md`. Phase 5 download verification remains in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Builds and all test execution are assigned to the user.
 
 This plan follows `AGENTS.md` and documents 1–4. Checked boxes represent completed deliverables. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats. The table below preserves the original source-inspection baseline; current Phase 1 decisions are recorded in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 
@@ -208,15 +209,17 @@ Implementation: `12_DOWNLOAD_PIPELINE.md`, 2026-09-13. The dialog submits actual
 
 Dependencies: Phases 2, 4–5.
 
-The package list, incremental loading, size/status/elevation labels, incomplete warnings, and restore controls are already implemented with Phase 5. Details, filter controls, deletion UI, and offline viewing remain.
+The Phase 5 library foundation is extended with details, database filters, confirmed deletion, offline rendering, and persistent favourites/built-in avatars. Navigation now starts at the library with a constructor FAB, opens ready maps on tap, and exposes preferences through a gear icon. No navigation bars remain. Implementation details and unrun verification are in document 13.
 
-- [ ] Implement package list, details, size/status/elevation availability display, filters, and incremental loading using the custom database queries. Include incomplete maps by default with warnings and a Restore / Download missing tiles action.
+- [x] Implement package list, details, size/status/elevation availability display, filters, and incremental loading using the custom database queries. Include incomplete maps by default with warnings and a Restore / Download missing tiles action.
 - [x] Show ongoing download progress at the top of the library; connect restore/pause/cancel to the Phase 5 scheduler. Implemented with Phase 5; native verification pending.
-- [ ] Open packages through domain operations and adapt local MBTiles sources to the renderer wrapper.
-- [ ] Display geographic bounds, supported zooms, loading/empty states, and missing/corrupt package errors.
-- [ ] Implement package deletion with handle closure, file cleanup, metadata reconciliation, and appropriate UI confirmation.
-- [ ] Preserve viewport across normal screen recreation and restore relevant preferences.
+- [x] Open packages through domain operations and adapt local MBTiles sources to the renderer wrapper.
+- [x] Display geographic bounds, supported zooms, loading/empty states, and missing/corrupt package errors.
+- [x] Implement package deletion with handle closure, file cleanup, metadata reconciliation, and appropriate UI confirmation.
+- [x] Preserve viewport across normal screen recreation and restore relevant preferences.
 - [ ] Verify offline viewing makes no tile-network requests and does not depend on a warm HTTP cache.
+
+Implementation is present; Phase 6 acceptance remains pending user-run builds and tests.
 
 Acceptance for M1: create a package online, terminate the app, disable connectivity, relaunch, find it in the library, and pan/zoom all downloaded levels on both platforms. Delete it and verify files and metadata agree.
 

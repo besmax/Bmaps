@@ -118,3 +118,8 @@ Both commands passed, with 10 host tests and no test failures. Apps were not lau
 `BuildLayerRequest.zoomLevels` and `PackageLayer.zoomLevels` preserve non-contiguous selection. Empty sets retain the original inclusive-range semantics. Final layers record their verified `tileCount`; a null count identifies a draft or a package requiring import validation. New package writes explicitly serialize `elevation: null`; no DEM is currently included. Summaries expose elevation availability and durable tile counters; bounds may be null for corrupt orphan entries without readable metadata.
 
 `PackageBuildStorage` supplies durable request lookup, bounded batch storage, existence checks for resume, state/checkpoint persistence, progress observation, finalization, and reconciliation. It performs no network scheduling. Tile blobs and unresolved failure identities share each layer database transaction; Room counts follow and can be rebuilt. Package opening/deletion now have local implementations and owned tile sources. Paths, size limits, completeness, and native verification limitations are detailed in `11_PACKAGE_STORAGE.md`.
+
+
+## Phase 6 library preferences
+
+`PackageSummary` exposes favourite status, a stable avatar key, and exact downloaded zoom levels. `PackageQuery.favouritesOnly` participates in database filtering and cursor identity. `PackageRepository.setFavourite` and `setAvatar` update a separate Room preference record. These device-local choices do not alter manifest version 1, package assets, or total package bytes. Room schema version 2 includes a non-destructive 1-to-2 migration and cascading preference deletion. See document 13 for rendering and verification limits.

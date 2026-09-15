@@ -67,3 +67,8 @@ Authored but not run:
 - `PackageStorageDeviceTest` / `PackageStorageIosTest`: real Room/SQLite/filesystem scenarios for missing-tile recovery, reopening after database recreation, duplicate results, elevation absence, promotion recovery, orphan reindexing, missing directories, source closure on deletion, stable filtered pagination, SQL rollback on size limits, bounded stream cleanup, and path traversal rejection.
 
 User verification should also exercise disk exhaustion, cancellation at each commit boundary, hot-journal recovery after process kill, symlink rejection on both platforms, and concurrent reads/deletion. No new build, host test, simulator, device, or network-download execution was performed for this phase.
+
+
+## Phase 6 catalog extension
+
+Room schema version 2 adds device-local package favourite/avatar preferences with an explicit migration from version 1. Existing package manifests and download checkpoints are unchanged. Generate and review the version 2 schema during the next user-run build. Library deletion now invokes the scheduler/runner cancellation path before repository cleanup when a download job exists. Details are in `13_LIBRARY_AND_OFFLINE_VIEWER.md`.

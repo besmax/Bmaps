@@ -19,7 +19,11 @@ data class LibraryState(
     val maps: List<PackageSummary> = emptyList(), val progress: List<BuildProgress> = emptyList(),
     val loading: Boolean = true, val error: StringResource? = null, val busy: Set<PackageId> = emptySet(),
     val pages: Int = 1, val hasMore: Boolean = false,
+    val search: String = "", val filter: LibraryFilter = LibraryFilter.ALL,
+    val details: PackageId? = null, val deleteConfirmation: PackageId? = null,
 )
+
+enum class LibraryFilter { ALL, FAVOURITES, READY, INCOMPLETE }
 
 @Inject
 @ViewModelKey
@@ -47,8 +51,14 @@ class LibraryViewModel(
         listing?.cancel()
         mutableState.update { it.copy(loading = true, error = null) }
         val pageCount = state.value.pages
+        val query = PackageQuery(nameContains = state.value.search, favouritesOnly = state.value.filter == LibraryFilter.FAVOURITES,
+            states = when (state.value.filter) {
+                LibraryFilter.READY -> setOf(PackageState.READY)
+                LibraryFilter.INCOMPLETE -> PackageState.entries.toSet() - PackageState.READY
+                else -> PackageState.entries.toSet()
+            })
         listing = viewModelScope.launch {
-            packages.observe(PackageQuery()).collectLatest { result ->
+            packages.observe(query).collectLatest { result ->
                 when (result) {
                     is PackageResult.Success -> {
                         val maps = result.value.items.toMutableList()
@@ -56,7 +66,7 @@ class LibraryViewModel(
                         var failed = false
                         for (page in 1 until pageCount) {
                             val next = cursor ?: break
-                            when (val more = packages.observe(PackageQuery(cursor = next)).first()) {
+                            when (val more = packages.observe(query.copy(cursor = next)).first()) {
                                 is PackageResult.Success -> { maps.addAll(more.value.items); cursor = more.value.nextCursor }
                                 is PackageResult.Failure -> { failed = true; break }
                             }
@@ -66,6 +76,31 @@ class LibraryViewModel(
                     }
                     is PackageResult.Failure -> mutableState.update { it.copy(error = Res.string.library_load_failed, loading = false) }
                 }
+            }
+        }
+    }
+
+    fun search(value: String) {
+        if (value == state.value.search) return
+        mutableState.update { it.copy(search = value, pages = 1, maps = emptyList(), hasMore = false) }
+        refresh()
+    }
+    fun filter(value: LibraryFilter) {
+        if (value == state.value.filter) return
+        mutableState.update { it.copy(filter = value, pages = 1, maps = emptyList(), hasMore = false) }
+        refresh()
+    }
+    fun details(id: PackageId?) { mutableState.update { it.copy(details = id) } }
+    fun confirmDelete(id: PackageId?) { mutableState.update { it.copy(deleteConfirmation = id) } }
+    fun favourite(map: PackageSummary) = action(map.id) { packages.setFavourite(map.id, !map.favourite) }
+    fun avatar(id: PackageId, avatar: MapAvatar) = action(id) { packages.setAvatar(id, avatar) }
+    fun deleteConfirmed() {
+        val id = state.value.deleteConfirmation ?: return
+        mutableState.update { it.copy(deleteConfirmation = null, details = null) }
+        action(id) {
+            when (val progress = storage.observeProgress(BuildJobId(id.value)).first()) {
+                is PackageResult.Success -> executor.cancel(BuildJobId(id.value), PartialPackageRetention.DELETE)
+                is PackageResult.Failure -> if (progress.reason == PackageFailure.NotFound) packages.delete(id) else progress
             }
         }
     }

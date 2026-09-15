@@ -1,11 +1,11 @@
 # Feature Shell and DI Composition
 
-Phase 2 replaces the template UI with library, constructor, and viewer destinations and a working preferences dialog. The map destinations remain placeholders; this phase does not implement map rendering, library queries, or downloads.
+Phase 2 introduced feature composition and the preferences dialog. Phase 6 replaces tab navigation with a home library, a constructor FAB, and package-specific offline viewer entries; see `13_LIBRARY_AND_OFFLINE_VIEWER.md`.
 
 ## Module ownership
 
 - `feature:shell` owns application chrome, theme state, navigation events, and preferences presentation. It depends on core infrastructure and accepts content callbacks; it never imports another feature.
-- `feature:library`, `feature:constructor`, and `feature:viewer` own their placeholder UI and expose navigation callbacks. They do not need ViewModels until they acquire screen behavior/state.
+- `feature:library`, `feature:constructor`, and `feature:viewer` own their screen UI, ViewModels, and navigation callbacks.
 - `shared` composes a Navigation Compose host and connects the feature callbacks. It contains no screen ViewModels, preference mutation, or business logic.
 - `core:di` owns `AppScope` and the Metro ViewModel factory binding.
 - `core:datastore` owns the preference contract, DataStore implementation, and platform DataStore construction.
@@ -24,7 +24,7 @@ The DataStore artifact is an API dependency of `core:datastore` because its type
 
 ## Navigation, state, and effects
 
-The root starts at Library. Bottom navigation uses single-top destinations with saved/restored back stacks. Feature callbacks are converted into `ShellEvent` values by `ShellViewModel`; the shell consumes them while RESUMED and the umbrella performs the corresponding navigation operation. This keeps navigation events out of durable screen state.
+The root starts at Library. Its FAB opens the constructor, and ready package rows open a viewer entry carrying the package ID. There is no bottom navigation or saved tab stack. Back returns through the navigation stack. The top-bar gear opens Preferences. Feature callbacks are converted into `ShellEvent` values by `ShellViewModel`; the shell consumes them while RESUMED and the umbrella performs the corresponding navigation operation. This keeps navigation events out of durable screen state.
 
 Preferences is a navigation dialog destination, not a Boolean attached to the shell's ViewModel. Its lifetime therefore follows dismissal, back navigation, and restoration. A draft survives ordinary activity recreation through its retained ViewModel. Dismissing without Save discards the draft; reopening reads persisted preferences. Uncommitted drafts are not promised to survive process death.
 

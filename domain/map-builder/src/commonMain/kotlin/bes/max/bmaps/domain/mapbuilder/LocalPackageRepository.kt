@@ -33,7 +33,7 @@ class LocalPackageRepository(
 
     override fun observe(query: PackageQuery): Flow<PackageResult<PackagePage>> = flow<PackageResult<PackagePage>> {
         requireInitialized()
-        emitAll(catalog.observe(PackageFilter(query.nameContains, query.states.map { it.name }.toSet()),
+        emitAll(catalog.observe(PackageFilter(query.nameContains, query.states.map { it.name }.toSet(), query.favouritesOnly),
             query.limit, query.cursor).map { page ->
             PackageResult.Success(PackagePage(page.items.map { summary(it) }, page.nextCursor))
         })
@@ -220,7 +220,12 @@ class LocalPackageRepository(
 
     override suspend fun open(id: PackageId): PackageResult<OpenedPackage> = operation {
         val record = records.get(id.value) ?: fail(PackageFailure.NotFound)
-        if (record.state != PackageState.READY.name) fail(PackageFailure.NotReady)
+        when (record.state) {
+            PackageState.MISSING.name -> fail(PackageFailure.NotFound)
+            PackageState.CORRUPT.name -> fail(PackageFailure.CorruptData)
+            PackageState.READY.name -> Unit
+            else -> fail(PackageFailure.NotReady)
+        }
         storage.access {
             try {
                 val manifest = readManifest(id, false)
@@ -238,6 +243,16 @@ class LocalPackageRepository(
                 throw error
             }
         }
+    }
+
+    override suspend fun setFavourite(id: PackageId, favourite: Boolean): PackageResult<Unit> = operation {
+        if (records.get(id.value) == null) fail(PackageFailure.NotFound)
+        records.putPreferences((records.preferences(id.value) ?: PackagePreferencesRecord(id.value)).copy(favourite = favourite))
+    }
+
+    override suspend fun setAvatar(id: PackageId, avatar: MapAvatar): PackageResult<Unit> = operation {
+        if (records.get(id.value) == null) fail(PackageFailure.NotFound)
+        records.putPreferences((records.preferences(id.value) ?: PackagePreferencesRecord(id.value)).copy(avatar = avatar.storageKey))
     }
 
     override suspend fun delete(id: PackageId): PackageResult<Unit> = operation {
@@ -380,11 +395,14 @@ class LocalPackageRepository(
             runCatching { PackageManifestCodec.decode(it) }.getOrNull()
         }
         val job = records.job(record.id)
+        val preferences = records.preferences(record.id)
         return PackageSummary(PackageId(record.id), record.name,
             manifest?.bounds,
             PackageState.valueOf(record.state), record.sizeBytes, record.updatedAtEpochMillis, record.hasElevationData,
             job?.totalTiles ?: manifest?.layers?.sumOf { it.tileCount ?: 0 } ?: 0,
-            job?.completedTiles ?: manifest?.layers?.sumOf { it.tileCount ?: 0 } ?: 0, job?.failedTiles ?: 0)
+            job?.completedTiles ?: manifest?.layers?.sumOf { it.tileCount ?: 0 } ?: 0, job?.failedTiles ?: 0,
+            favourite = preferences?.favourite ?: false, avatarKey = preferences?.avatar ?: "map",
+            zoomLevels = manifest?.layers?.flatMap { it.zoomLevels.ifEmpty { (it.zoomRange.min..it.zoomRange.max).toSet() } }?.toSet().orEmpty())
     }
 
     private fun DownloadJobRecord.progress() = BuildProgress(BuildJobId(id), PackageId(packageId), BuildJobState.valueOf(state),

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import bes.max.bmaps.domain.mapbuilder.PackageId
 import androidx.navigation.NavHostController
 import androidx.savedstate.read
 import androidx.navigation.compose.NavHost
@@ -34,14 +35,16 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
             entry?.destination?.route
         }
         AppShell(
-            destination = ShellDestination.entries.firstOrNull { it.route == route } ?: ShellDestination.LIBRARY,
-            fullScreen = route == MapRoute || route == MapSettingsRoute,
+            destination = ShellDestination.entries.firstOrNull { it.route == route || (it == ShellDestination.VIEWER && route == ViewerRoute) } ?: ShellDestination.LIBRARY,
+            fullScreen = route == MapRoute || route == MapSettingsRoute || route == ViewerRoute,
+            onBack = { navigation.popBackStack() },
             onNavigate = navigation::openDestination,
             onPreferences = { navigation.navigate(PreferencesRoute) { launchSingleTop = true } },
         ) { navigate ->
             NavHost(navController = navigation, startDestination = startDestination.route) {
                 composable(ShellDestination.LIBRARY.route) {
-                    LibraryScreen(onBuildMap = { navigate(ShellDestination.CONSTRUCTOR) })
+                    LibraryScreen(onBuildMap = { navigate(ShellDestination.CONSTRUCTOR) },
+                        onOpenMap = { navigation.navigate("viewer/${it.value}") { launchSingleTop = true } })
                 }
                 composable(ShellDestination.CONSTRUCTOR.route) {
                     ConstructorScreen(onOpenLibrary = { navigate(ShellDestination.LIBRARY) },
@@ -65,8 +68,9 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
                         } },
                         onDismiss = { navigation.popBackStack() })
                 }
-                composable(ShellDestination.VIEWER.route) {
-                    ViewerScreen(onOpenLibrary = { navigate(ShellDestination.LIBRARY) })
+                composable(ViewerRoute) { viewerEntry ->
+                    val id = viewerEntry.arguments?.read { getString("packageId") }.orEmpty()
+                    ViewerScreen(PackageId(id), onBack = { navigation.popBackStack() })
                 }
                 dialog("provider-credentials/{identifier}") { entry ->
                     val identifier = entry.arguments?.read { getString("identifier") }
@@ -82,9 +86,8 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
 
 private fun NavHostController.openDestination(destination: ShellDestination) {
     navigate(destination.route) {
-        popUpTo(ShellDestination.LIBRARY.route) { saveState = true }
+        popUpTo(ShellDestination.LIBRARY.route)
         launchSingleTop = true
-        restoreState = true
     }
 }
 
@@ -92,3 +95,5 @@ private const val PreferencesRoute = "preferences"
 
 private const val MapRoute = "map/{provider}/{style}"
 private const val MapSettingsRoute = "map-settings"
+
+private const val ViewerRoute = "viewer/{packageId}"

@@ -3,12 +3,8 @@ package bes.max.bmaps.feature.shell
 import bmaps.feature.shell.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.StringResource
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.TopAppBarDefaults
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
@@ -24,8 +20,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -57,6 +51,7 @@ fun AppShell(
     destination: ShellDestination,
     onNavigate: (ShellDestination) -> Unit,
     onPreferences: () -> Unit,
+    onBack: () -> Unit = {},
     fullScreen: Boolean = false,
     viewModel: ShellViewModel = metroViewModel(),
     content: @Composable ((ShellDestination) -> Unit) -> Unit,
@@ -85,35 +80,11 @@ fun AppShell(
             contentWindowInsets = if (fullScreen) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
             topBar = {
                 if (!fullScreen) TopAppBar(
+                    navigationIcon = { if (destination != ShellDestination.LIBRARY) IconButton(onClick = onBack) { Icon(painterResource(Res.drawable.ic_back), stringResource(Res.string.back)) } },
                     title = { Text(stringResource(Res.string.bmaps), style = MaterialTheme.typography.titleLarge) },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    actions = { TextButton(onClick = viewModel::openPreferences) { Text(stringResource(Res.string.preferences)) } },
+                    actions = { IconButton(onClick = viewModel::openPreferences) { Icon(painterResource(Res.drawable.ic_settings), stringResource(Res.string.preferences)) } },
                 )
-            },
-            bottomBar = {
-                if (!fullScreen) Surface(
-                    modifier = Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
-                    shape = MaterialTheme.shapes.large,
-                    color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                    shadowElevation = 4.dp,
-                ) {
-                    NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp, windowInsets = WindowInsets(0, 0, 0, 0)) {
-                        ShellDestination.entries.forEach { item ->
-                            NavigationBarItem(
-                                selected = destination == item,
-                                onClick = { viewModel.navigateTo(item) },
-                                icon = { Icon(painterResource(item.icon), null, Modifier.size(20.dp)) },
-                                label = { Text(stringResource(item.label)) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                                    indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                ),
-                            )
-                        }
-                    }
-                }
             },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {

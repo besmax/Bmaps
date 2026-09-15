@@ -77,7 +77,7 @@ class DurableDownloadExecutor(
     private suspend fun stop(id: BuildJobId, state: BuildJobState, delete: Boolean): PackageResult<Unit> = command {
         lock.withLock {
             val progress = observe(id).first().valueOrThrow()
-            if (progress.state == BuildJobState.COMPLETED) throw PackageStorageException(PackageFailure.Conflict)
+            if (progress.state == BuildJobState.COMPLETED && !delete) throw PackageStorageException(PackageFailure.Conflict)
             scheduler.cancel(id)
             runner.stop(id)
             if (observe(id).first().valueOrThrow().state == BuildJobState.COMPLETED && !delete) return@withLock
