@@ -1,7 +1,6 @@
 package bes.max.bmaps.feature.viewer
 
 import bmaps.feature.viewer.generated.resources.*
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -30,7 +29,9 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+
     LaunchedEffect(packageId, model) { model.open(packageId) }
+
     LaunchedEffect(model, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             model.events.collect { snackbar.showSnackbar(getString(it)) }
@@ -38,46 +39,27 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
     }
     Box(Modifier.fillMaxSize()) {
         RasterMap(model.renderer, Modifier.fillMaxSize())
-        Surface(Modifier.statusBarsPadding().padding(16.dp).align(Alignment.TopCenter).widthIn(max = 720.dp),
-            shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f)) {
-            Column(Modifier.padding(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    MapIconButton(onClick = onBack, iconResId = MapIcons.back, contentDescription = stringResource(Res.string.viewer_back))
-                    Text(state.summary?.name ?: stringResource(Res.string.map_viewer), Modifier.weight(1f), maxLines = 2,
-                        style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = model::favourite, enabled = state.summary != null && !state.busy) {
-                        Text(stringResource(if (state.summary?.favourite == true) Res.string.viewer_unfavourite else Res.string.viewer_favourite))
-                    }
-                }
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (state.automaticAvailable) FilterChip(selected = state.selectedLevel == null,
-                        onClick = { model.selectLevel(null) }, label = { Text(stringResource(Res.string.viewer_auto)) })
-                    state.levels.forEach { level ->
-                        FilterChip(selected = state.selectedLevel == level, onClick = { model.selectLevel(level) },
-                            label = { Text(stringResource(Res.string.viewer_level, level)) })
-                    }
-                }
-                if (state.regionCount > 1) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    repeat(state.regionCount) { region ->
-                        FilterChip(selected = state.region == region, onClick = { model.selectRegion(region) },
-                            label = { Text(stringResource(if (region == 0) Res.string.viewer_dateline_west else Res.string.viewer_dateline_east)) })
-                    }
-                }
-                TextButton(onClick = { model.showDetails(true) }) { Text(stringResource(Res.string.viewer_details)) }
-                if (state.loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                state.error?.let {
-                    Text(stringResource(it), color = MaterialTheme.colorScheme.error)
-                    TextButton(onClick = model::retry) { Text(stringResource(Res.string.viewer_retry)) }
-                }
-                state.tileWarning?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
-            }
-        }
-        Column(Modifier.align(Alignment.CenterEnd).safeDrawingPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+
+        MapIconButton(
+            onClick = onBack,
+            iconResId = MapIcons.back,
+            contentDescription = stringResource(Res.string.viewer_back),
+            modifier = Modifier.statusBarsPadding().padding(16.dp).align(Alignment.TopStart)
+        )
+
+        Column(
+            Modifier
+            .align(Alignment.CenterEnd)
+            .safeDrawingPadding()
+            .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             MapIconButton(
                 onClick = model.renderer.controller::zoomIn,
                 iconResId = MapIcons.zoomIn,
                 contentDescription = stringResource(Res.string.viewer_zoom_in),
             )
+
             MapIconButton(
                 onClick = model.renderer.controller::zoomOut,
                 iconResId = MapIcons.zoomOut,
