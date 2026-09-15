@@ -16,6 +16,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bes.max.bmaps.core.mapengine.RasterMap
+import bes.max.bmaps.core.ui.components.MapIconButton
+import bes.max.bmaps.core.ui.components.MapIcons
 import bes.max.bmaps.domain.mapbuilder.*
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.jetbrains.compose.resources.painterResource
@@ -40,7 +42,7 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
             shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f)) {
             Column(Modifier.padding(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onBack) { Text(stringResource(Res.string.viewer_back)) }
+                    MapIconButton(onClick = onBack, iconResId = MapIcons.back, contentDescription = stringResource(Res.string.viewer_back))
                     Text(state.summary?.name ?: stringResource(Res.string.map_viewer), Modifier.weight(1f), maxLines = 2,
                         style = MaterialTheme.typography.titleMedium)
                     TextButton(onClick = model::favourite, enabled = state.summary != null && !state.busy) {
@@ -70,9 +72,17 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
                 state.tileWarning?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
             }
         }
-        Column(Modifier.align(Alignment.CenterEnd).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalButton(onClick = model.renderer.controller::zoomIn) { Text(stringResource(Res.string.viewer_zoom_in)) }
-            FilledTonalButton(onClick = model.renderer.controller::zoomOut) { Text(stringResource(Res.string.viewer_zoom_out)) }
+        Column(Modifier.align(Alignment.CenterEnd).safeDrawingPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            MapIconButton(
+                onClick = model.renderer.controller::zoomIn,
+                iconResId = MapIcons.zoomIn,
+                contentDescription = stringResource(Res.string.viewer_zoom_in),
+            )
+            MapIconButton(
+                onClick = model.renderer.controller::zoomOut,
+                iconResId = MapIcons.zoomOut,
+                contentDescription = stringResource(Res.string.viewer_zoom_out),
+            )
         }
         val uriHandler = LocalUriHandler.current
         val attribution = state.manifest?.layers?.firstOrNull()?.attribution.orEmpty()

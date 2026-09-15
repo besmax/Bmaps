@@ -35,6 +35,7 @@ include(":domain:providers", ":domain:map-builder")
 include(":feature:shell", ":feature:constructor", ":feature:library", ":feature:viewer")
 
 include(
+    ":core:ui",
     ":core:network",
     ":core:database",
     ":core:mbtiles",

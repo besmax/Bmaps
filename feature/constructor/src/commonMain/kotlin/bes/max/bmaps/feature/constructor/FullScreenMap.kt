@@ -4,7 +4,6 @@ import bmaps.feature.constructor.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,8 +21,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import bes.max.bmaps.core.mapengine.*
+import bes.max.bmaps.core.ui.components.MapIconButton
+import bes.max.bmaps.core.ui.components.MapIcons
 import dev.zacsweers.metrox.viewmodel.metroViewModel
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
@@ -67,7 +67,7 @@ fun FullScreenMap(
         ) {
             MapIconButton(
                 onClick = onBack,
-                iconResId = Res.drawable.ic_arrow_back,
+                iconResId = MapIcons.back,
                 contentDescription = stringResource(Res.string.back)
             )
             if (selection.selecting) MapButton(
@@ -81,13 +81,13 @@ fun FullScreenMap(
         ) {
             MapIconButton(
                 onClick = controls::zoomIn,
-                iconResId = Res.drawable.ic_zoom_in,
+                iconResId = MapIcons.zoomIn,
                 contentDescription = stringResource(Res.string.zoom_in)
             )
 
             MapIconButton(
                 onClick = controls::zoomOut,
-                iconResId = Res.drawable.ic_zoom_out,
+                iconResId = MapIcons.zoomOut,
                 contentDescription = stringResource(Res.string.zoom_out)
             )
         }
@@ -218,25 +218,4 @@ private fun MapButton(
             contentColor = if (confirmation) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
         ),
     ) { Text(label) }
-}
-
-@Composable
-private fun MapIconButton(
-    onClick: () -> Unit,
-    iconResId: DrawableResource,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    IconButton(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        colors = IconButtonDefaults.iconButtonColors().copy(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        )
-    ) {
-        Icon(painterResource(iconResId), contentDescription, modifier = Modifier.size(20.dp))
-    }
 }

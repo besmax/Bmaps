@@ -4,6 +4,7 @@ plugins {
 
 kotlin {
     sourceSets.commonMain.dependencies {
+        implementation(project(":core:ui"))
         implementation(project(":domain:map-builder"))
         implementation(project(":core:map-engine"))
     }

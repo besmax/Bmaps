@@ -16,14 +16,14 @@ This document serves as the single source of truth for the project's module topo
 ## 2. Feature Layer (Presentation & UI)
 Modules containing Compose Multiplatform screens, ViewModels, and presentation-layer validation logic.
 * **`feature:shell`**
-    * **Responsibility:** Application chrome, theme presentation, and preferences dialog with its own ViewModel. Accepts content/navigation callbacks from `:shared`; never imports other features. Theme preferences use `core:datastore` and ViewModel injection uses `core:di`.
+    * **Responsibility:** Application chrome, theme selection/application, and preferences dialog with its own ViewModel. Accepts content/navigation callbacks from `:shared`; never imports other features. Visual theme definitions come from `core:ui`. Theme preferences use `core:datastore` and ViewModel injection uses `core:di`.
 * **`feature:constructor`**
-    * **Phase 3C:** Online map presentation, source/style selection, presentation validation, loading/error/retry state, attribution, and a separate dialog-scoped credentials ViewModel. Uses `domain:providers`, `core:map-engine`, `core:datastore`, and `core:di`.
+    * **Phase 3C:** Online map presentation, source/style selection, presentation validation, loading/error/retry state, attribution, and a separate dialog-scoped credentials ViewModel. Uses `core:ui`, `domain:providers`, `core:map-engine`, `core:datastore`, and `core:di`.
     * **Responsibility:** UI for the map builder. Handles user interaction for bounding box selection, zoom level toggling, layer opacity control, and initiating the download process.
 * **`feature:library`**
     * **Responsibility:** Home UI for local packages, constructor FAB, search/status/favourite filters, incremental loading, details, avatar preferences, and confirmed deletion. Retains download progress and recovery actions. Sharing remains Phase 10.
 * **`feature:viewer`**
-    * **Responsibility:** The offline map rendering screen. Phase 6 owns package sessions, regional raster configuration, exact-level selection, lifecycle viewport retention, details, and favourite/avatar editing. Depends on `domain:map-builder`, `core:map-engine`, and `core:di`. Layer composition, annotation managers, and DEM overlays remain subsequent phases.
+    * **Responsibility:** The offline map rendering screen. Phase 6 owns package sessions, regional raster configuration, exact-level selection, lifecycle viewport retention, details, and favourite/avatar editing. Depends on `domain:map-builder`, `core:map-engine`, `core:ui`, and `core:di`. Layer composition, annotation managers, and DEM overlays remain subsequent phases.
 
 ## 3. Domain Layer (Business Logic & Contracts)
 Modules containing pure use cases, models, and interface contracts.
@@ -35,8 +35,12 @@ Modules containing pure use cases, models, and interface contracts.
     * **Dependencies:** `domain:providers` for source identities/configuration and `core:map-engine` for geometry/tile contracts. Phase 4 adds `core:storage`, `core:mbtiles`, `core:database`, and `core:di` for the package repository adapter. The domain-to-domain dependency is one-way; providers do not depend on map-builder.
     * **Implementation ownership:** Domain adapters implement domain repositories using lower-level core APIs; core modules never import domain contracts. Metro bindings are assembled in `:shared`. Phase 4 implements persistence and reconciliation through `LocalPackageRepository`; Phase 5 adds streaming tile planning, durable execution, Android WorkManager and iOS BGProcessingTask adapters. The constructor owns submission validation; the library owns list/progress/recovery presentation. `core:map-engine` exposes raster dimension validation without renderer types. See `12_DOWNLOAD_PIPELINE.md`.
 
-## 4. Core Layer (Infrastructure & Data)
+## 4. Core Layer (Infrastructure, Shared UI & Data)
 Isolated infrastructure modules. Cross-dependencies within this layer must be minimized.
+* **`core:ui`**
+    * **Responsibility:** Shared Compose Multiplatform visual infrastructure: `BmapsTheme`, palette, typography, shapes, bundled fonts/license, and reusable components such as `MapIconButton` with shared `MapIcons`.
+    * **Constraints:** Depends on Compose and resources only; no feature, domain, renderer, persistence, or DI dependencies. Components accept display values and callbacks; feature ViewModels own behavior and validation. Feature-specific components remain in their owning feature.
+    * **Build:** Applies `app.android.library` and `app.compose.multiplatform`; does not generate an iOS framework.
 * **`core:network`**
     * **Responsibility:** Ktor HTTP client configuration, interceptors, timeouts, and bounded raw byte downloading capabilities. Depends on `core:di` for application-scoped client bindings; knows nothing about providers.
 * **`core:database`**

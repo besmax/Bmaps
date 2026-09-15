@@ -58,4 +58,4 @@ Native smoke checks should open each destination, save a theme, dismiss/reopen p
 
 ## Bmaps visual system
 
-`BmapsTheme.kt` now owns the palette, bundled Inter font family, responsive typography, and shapes applied by AppShell. All destinations inherit the theme without feature-to-feature imports. Implementation details and mappings from the supplied Stitch design are recorded in `10_BMAPS_DESIGN.md`.
+`core:ui/theme/BmapsTheme.kt` owns the palette, bundled Inter font family, responsive typography, and shapes applied by AppShell. All destinations inherit the theme without feature-to-feature imports. Implementation details and mappings from the supplied Stitch design are recorded in `10_BMAPS_DESIGN.md`.

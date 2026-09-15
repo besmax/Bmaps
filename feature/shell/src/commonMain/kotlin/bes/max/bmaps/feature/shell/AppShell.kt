@@ -1,5 +1,7 @@
 package bes.max.bmaps.feature.shell
 
+import bes.max.bmaps.core.ui.theme.BmapsTheme
+
 import bmaps.feature.shell.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.StringResource

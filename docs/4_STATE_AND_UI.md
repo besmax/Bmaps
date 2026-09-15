@@ -39,8 +39,14 @@ To prevent UI jank and frame drops during heavy map rendering operations:
 
 ## 6. Resources and map selection
 
-User-facing labels, accessibility descriptions, and error messages belong in each feature's `commonMain/composeResources/values/strings.xml`. ViewModel error state carries a `StringResource` reference; composables resolve it with `stringResource` so locale changes do not require recreating error state. Parameterized messages use resource placeholders. Provider identities, attribution data, protocol values, and diagnostic exceptions remain data rather than UI translations.
+Feature-specific labels, accessibility descriptions, and error messages belong in each feature's `commonMain/composeResources/values/strings.xml`. ViewModel error state carries a `StringResource` reference; composables resolve it with `stringResource` so locale changes do not require recreating error state. Parameterized messages use resource placeholders. Provider identities, attribution data, protocol values, and diagnostic exceptions remain data rather than UI translations.
 
 Map renderer state, tile events, and zoom controls belong to the ViewModel-owned `RasterMapRenderer`, not composable `remember` blocks. Source menu visibility and link failures belong to `OnlineMapState`. The ViewModel runs the renderer in its own scope; observing UI lifecycle changes must not destroy the engine or decoded tiles. Compose retains only framework UI mechanisms such as scroll position and updated effect callbacks.
 
 `AreaSelectionViewModel` owns a normalized selection rectangle and computes bounds from that rectangle and the visible world window. Dragging inside the rectangle moves it; dragging a corner resizes it. Movement stays within the viewport and resizing enforces a minimum extent. Areas outside the frame pass gestures to the map. Each corner has a 48 dp touch target and directional accessibility actions. Accepted bounds are a snapshot, independent of subsequent drags and map movement.
+
+## 7. Shared visual components
+
+`core:ui` owns reusable composables, theme definitions, fonts, and shared icons. Components accept immutable display values, localized accessibility descriptions, modifiers, and callbacks. They do not resolve ViewModels or access repositories; feature ViewModels retain interaction state and validation. Extract components when reuse is concrete, keeping feature-specific UI local. Shared component-owned resources belong in `core:ui`; feature wording remains in feature resources.
+
+`MapIconButton` provides a themed translucent surface, a 20 dp icon, and a minimum 48 dp layout size. Online and offline maps use it with `MapIcons` for Back and zoom controls; the constructor also supplies its own area-selection icon. `MapIcons` exposes shared drawable resources without exposing the generated resource class.
