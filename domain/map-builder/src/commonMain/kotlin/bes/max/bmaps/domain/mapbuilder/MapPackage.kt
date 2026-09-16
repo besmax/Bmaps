@@ -44,6 +44,7 @@ data class PackageLayer(
     val attribution: List<Attribution> = emptyList(),
     val zoomLevels: Set<Int> = emptySet(),
     val tileCount: Long? = null,
+    val renderOrder: Int = 0,
 )
 
 @Serializable

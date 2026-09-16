@@ -43,6 +43,17 @@ class OfflinePyramidTest {
         assertTrue(viewport.scale > 1.0)
     }
 
+    @Test fun compositionRejectsDifferentBoundsDimensionsAndZoomCoverage() {
+        val base = layer(BoundingBox(-10.0, -10.0, 10.0, 10.0), ZoomRange(0, 2))
+        val overlay = base.copy(id = LayerId("satellite"), tiles = PackageAsset("layers/satellite.mbtiles", 0))
+        assertTrue(alignedLayers(listOf(base, overlay.copy(opacity = 0.4, visible = false))))
+        assertFalse(alignedLayers(listOf(base, overlay.copy(bounds = BoundingBox(-9.0, -10.0, 10.0, 10.0)))))
+        assertFalse(alignedLayers(listOf(base, overlay.copy(tileWidth = 512, tileHeight = 512))))
+        assertFalse(alignedLayers(listOf(base, overlay.copy(zoomLevels = setOf(0, 2)))))
+        assertFalse(alignedLayers(listOf(base, overlay.copy(coordinateSystem = CoordinateSystemId.Wgs84))))
+        assertTrue(alignedLayers(listOf(base.copy(zoomLevels = setOf(0, 2)), overlay.copy(zoomLevels = setOf(0, 2)))))
+    }
+
     private fun layer(bounds: BoundingBox, range: ZoomRange) = PackageLayer(
         LayerId("base"), "Map", null, PackageAsset("map_data.mbtiles", 0), bounds, range,
     )

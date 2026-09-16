@@ -13,11 +13,14 @@ data class PackageQuery(
 
 data class PackagePage(val items: List<PackageSummary>, val nextCursor: String?)
 
+data class LayerPresentation(val id: LayerId, val visible: Boolean, val opacity: Double, val order: Int)
+
 interface PackageRepository {
     fun observe(query: PackageQuery): Flow<PackageResult<PackagePage>>
     fun observe(id: PackageId): Flow<PackageResult<PackageSummary>>
     suspend fun open(id: PackageId): PackageResult<OpenedPackage>
     suspend fun delete(id: PackageId): PackageResult<Unit>
+    suspend fun setLayerPresentation(id: PackageId, layers: List<LayerPresentation>): PackageResult<Unit>
     suspend fun setFavourite(id: PackageId, favourite: Boolean): PackageResult<Unit>
     suspend fun setAvatar(id: PackageId, avatar: MapAvatar): PackageResult<Unit>
 }

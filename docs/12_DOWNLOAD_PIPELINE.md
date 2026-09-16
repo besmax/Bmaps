@@ -50,3 +50,9 @@ User acceptance checklist:
 8. Verify pagination with more than 200 packages. Offline viewer acceptance follows in Phase 6.
 
 Static whitespace validation is recorded separately from runtime acceptance; no successful compilation or test result is claimed for this phase.
+
+## Phase 7 layer execution
+
+The constructor can add provider/style layers to the selected area. Every layer uses the same selected zoom levels, with presentation validation against each provider’s coverage and tile matrix. Estimates and package limits include all layers, including hidden layers. The root writes to `map_data.mbtiles`; each additional layer writes to `layers/<layer-id>.mbtiles`. Initial visibility and opacity are persisted in the durable request and manifest.
+
+Android schedules a unique sequential WorkManager chain with one worker per layer, carrying the package job identity and durable layer index. Additional workers execute only after successful predecessor completion. iOS executes the same layer-scoped runner sequentially within its foreground/background processing opportunity. A runner checks that predecessors are complete before opening the next source. Missing root tiles stop the chain. Each layer closes its source and persists QUEUED at the boundary; only completion of the entire package triggers finalization and READY. Restore skips completed layers without reopening their providers and skips committed tiles within incomplete layers. No Room schema change is needed: layer requests and manifests are already serialized durably. User-run validation remains pending.

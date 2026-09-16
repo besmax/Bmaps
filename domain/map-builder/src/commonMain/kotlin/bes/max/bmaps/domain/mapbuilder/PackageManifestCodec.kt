@@ -29,6 +29,7 @@ internal object PackageManifestCodec {
                 throw PackageStorageException(PackageFailure.UnsupportedCoordinateSystem)
             }
             require(layer.tileWidth > 0 && layer.tileHeight == layer.tileWidth)
+            require(layer.renderOrder >= 0)
             require(layer.opacity.isFinite() && layer.opacity in 0.0..1.0)
             require(layer.tiles.relativePath == if (index == 0) "map_data.mbtiles" else "layers/${layer.id.value}.mbtiles")
             val coverage = PackageTileCoverage(layer.bounds, layer.zoomRange, layer.zoomLevels)

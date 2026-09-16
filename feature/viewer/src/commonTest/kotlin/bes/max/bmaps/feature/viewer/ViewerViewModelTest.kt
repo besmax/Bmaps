@@ -33,6 +33,39 @@ class ViewerViewModelTest {
         } finally { owner.clear(); Dispatchers.resetMain() }
     }
 
+    @Test fun layerEditsSaveAndCancelWithoutChangingTileAssetIdentity() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val owner = ViewModelStore()
+        try {
+            val repository = LocalOnlyRepository()
+            val base = repository.manifest.layers.single()
+            val overlay = base.copy(id = LayerId("satellite"), tiles = PackageAsset("layers/satellite.mbtiles", 100), renderOrder = 1)
+            repository.manifest = repository.manifest.copy(layers = listOf(base, overlay))
+            val model = ViewerViewModel(repository)
+            owner.put("viewer", model)
+            model.open(repository.id)
+            runCurrent()
+            model.showLayers()
+            model.layerAppearance(base.id, false, 0.25)
+            model.moveLayer(overlay.id, -1)
+            model.saveLayers()
+            runCurrent()
+            assertFalse(model.state.value.layersVisible)
+            assertEquals("map_data.mbtiles", repository.manifest.layers.first().tiles.relativePath)
+            model.retry()
+            runCurrent()
+            model.showLayers()
+            assertEquals(overlay.id, model.state.value.layerDraft.first().id)
+            assertFalse(model.state.value.layerDraft.last().visible)
+            assertEquals(0.25, model.state.value.layerDraft.last().opacity)
+            model.layerAppearance(base.id, true, 1.0)
+            model.dismissLayers()
+            model.showLayers()
+            assertFalse(model.state.value.layerDraft.last().visible)
+            assertEquals(0.25, model.state.value.layerDraft.last().opacity)
+        } finally { owner.clear(); runCurrent(); Dispatchers.resetMain() }
+    }
+
     @Test fun missingPackageIsRetryableAndPreferencesAreObserved() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val owner = ViewModelStore()
@@ -62,7 +95,7 @@ private class LocalOnlyRepository : PackageRepository {
     val id = PackageId("local-map")
     private val bounds = BoundingBox(-10.0, -10.0, 10.0, 10.0)
     private val summary = MutableStateFlow(PackageSummary(id, "Local map", bounds, PackageState.READY, 100, 0))
-    private val manifest = PackageManifest(1, id, "Local map", bounds, ZoomRange(0, 1), 0, 0,
+    var manifest = PackageManifest(1, id, "Local map", bounds, ZoomRange(0, 1), 0, 0,
         listOf(PackageLayer(LayerId("base"), "Base", null, PackageAsset("map_data.mbtiles", 100), bounds, ZoomRange(0, 1))))
     val operations = mutableListOf<String>()
     var tileOpens = 0
@@ -84,6 +117,13 @@ private class LocalOnlyRepository : PackageRepository {
         })
     }
     override suspend fun delete(id: PackageId): PackageResult<Unit> = PackageResult.Success(Unit)
+    override suspend fun setLayerPresentation(id: PackageId, layers: List<LayerPresentation>): PackageResult<Unit> {
+        manifest = manifest.copy(layers = manifest.layers.map { layer ->
+            val setting = layers.single { it.id == layer.id }
+            layer.copy(visible = setting.visible, opacity = setting.opacity, renderOrder = setting.order)
+        })
+        return PackageResult.Success(Unit)
+    }
     override suspend fun setFavourite(id: PackageId, favourite: Boolean): PackageResult<Unit> {
         summary.update { it.copy(favourite = favourite) }
         return PackageResult.Success(Unit)

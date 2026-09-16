@@ -26,6 +26,8 @@ data class ViewerState(
     val region: Int = 0,
     val regionCount: Int = 1,
     val details: Boolean = false,
+    val layersVisible: Boolean = false,
+    val layerDraft: List<PackageLayer> = emptyList(),
     val attributionVisible: Boolean = false,
     val busy: Boolean = false,
 )
@@ -101,6 +103,10 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
                             mutableState.update { it.copy(loading = false, error = Res.string.viewer_empty) }
                             return@launch
                         }
+                        if (!alignedLayers(manifest.layers)) {
+                            mutableState.update { it.copy(loading = false, error = Res.string.layer_alignment_error) }
+                            return@launch
+                        }
                         val levels = layer.zoomLevels.ifEmpty { (layer.zoomRange.min..layer.zoomRange.max).toSet() }.sorted()
                         val regions = WebMercator.splitBounds(layer.bounds).orEmpty()
                         mutableState.update { it.copy(manifest = manifest, levels = levels, regionCount = regions.size) }
@@ -135,7 +141,13 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
 
     private fun configure(level: Int?) {
         val session = opened ?: return
-        val layer = session.manifest.layers.first()
+        val manifest = state.value.manifest ?: return
+        val layers = if (state.value.layersVisible) state.value.layerDraft else manifest.layers.sortedBy { it.renderOrder }
+        if (!alignedLayers(layers)) {
+            mutableState.update { it.copy(loading = false, error = Res.string.layer_alignment_error) }
+            return
+        }
+        val layer = manifest.layers.first()
         val automatic = offlineAutomaticPyramid(layer, state.value.region)
         val selected = level ?: if (automatic == null) state.value.levels.first() else null
         val next = if (selected == null) automatic else offlinePyramid(layer, selected, state.value.region)
@@ -159,14 +171,69 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
         viewport = initial
         generation++
         mutableState.update { it.copy(selectedLevel = selected, loading = true, error = null, tileWarning = null) }
-        renderer.setContent(generation, RasterMapConfig(next, initialViewport = initial, minScale = minimumScale), listOf(
-            RasterLayer(layer.id.value, TileSourceFactory {
-                when (val result = session.openTiles(layer.id)) {
+        renderer.setContent(generation, RasterMapConfig(next, initialViewport = initial, minScale = minimumScale), layers.map { item ->
+            RasterLayer(item.id.value, TileSourceFactory {
+                when (val result = session.openTiles(item.id)) {
                     is PackageResult.Success -> result.value
                     is PackageResult.Failure -> error("Cannot open local tile source")
                 }
-            }),
-        ))
+            }, item.opacity.toFloat(), visible = item.visible)
+        })
+        if (layers.none { it.visible && it.opacity > 0 }) mutableState.update { it.copy(loading = false) }
+    }
+
+    fun showLayers() {
+        val manifest = state.value.manifest ?: return
+        mutableState.update { it.copy(layersVisible = true, layerDraft = manifest.layers.sortedBy { layer -> layer.renderOrder }) }
+    }
+
+    fun layerAppearance(id: LayerId, visible: Boolean, opacity: Double) {
+        if (state.value.busy || !opacity.isFinite() || opacity !in 0.0..1.0) return
+        mutableState.update { it.copy(layerDraft = it.layerDraft.map { layer ->
+            if (layer.id == id) layer.copy(visible = visible, opacity = opacity) else layer
+        }) }
+    }
+
+    fun previewLayers() { configure(state.value.selectedLevel) }
+
+    fun moveLayer(id: LayerId, offset: Int) {
+        if (state.value.busy) return
+        val layers = state.value.layerDraft.toMutableList()
+        val index = layers.indexOfFirst { it.id == id }
+        if (index < 0 || index + offset !in layers.indices) return
+        val layer = layers.removeAt(index)
+        layers.add(index + offset, layer)
+        mutableState.update { it.copy(layerDraft = layers) }
+        previewLayers()
+    }
+
+    fun dismissLayers() {
+        if (state.value.busy) return
+        mutableState.update { it.copy(layersVisible = false, layerDraft = emptyList()) }
+        configure(state.value.selectedLevel)
+    }
+
+    fun saveLayers() {
+        val id = packageId ?: return
+        if (state.value.busy) return
+        val layers = state.value.layerDraft.mapIndexed { index, layer -> layer.copy(renderOrder = index) }
+        if (!alignedLayers(layers)) { channel.trySend(Res.string.layer_alignment_error); return }
+        mutableState.update { it.copy(busy = true) }
+        viewModelScope.launch {
+            try {
+                when (packages.setLayerPresentation(id, layers.map { LayerPresentation(it.id, it.visible, it.opacity, it.renderOrder) })) {
+                    is PackageResult.Success -> {
+                        val byId = layers.associateBy { it.id }
+                        mutableState.update { current -> current.copy(layersVisible = false, layerDraft = emptyList(),
+                            manifest = current.manifest?.let { manifest -> manifest.copy(layers = manifest.layers.map { byId.getValue(it.id) }) }) }
+                        configure(state.value.selectedLevel)
+                    }
+                    is PackageResult.Failure -> channel.send(Res.string.viewer_save_error)
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { channel.send(Res.string.viewer_save_error) }
+            finally { mutableState.update { it.copy(busy = false) } }
+        }
     }
 
     fun openLink(url: String, open: (String) -> Unit) {

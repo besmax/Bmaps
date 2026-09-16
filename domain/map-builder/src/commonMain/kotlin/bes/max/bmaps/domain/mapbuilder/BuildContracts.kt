@@ -16,6 +16,8 @@ data class BuildLayerRequest(
     val zoomRange: ZoomRange,
     val endpointParameters: Map<String, String> = emptyMap(),
     val zoomLevels: Set<Int> = emptySet(),
+    val visible: Boolean = true,
+    val opacity: Double = 1.0,
 )
 
 @Serializable

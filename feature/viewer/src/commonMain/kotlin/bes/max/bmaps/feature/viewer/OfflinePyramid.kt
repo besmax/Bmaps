@@ -41,3 +41,15 @@ internal fun offlineInitialViewport(layer: PackageLayer, region: Int, pyramid: T
     val detailScale = maxOf(1.0, (1L shl (pyramid.levels.max - pyramid.levels.min)) * maxOf(pyramid.columns, pyramid.rows) / 4.0)
     return MapViewport(center, (1.0 / extent).coerceIn(minimumScale, maxOf(minimumScale, detailScale)))
 }
+
+internal fun alignedLayers(layers: List<PackageLayer>): Boolean {
+    val root = layers.firstOrNull() ?: return false
+    fun PackageLayer.levels() = zoomLevels.ifEmpty { (zoomRange.min..zoomRange.max).toSet() }
+    return layers.all {
+        it.content.kind == TileContentKind.RASTER && it.content.rasterFormats.isNotEmpty() &&
+            it.bounds == root.bounds && it.coordinateSystem == CoordinateSystemId.WebMercator &&
+            it.tileWidth > 0 && it.tileWidth == root.tileWidth && it.tileHeight == root.tileWidth &&
+            it.zoomRange == root.zoomRange && it.levels() == root.levels() &&
+            it.opacity.isFinite() && it.opacity in 0.0..1.0
+    }
+}

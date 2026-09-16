@@ -90,7 +90,12 @@ class IosDownloadScheduler(private val runner: DownloadRunner, private val stora
                 if (foreground) token = UIApplication.sharedApplication.beginBackgroundTaskWithName("Map download") {
                     scope.launch { jobs[id]?.cancel() }
                 }
-                val result = runner.run(id)
+                val request = storage.request(PackageId(id.value)).valueOrThrow()
+                var result: PackageResult<Unit> = PackageResult.Success(Unit)
+                for (index in request.layers.indices) {
+                    result = runner.run(id, index)
+                    if (result is PackageResult.Failure) break
+                }
                 wanted.remove(id)
                 if (UIApplication.sharedApplication.applicationState != UIApplicationState.UIApplicationStateActive) {
                     notifyCompletion(id, result is PackageResult.Success)

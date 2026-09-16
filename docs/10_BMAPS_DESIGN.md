@@ -15,3 +15,5 @@ Map chrome uses translucent surface tiers, subtle borders, and elevation shadows
 The area selector retains its ViewModel-owned movement and resizing behavior. Its visual treatment is a 12% amber fill, a 2 dp amber boundary, and 8 dp corner circles within 48 dp gesture targets. Instructions use a translucent rounded surface. No dummy search, GPS, recording, telemetry, offline-ready, or 3D controls are introduced for unimplemented features.
 
 Builds, device previews, and runtime testing are left to the user at their request.
+
+Phase 7 adds provider selection and layer appearance controls to constructor settings and a floating Layers button to the offline viewer. Lists run from bottom to top, with Raise/Lower actions, visibility checkboxes, and opacity sliders. Viewer edits preview after a slider gesture; Save writes the settings and Cancel restores the committed appearance. Attribution includes every package source. Labels use feature string resources and Material theme roles.

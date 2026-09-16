@@ -9,6 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -31,7 +33,8 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
     val authorizeNotifications = rememberDownloadNotificationPermission()
     val state by model.state.collectAsStateWithLifecycle()
     val selection by area.state.collectAsStateWithLifecycle()
-    val source = map.state.value.selected
+    val online by map.state.collectAsStateWithLifecycle()
+    val source = online.selected
     LaunchedEffect(model, selection.acceptedBounds, source) {
         val bounds = selection.acceptedBounds ?: return@LaunchedEffect
         val choice = source ?: return@LaunchedEffect
@@ -39,12 +42,13 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
         model.initialize(bounds, ZoomRange(limits.levelMin, limits.levelMax ?: limits.levelMin), selection.settings)
         submission.configure(choice)
     }
+    val currentSource by rememberUpdatedState(source)
     val dismiss by rememberUpdatedState(onDismiss)
     val started by rememberUpdatedState(onStarted)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(model, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            model.events.collect { settings -> source?.let { choice ->
+            model.events.collect { settings -> currentSource?.let { choice ->
                 area.retain(settings)
                 authorizeNotifications { submission.start(settings, choice) }
             } }
@@ -53,7 +57,18 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
     LaunchedEffect(submission, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { submission.events.collect { started() } }
     }
-    AlertDialog(
+    if (state.addingLayer) AlertDialog(
+        onDismissRequest = { model.showLayerPicker(false) },
+        title = { Text(stringResource(Res.string.layer_add)) },
+        text = { Column(Modifier.heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+            online.choices.forEach { choice ->
+                TextButton(onClick = { source?.let { model.addLayer(choice, it) } }) {
+                    Text("${choice.provider.name} · ${choice.style.name}")
+                }
+            }
+        } },
+        confirmButton = { TextButton(onClick = { model.showLayerPicker(false) }) { Text(stringResource(Res.string.cancel)) } },
+    ) else AlertDialog(
         shape = MaterialTheme.shapes.medium,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 0.dp,
@@ -68,6 +83,26 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
                         FilterChip(selected = level in state.selectedLevels, onClick = { model.toggle(level) }, enabled = !download.busy, label = { Text(level.toString()) })
                     }
                 }
+                Text(stringResource(Res.string.layers_title), style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(Res.string.layers_hint), style = MaterialTheme.typography.bodySmall)
+                source?.let { root ->
+                    LayerAppearance("${root.provider.name} · ${root.style.name}", state.rootVisible, state.rootOpacity, !download.busy) { visible, opacity ->
+                        model.layerAppearance(null, visible, opacity)
+                    }
+                    root.provider.attributionFor(root.style).forEach { Text(it.text, style = MaterialTheme.typography.bodySmall) }
+                }
+                state.layers.forEachIndexed { index, layer ->
+                    LayerAppearance("${layer.choice.provider.name} · ${layer.choice.style.name}", layer.visible, layer.opacity, !download.busy) { visible, opacity ->
+                        model.layerAppearance(layer.id, visible, opacity)
+                    }
+                    layer.choice.provider.attributionFor(layer.choice.style).forEach { Text(it.text, style = MaterialTheme.typography.bodySmall) }
+                    Row {
+                        TextButton(onClick = { model.moveLayer(layer.id, -1) }, enabled = !download.busy && index > 0) { Text(stringResource(Res.string.layer_down)) }
+                        TextButton(onClick = { model.moveLayer(layer.id, 1) }, enabled = !download.busy && index < state.layers.lastIndex) { Text(stringResource(Res.string.layer_up)) }
+                        TextButton(onClick = { model.removeLayer(layer.id) }, enabled = !download.busy) { Text(stringResource(Res.string.layer_remove)) }
+                    }
+                }
+                TextButton(onClick = { model.showLayerPicker(true) }, enabled = !download.busy && state.layers.size < 31) { Text(stringResource(Res.string.layer_add)) }
                 Text(stringResource(Res.string.estimated_size_mb, formatMegabytes(state.estimate?.estimatedPackageBytes) ?: stringResource(Res.string.unavailable)),
                     style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.tertiary)
                 Text(stringResource(Res.string.tile_count_estimate, state.estimate?.tileCount ?: 0), style = MaterialTheme.typography.bodySmall)
@@ -94,4 +129,18 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
 internal fun formatMegabytes(bytes: Long?): String? = bytes?.let {
     val tenths = it / 100_000
     "${tenths / 10}.${tenths % 10}"
+}
+
+@Composable
+private fun LayerAppearance(name: String, visible: Boolean, opacity: Double, enabled: Boolean, change: (Boolean, Double) -> Unit) {
+    Column {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+            Checkbox(visible, { change(it, opacity) }, enabled = enabled,
+                modifier = Modifier.semantics { contentDescription = name })
+        }
+        Text(stringResource(Res.string.layer_opacity, (opacity * 100).toInt()))
+        Slider(opacity.toFloat(), { change(visible, it.toDouble()) }, enabled = enabled,
+            modifier = Modifier.semantics { contentDescription = name })
+    }
 }

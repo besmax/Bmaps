@@ -12,7 +12,8 @@ object TileAreaEstimate {
         return estimate(coverage.count, averageTileBytes)
     }
 
-    internal fun estimate(count: Long, averageTileBytes: Long = 32_000): BuildEstimate {
+    fun estimate(count: Long, averageTileBytes: Long = 32_000): BuildEstimate {
+        require(count >= 0 && averageTileBytes in 0..Long.MAX_VALUE - 256)
         val perTile = averageTileBytes + 256
         return BuildEstimate(count, if (count <= (Long.MAX_VALUE - METADATA_BYTES) / perTile)
             count * perTile + METADATA_BYTES else null)

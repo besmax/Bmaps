@@ -2,11 +2,14 @@ package bes.max.bmaps.feature.viewer
 
 import bmaps.feature.viewer.generated.resources.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
@@ -30,7 +33,7 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val uriHandler = LocalUriHandler.current
-    val attribution = state.manifest?.layers?.firstOrNull()?.attribution.orEmpty()
+    val attribution = state.manifest?.layers.orEmpty().flatMap { it.attribution }.distinct()
 
     LaunchedEffect(packageId, model) { model.open(packageId) }
 
@@ -68,6 +71,19 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
                 contentDescription = stringResource(Res.string.viewer_zoom_out),
             )
         }
+        FilledTonalButton(onClick = model::showLayers,
+            enabled = state.manifest != null && state.error == null,
+            modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(16.dp)) {
+            Text(stringResource(Res.string.layers_title))
+        }
+        state.error?.let { error ->
+            Surface(Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp), shape = MaterialTheme.shapes.medium) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(stringResource(error))
+                    TextButton(onClick = model::retry) { Text(stringResource(Res.string.viewer_retry)) }
+                }
+            }
+        }
         if (attribution.isNotEmpty()) MapIconButton(
             onClick = { model.showAttribution(true) },
             iconResId = Res.drawable.ic_info,
@@ -76,6 +92,45 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
         )
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
+    if (state.layersVisible) AlertDialog(
+        onDismissRequest = model::dismissLayers,
+        title = { Text(stringResource(Res.string.layers_title)) },
+        text = { Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(Res.string.layers_hint))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.automaticAvailable) FilterChip(selected = state.selectedLevel == null,
+                    onClick = { model.selectLevel(null) }, enabled = !state.busy, label = { Text(stringResource(Res.string.layers_automatic_zoom)) })
+                state.levels.forEach { level ->
+                    FilterChip(selected = state.selectedLevel == level, onClick = { model.selectLevel(level) }, enabled = !state.busy,
+                        label = { Text(stringResource(Res.string.viewer_level, level)) })
+                }
+            }
+            if (state.regionCount > 1) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(state.regionCount) { region ->
+                    FilterChip(selected = state.region == region, onClick = { model.selectRegion(region) }, enabled = !state.busy,
+                        label = { Text(stringResource(Res.string.layers_region, region + 1)) })
+                }
+            }
+            state.layerDraft.forEachIndexed { index, layer ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(layer.name, Modifier.weight(1f))
+                    Checkbox(layer.visible, { model.layerAppearance(layer.id, it, layer.opacity); model.previewLayers() }, enabled = !state.busy,
+                        modifier = Modifier.semantics { contentDescription = layer.name })
+                }
+                Text(stringResource(Res.string.layer_opacity, (layer.opacity * 100).toInt()))
+                Slider(layer.opacity.toFloat(), { model.layerAppearance(layer.id, layer.visible, it.toDouble()) },
+                    onValueChangeFinished = model::previewLayers, enabled = !state.busy,
+                    modifier = Modifier.semantics { contentDescription = layer.name })
+                Row {
+                    TextButton(onClick = { model.moveLayer(layer.id, -1) }, enabled = !state.busy && index > 0) { Text(stringResource(Res.string.layer_down)) }
+                    TextButton(onClick = { model.moveLayer(layer.id, 1) }, enabled = !state.busy && index < state.layerDraft.lastIndex) { Text(stringResource(Res.string.layer_up)) }
+                }
+                layer.attribution.forEach { Text(it.text, style = MaterialTheme.typography.bodySmall) }
+            }
+        } },
+        confirmButton = { TextButton(onClick = model::saveLayers, enabled = !state.busy) { Text(stringResource(Res.string.layers_save)) } },
+        dismissButton = { TextButton(onClick = model::dismissLayers, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) } },
+    )
     if (state.attributionVisible) AlertDialog(
         onDismissRequest = { model.showAttribution(false) },
         title = { Text(stringResource(Res.string.viewer_attribution)) },

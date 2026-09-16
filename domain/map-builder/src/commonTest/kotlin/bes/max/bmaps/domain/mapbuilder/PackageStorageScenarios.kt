@@ -13,6 +13,46 @@ import kotlinx.io.bytestring.ByteString
 import kotlinx.io.files.*
 
 internal class PackageStorageScenarios(private val database: (String) -> PackageDatabase) {
+    suspend fun layerConfigurationSurvivesReopening() = fixture { root ->
+        var db = database(Path(root, "catalog.db").toString())
+        val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
+        var repository = LocalPackageRepository(PackageCatalog(db), files)
+        val (baseRequest, baseManifest) = fixtureRequest(ZoomRange(0, 0))
+        val overlayId = LayerId("satellite")
+        val request = baseRequest.copy(layers = baseRequest.layers + baseRequest.layers.single().copy(id = overlayId))
+        val manifest = baseManifest.copy(layers = baseManifest.layers + baseManifest.layers.single().copy(
+            id = overlayId, tiles = PackageAsset("layers/satellite.mbtiles", 0), renderOrder = 1))
+        val tile = DownloadedTile(TileKey(0, 0, 0), ByteString(byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)))
+        try {
+            repository.prepare(request, manifest).success()
+            manifest.layers.forEach { repository.write(request.packageId, it.id, listOf(tile), emptyList(), 8).success() }
+            repository.finalize(request.packageId).success()
+            val rootId = manifest.layers.first().id
+            repository.setLayerPresentation(request.packageId, listOf(
+                LayerPresentation(rootId, false, 0.25, 1), LayerPresentation(overlayId, true, 0.6, 0))).success()
+            db.close()
+            db = database(Path(root, "catalog.db").toString())
+            repository = LocalPackageRepository(PackageCatalog(db), files)
+            // Simulate an interrupted subsequent manifest edit; the committed settings must survive.
+            files.access {
+                val temporary = asset(request.packageId.value, false, "config.json.part")
+                SystemFileSystem.sink(temporary).use { it.write(Buffer().apply { write(byteArrayOf(1)) }, 1) }
+            }
+            repository.reconcile().success()
+            val session = repository.open(request.packageId).success()
+            try {
+                val layers = session.manifest.layers
+                assertEquals("map_data.mbtiles", layers.first().tiles.relativePath)
+                assertEquals(listOf(overlayId, rootId), layers.sortedBy { it.renderOrder }.map { it.id })
+                assertFalse(layers.first().visible)
+                assertEquals(0.25, layers.first().opacity)
+                assertEquals(0.6, layers.last().opacity)
+                val source = session.openTiles(overlayId).success()
+                try { assertIs<TileReadResult.Available>(source.read(tile.key)) } finally { source.close() }
+            } finally { session.close() }
+        } finally { db.close() }
+    }
+
     suspend fun recoverAndReopen() = fixture { root ->
         var db = database(Path(root, "catalog.db").toString())
         val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))

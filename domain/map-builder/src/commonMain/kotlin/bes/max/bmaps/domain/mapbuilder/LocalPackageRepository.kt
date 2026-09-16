@@ -66,7 +66,7 @@ class LocalPackageRepository(
         require(manifest.elevation == null && manifest.annotations == null && manifest.auxiliaryAssets.isEmpty())
         request.layers.zip(manifest.layers).forEach { (source, layer) ->
             require(source.id == layer.id && source.source == layer.source && source.zoomRange == layer.zoomRange &&
-                source.zoomLevels == layer.zoomLevels)
+                source.zoomLevels == layer.zoomLevels && source.visible == layer.visible && source.opacity == layer.opacity)
         }
         val total = manifest.layers.fold(0L) { sum, layer ->
             val count = coverage(layer).count
@@ -245,6 +245,40 @@ class LocalPackageRepository(
         }
     }
 
+    override suspend fun layerComplete(id: PackageId, layerId: LayerId): PackageResult<Boolean> = operation {
+        val manifest = PackageManifestCodec.decode(building(id).manifestJson)
+        val layer = manifest.layers.firstOrNull { it.id == layerId } ?: fail(PackageFailure.NotFound)
+        storage.access {
+            val database = MbTiles.open(asset(id.value, true, layer.tiles.relativePath).toString())
+            try {
+                val counts = database.counts()
+                counts.downloaded == coverage(layer).count && counts.failed == 0L
+            } finally { database.close() }
+        }
+    }
+
+    override suspend fun setLayerPresentation(id: PackageId, layers: List<LayerPresentation>): PackageResult<Unit> = operation {
+        val record = records.get(id.value) ?: fail(PackageFailure.NotFound)
+        if (record.state != PackageState.READY.name) fail(PackageFailure.NotReady)
+        storage.access {
+            val manifest = readManifest(id, false)
+            require(layers.size == manifest.layers.size && layers.map { it.id }.toSet() == manifest.layers.map { it.id }.toSet())
+            require(layers.map { it.order }.toSet() == manifest.layers.indices.toSet())
+            val updated = manifest.copy(updatedAtEpochMillis = Clock.System.now().toEpochMilliseconds(),
+                layers = manifest.layers.map { layer ->
+                    val setting = layers.single { it.id == layer.id }
+                    layer.copy(visible = setting.visible, opacity = setting.opacity, renderOrder = setting.order)
+                })
+            val encoded = PackageManifestCodec.encode(updated)
+            write(id.value, "config.json", Buffer().apply { write(encoded.encodeToByteArray()) }, MANIFEST_RESERVE, limit(updated), staged = false)
+            val bytes = size(id.value, false)
+            val updatedRecord = record.copy(manifestJson = encoded, sizeBytes = bytes, updatedAtEpochMillis = updated.updatedAtEpochMillis)
+            val job = records.job(id.value)
+            if (job == null) records.putPackage(updatedRecord)
+            else records.checkpoint(updatedRecord, job.copy(packageBytes = bytes))
+        }
+    }
+
     override suspend fun setFavourite(id: PackageId, favourite: Boolean): PackageResult<Unit> = operation {
         if (records.get(id.value) == null) fail(PackageFailure.NotFound)
         records.putPreferences((records.preferences(id.value) ?: PackagePreferencesRecord(id.value)).copy(favourite = favourite))
@@ -281,6 +315,7 @@ class LocalPackageRepository(
                 try {
                     when {
                         exists(record.id, false) -> {
+                            removeTemporaryFiles(record.id, staged = false)
                             indexFinal(record)
                         }
                         exists(record.id, true) -> {
@@ -304,6 +339,7 @@ class LocalPackageRepository(
             for (id in ids(false)) {
                 if (records.get(id) != null) continue
                 try {
+                    removeTemporaryFiles(id, staged = false)
                     val manifest = readManifest(PackageId(id), false)
                     verify(manifest, false)
                     records.putPackage(PackageRecord(id, manifest.name, PackageState.READY.name,
@@ -325,7 +361,7 @@ class LocalPackageRepository(
         verify(manifest, false)
         val bytes = size(record.id, false)
         val ready = record.copy(state = PackageState.READY.name, manifestJson = PackageManifestCodec.encode(manifest),
-            sizeBytes = bytes, hasElevationData = manifest.elevation != null)
+            sizeBytes = bytes, updatedAtEpochMillis = manifest.updatedAtEpochMillis, hasElevationData = manifest.elevation != null)
         val job = records.job(record.id)
         if (job == null) records.putPackage(ready) else {
             val counts = counts(manifest, false)

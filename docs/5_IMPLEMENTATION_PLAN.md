@@ -59,7 +59,7 @@ Record decisions in the relevant existing architecture/product document. These a
 | Repository implementation ownership | Keep domain contracts and their orchestration/adapters in domain modules where they depend on core APIs; core must never import domain. Bind implementations through Metro in `:shared`. | Phase 1 |
 | Missing domain responsibilities | Initially group package lifecycle, library, annotation, elevation, and transfer contracts under `domain:map-builder`, explicitly expanding its registry entry. If this becomes incoherent, propose focused domain modules and update the registry before creating them. | Phase 1 |
 | Geometry ownership | Keep reusable geospatial primitives and transformations in `core:map-engine`, following the registry; expose renderer-independent APIs. Domain must not use MapComposeMP types. Domain plans downloads using these primitives. | Phase 1 |
-| Multiple raster layers | Proposed package layout: retain `map_data.mbtiles` for the base layer and add `layers/<layer-id>.mbtiles`, referenced by `config.json`. Resolve the current single-file example before multi-layer writes. | Phase 1 |
+| Multiple raster layers | Implemented layout: `map_data.mbtiles` for the root and `layers/<layer-id>.mbtiles` for additional layers, referenced by `config.json`. Phase 7 adds provider selection, sequential layer workers, and independent render order. | Phase 1 |
 | Package identity | Use stable IDs and safe storage directory names; treat the user-visible name as metadata. Version the package manifest from the first package. | Phase 1 |
 | Provider availability | Choose actual providers after verifying current download rights, attribution, authentication, caching, and request limits from their official documentation. The OSM example is not authorization to bulk-download any particular endpoint. | Phase 3 |
 | Download lifecycle | Durable Phase 4 checkpoints; Phase 5 Android WorkManager with foreground progress, plus iOS BGProcessingTask opportunities and foreground lifetime extension. Preserve missing tiles and expose user restore, top-of-library progress, and platform progress/completion surfaces. See document 11. | Phase 5 |
@@ -227,11 +227,13 @@ Acceptance for M1: create a package online, terminate the app, disable connectiv
 
 Dependencies: Phase 6 and the package-layout decision.
 
-- [ ] Implement multiple raster asset references with stable layer IDs, ordering, visibility, attribution, and independent opacity.
-- [ ] Validate identical geographic bounding boxes in the presentation flow; define compatible CRS and zoom behavior and reject unsupported combinations clearly.
-- [ ] Extend constructor downloads and package manifests for the agreed multi-layer layout.
-- [ ] Add constructor/viewer layer controls without coupling the two feature modules.
-- [ ] Persist layer configuration and restore it when reopening a package.
+- [x] Implement multiple raster asset references with stable layer IDs, ordering, visibility, attribution, and independent opacity.
+- [x] Validate identical geographic bounding boxes in the presentation flow; define compatible CRS and zoom behavior and reject unsupported combinations clearly.
+- [x] Extend constructor downloads and package manifests for the agreed multi-layer layout.
+- [x] Add constructor/viewer layer controls without coupling the two feature modules.
+- [x] Persist layer configuration and restore it when reopening a package.
+
+Implementation and authored regression scenarios are present; builds, test execution, and native acceptance remain with the user. See `14_RASTER_LAYER_COMPOSITION.md`.
 
 Acceptance: two aligned raster layers render in the expected order; each opacity control operates independently; persisted settings survive reopening; unsupported alignment is reported before composition.
 

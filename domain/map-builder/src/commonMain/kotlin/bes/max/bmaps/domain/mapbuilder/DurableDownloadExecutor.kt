@@ -43,7 +43,8 @@ class DurableDownloadExecutor(
                     request.bounds, layer.zoomRange, content = style.content,
                     coordinateSystem = layer.config.tileMatrix.coordinateSystem,
                     tileWidth = layer.config.tileMatrix.tileWidth, tileHeight = layer.config.tileMatrix.tileHeight,
-                    attribution = provider.attributionFor(style), zoomLevels = layer.zoomLevels)
+                    attribution = provider.attributionFor(style), zoomLevels = layer.zoomLevels,
+                    visible = layer.visible, opacity = layer.opacity, renderOrder = index)
             }
             val manifest = PackageManifest(PackageManifest.CURRENT_SCHEMA_VERSION, request.packageId, request.name,
                 request.bounds, ZoomRange(layers.minOf { it.zoomRange.min }, layers.maxOf { it.zoomRange.max }),
@@ -62,7 +63,6 @@ class DurableDownloadExecutor(
             if (progress.state !in setOf(BuildJobState.PAUSED, BuildJobState.FAILED, BuildJobState.CANCELLED, BuildJobState.FINALIZING)) {
                 throw PackageStorageException(PackageFailure.Conflict)
             }
-            if (progress.missingTiles > 0) storage.request(progress.packageId).valueOrThrow().layers.forEach { providers.downloadSource(it) }
             scheduler.cancel(jobId)
             runner.stop(jobId)
             enqueue(jobId)

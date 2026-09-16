@@ -122,19 +122,58 @@ class DownloadRunnerTest {
         assertEquals(TileAreaEstimate.estimate(selected.bounds, setOf(0, 2), 32_000), estimate)
     }
 
-    private class MemoryBuildStorage : PackageBuildStorage {
-        val progress = MutableStateFlow(BuildProgress(jobId, packageId, BuildJobState.QUEUED, 5, 0, 0, 0, 0))
-        private val downloaded = mutableSetOf<TileKey>()
-        private val failed = mutableSetOf<TileKey>()
+    @Test fun additionalWorkerWaitsForRootAndRestoreDoesNotReopenCompletedRoot() = runTest {
+        val overlay = request.layers.single().copy(id = LayerId("satellite"), source = ProviderStyleId(ProviderId("other"), styleId))
+        val storage = MemoryBuildStorage(request.copy(layers = request.layers + overlay))
+        val opened = mutableListOf<LayerId>()
+        var rootUnavailable = true
+        val runner = DownloadRunner(storage, fixtureProviders(), DownloadSourceOpener { layer ->
+            opened += layer.id
+            OnlineSourceResult.Available(object : TileSource {
+                override suspend fun read(key: TileKey): TileReadResult =
+                    if (layer.id == layerId && key == TileKey(0, 0, 0) && rootUnavailable) TileReadResult.Missing
+                    else TileReadResult.Available(bytes, RasterTileFormat.PNG)
+                override suspend fun close() = Unit
+            })
+        })
+        assertIs<PackageResult.Failure>(runner.run(jobId, 0))
+        assertEquals(listOf(layerId), opened)
+        assertFalse(storage.finalized)
+        rootUnavailable = false
+        storage.setState(packageId, BuildJobState.QUEUED)
+        assertIs<PackageResult.Success<Unit>>(runner.run(jobId, 0))
+        assertEquals(BuildJobState.QUEUED, storage.progress.value.state)
+        assertEquals(5L, storage.progress.value.completedTiles)
+        assertFalse(storage.finalized)
+        assertIs<PackageResult.Success<Unit>>(runner.run(jobId, 0))
+        assertEquals(listOf(layerId, layerId), opened)
+        assertIs<PackageResult.Success<Unit>>(runner.run(jobId, 1))
+        assertEquals(listOf(layerId, layerId, overlay.id), opened)
+        assertEquals(10L, storage.progress.value.completedTiles)
+        assertTrue(storage.finalized)
+    }
+
+    @Test fun additionalWorkerCannotRunBeforeRootCompletes() = runTest {
+        val storage = MemoryBuildStorage(request.copy(layers = request.layers + request.layers.single().copy(id = LayerId("overlay"))))
+        val runner = DownloadRunner(storage, fixtureProviders(), DownloadSourceOpener { error("Root is incomplete") })
+        assertEquals(PackageFailure.TileUnavailable, assertIs<PackageResult.Failure>(runner.run(jobId, 1)).reason)
+        assertEquals(0L, storage.progress.value.completedTiles)
+    }
+
+    private class MemoryBuildStorage(val build: BuildRequest = request) : PackageBuildStorage {
+        private val total = build.layers.sumOf { PackageTileCoverage(build.bounds, it.zoomRange, it.zoomLevels).count }
+        val progress = MutableStateFlow(BuildProgress(jobId, packageId, BuildJobState.QUEUED, total, 0, 0, 0, 0))
+        private val downloaded = mutableSetOf<Pair<LayerId, TileKey>>()
+        private val failed = mutableSetOf<Pair<LayerId, TileKey>>()
         var finalized = false
 
         override suspend fun availableBytes() = PackageResult.Success(1_000_000_000L)
         override suspend fun prepare(request: BuildRequest, manifest: PackageManifest) = PackageResult.Success(jobId)
-        override suspend fun request(id: PackageId) = PackageResult.Success(request)
-        override suspend fun contains(id: PackageId, layerId: LayerId, key: TileKey) = PackageResult.Success(key in downloaded)
+        override suspend fun request(id: PackageId) = PackageResult.Success(build)
+        override suspend fun contains(id: PackageId, layerId: LayerId, key: TileKey) = PackageResult.Success((layerId to key) in downloaded)
         override suspend fun write(id: PackageId, layerId: LayerId, tiles: List<DownloadedTile>, failures: List<FailedTile>, receivedBytes: Long): PackageResult<BuildProgress> {
-            downloaded.addAll(tiles.map { it.key })
-            failed.addAll(failures.map { it.key })
+            downloaded.addAll(tiles.map { layerId to it.key })
+            failed.addAll(failures.map { layerId to it.key })
             failed.removeAll(downloaded)
             progress.value = progress.value.copy(completedTiles = downloaded.size.toLong(), failedTiles = failed.size.toLong(),
                 receivedBytes = progress.value.receivedBytes + receivedBytes)
@@ -145,7 +184,7 @@ class DownloadRunnerTest {
             return PackageResult.Success(Unit)
         }
         override suspend fun finalize(id: PackageId): PackageResult<Unit> {
-            check(downloaded.size == 5 && failed.isEmpty())
+            check(downloaded.size.toLong() == total && failed.isEmpty())
             finalized = true
             progress.value = progress.value.copy(state = BuildJobState.COMPLETED)
             return PackageResult.Success(Unit)
@@ -169,8 +208,9 @@ class DownloadRunnerTest {
         fun fixtureProviders(permission: OfflineDownloadPermission = OfflineDownloadPermission.ALLOWED) = object : ProviderRepository {
             val provider = TileProvider(providerId, "Fixture", listOf(TileStyle(styleId, "Raster", TileEndpoint("https://example.invalid/{z}/{x}/{y}"))),
                 config, emptyList(), ProviderCapabilities(offlineDownload = permission, policyUrl = "https://example.invalid/policy"))
-            override suspend fun list() = listOf(provider)
-            override suspend fun find(id: ProviderId) = provider.takeIf { it.id == id }
+            val other = provider.copy(id = ProviderId("other"))
+            override suspend fun list() = listOf(provider, other)
+            override suspend fun find(id: ProviderId) = list().find { it.id == id }
         }
     }
 }

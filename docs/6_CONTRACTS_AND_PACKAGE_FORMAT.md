@@ -53,7 +53,7 @@ Sources checked for catalog design:
 
 `PackageManifest` is the serializable domain format for `config.json`. A mandatory `schemaVersion` prevents an unversioned file from silently becoming version 1. `compatibility()` checks format version and raster support only; it is not complete import validation. Structural/file-integrity checks remain the responsibility of the future storage boundary.
 
-The manifest contains stable package identity, display name, WGS-84 bounds, inclusive overall zoom range, UTC epoch-millisecond timestamps, ordered layers, optional annotations/elevation, auxiliary assets, and the package size policy. Layers carry independent source identity (nullable for imported sources), bounds, zoom range, tile content/CRS/matrix metadata, visibility, opacity, and attribution. List order is bottom to top. The overall zoom range spans the layer ranges; each layer may have narrower source coverage.
+The manifest contains stable package identity, display name, WGS-84 bounds, inclusive overall zoom range, UTC epoch-millisecond timestamps, ordered layers, optional annotations/elevation, auxiliary assets, and the package size policy. Layers carry independent source identity (nullable for imported sources), bounds, zoom range, tile content/CRS/matrix metadata, visibility, opacity, and attribution. List order identifies the root asset and download sequence. Optional `renderOrder` (default 0) controls bottom-to-top composition; ties retain list order for older manifests. Reordering never changes asset paths. The overall zoom range spans layer ranges; Phase 7 composition requires matching exact selected levels, bounds, CRS, and tile dimensions rather than resampling narrower sources.
 
 Storage layout:
 

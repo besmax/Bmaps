@@ -87,9 +87,9 @@ class PackageFiles internal constructor(private val root: Path) {
         return visit(directory).toSet()
     }
 
-    fun removeTemporaryFiles(id: String) {
-        relativeFiles(id, true).filter { it.endsWith(".part") }.forEach {
-            fs.delete(asset(id, true, it))
+    fun removeTemporaryFiles(id: String, staged: Boolean = true) {
+        relativeFiles(id, staged).filter { it.endsWith(".part") }.forEach {
+            fs.delete(asset(id, staged, it))
         }
     }
 
@@ -116,13 +116,13 @@ class PackageFiles internal constructor(private val root: Path) {
         }
     }
 
-    suspend fun write(id: String, relativePath: String, source: RawSource, maxBytes: Long, packageLimit: Long) {
+    suspend fun write(id: String, relativePath: String, source: RawSource, maxBytes: Long, packageLimit: Long, staged: Boolean = true) {
         require(maxBytes >= 0 && packageLimit > 0)
-        val destination = asset(id, true, relativePath)
-        val temporary = asset(id, true, "$relativePath.part")
+        val destination = asset(id, staged, relativePath)
+        val temporary = asset(id, staged, "$relativePath.part")
         fs.createDirectories(checkNotNull(destination.parent))
         if (fs.exists(temporary)) fs.delete(temporary)
-        val existing = size(id, true)
+        val existing = size(id, staged) - if (fs.exists(destination)) assetSize(id, staged, relativePath) else 0L
         var copied = 0L
         try {
             fs.sink(temporary).use { sink ->

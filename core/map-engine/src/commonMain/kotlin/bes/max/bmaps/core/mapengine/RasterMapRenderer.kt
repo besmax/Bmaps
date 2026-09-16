@@ -31,7 +31,6 @@ class RasterMapRenderer {
 
     fun setContent(generation: Int, config: RasterMapConfig, layers: List<RasterLayer>) {
         require(layers.isNotEmpty() && layers.map { it.id }.distinct().size == layers.size)
-        require(layers.first().opacity == 1f) { "The base layer must be opaque" }
         content.value = Content(generation, config, layers)
     }
 
@@ -54,7 +53,7 @@ class RasterMapRenderer {
 
     private suspend fun renderSession(content: Content, size: IntSize): Unit = coroutineScope {
         val config = content.config
-        val layers = content.layers
+        val layers = content.layers.filter { it.visible && it.opacity > 0f }
         fun emit(event: MapEvent) { eventChannel.trySend(RasterRendererEvent(content.generation, event)) }
         val dimensions = config.pyramid.engineSize()
         if (dimensions == null) {
@@ -106,6 +105,9 @@ class RasterMapRenderer {
                     )
                 }
             }
+            // MapCompose requires a decoded bottom tile and ignores its opacity.
+            val background = withContext(Dispatchers.Default) { transparentTile(config.pyramid.tileSize) }
+            map.addLayer({ _, _, _ -> kotlinx.io.Buffer().apply { write(background) } }, 1f)
             layers.forEach { layer ->
                 map.addLayer(
                     { row, col, level -> session.stream(layer.id, row, col, level) },

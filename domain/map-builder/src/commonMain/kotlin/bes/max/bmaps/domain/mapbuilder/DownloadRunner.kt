@@ -49,7 +49,7 @@ class DownloadRunner(
 
     suspend fun stop(id: BuildJobId) { lock.withLock { running[id] }?.cancelAndJoin() }
 
-    suspend fun run(id: BuildJobId): PackageResult<Unit> {
+    suspend fun run(id: BuildJobId, layerIndex: Int? = null): PackageResult<Unit> {
         val owner = currentCoroutineContext().job
         if (!lock.withLock { if (id in running) false else { running[id] = owner; true } }) {
             return PackageResult.Failure(PackageFailure.Conflict)
@@ -67,8 +67,13 @@ class DownloadRunner(
                 return PackageResult.Success(Unit)
             }
             val request = storage.request(progress.packageId).valueOrThrow()
+            require(layerIndex == null || layerIndex in request.layers.indices)
             storage.setState(request.packageId, BuildJobState.RUNNING).valueOrThrow()
-            for (layer in request.layers) {
+            for ((index, layer) in request.layers.withIndex()) {
+                if (layerIndex != null && index > layerIndex) break
+                suspend fun complete() = storage.layerComplete(request.packageId, layer.id).valueOrThrow()
+                if (complete()) continue
+                if (layerIndex != null && index < layerIndex) throw PackageStorageException(PackageFailure.TileUnavailable)
                 providers.downloadSource(layer)
                 val source = when (val opened = sources.open(layer)) {
                     is OnlineSourceResult.Available -> opened.source
@@ -105,6 +110,11 @@ class DownloadRunner(
                         }
                     }
                 } finally { withContext(NonCancellable) { source.close() } }
+                if (!complete()) throw PackageStorageException(PackageFailure.TileUnavailable)
+            }
+            if (layerIndex != null && layerIndex < request.layers.lastIndex) {
+                storage.setState(request.packageId, BuildJobState.QUEUED).valueOrThrow()
+                return PackageResult.Success(Unit)
             }
             val final = storage.observeProgress(id).first().valueOrThrow()
             if (final.missingTiles > 0) throw PackageStorageException(PackageFailure.TileUnavailable)

@@ -56,7 +56,7 @@ data class RasterMapConfig(
 
 fun interface TileSourceFactory { suspend fun open(): TileSource }
 
-class RasterLayer(val id: String, val source: TileSourceFactory, val opacity: Float = 1f) {
+class RasterLayer(val id: String, val source: TileSourceFactory, val opacity: Float = 1f, val visible: Boolean = true) {
     init { require(id.isNotBlank() && opacity.isFinite() && opacity in 0f..1f) }
 }
 

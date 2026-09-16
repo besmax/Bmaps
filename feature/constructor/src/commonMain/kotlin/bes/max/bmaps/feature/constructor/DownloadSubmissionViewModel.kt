@@ -55,11 +55,15 @@ class DownloadSubmissionViewModel(
     fun start(settings: MapSaveSettings, choice: MapChoice) {
         if (state.value.busy) return
         val config = choice.provider.configFor(choice.style)
-        val error = validateDownload(settings, config) ?: state.value.policyError
+        val error = validateComposition(settings, choice) ?: state.value.policyError
         if (error != null) { mutableState.update { it.copy(error = error) }; return }
         val levels = settings.levels.sorted().toSet()
         val candidate = BuildRequest(PackageId("draft"), settings.name.trim(), settings.bounds,
-            listOf(BuildLayerRequest(LayerId("base"), choice.id, config, ZoomRange(levels.min(), levels.max()), zoomLevels = levels)))
+            listOf(BuildLayerRequest(LayerId("base"), choice.id, config, ZoomRange(levels.min(), levels.max()),
+                zoomLevels = levels, visible = settings.rootVisible, opacity = settings.rootOpacity)) + settings.layers.map { layer ->
+                BuildLayerRequest(LayerId(layer.id), layer.choice.id, layer.choice.provider.configFor(layer.choice.style),
+                    ZoomRange(levels.min(), levels.max()), zoomLevels = levels, visible = layer.visible, opacity = layer.opacity)
+            })
         val previous = request
         val submitting = if (previous != null && previous.copy(packageId = candidate.packageId) == candidate) previous
             else candidate.copy(packageId = PackageId(Uuid.random().toString())).also { request = it }
@@ -101,11 +105,28 @@ internal fun validateDownload(settings: MapSaveSettings, config: ProviderConfig)
     val maximum = config.levelLimits.levelMax ?: return Res.string.unsupported_area_or_zoom
     if (selected.any { it !in config.levelLimits.levelMin..maximum || it !in 0..52 }) return Res.string.unsupported_area_or_zoom
     if (config.tileMatrix.coordinateSystem != CoordinateSystemId.WebMercator ||
-        config.tileMatrix.tileWidth <= 0 || config.tileMatrix.tileWidth != config.tileMatrix.tileHeight) return Res.string.unsupported_area_or_zoom
+        config.tileMatrix.tileWidth !in 1..4096 || config.tileMatrix.tileWidth != config.tileMatrix.tileHeight) return Res.string.unsupported_area_or_zoom
     val regions = WebMercator.splitBounds(settings.bounds) ?: return Res.string.unsupported_area_or_zoom
     val available = config.boundaries.boundingBoxList.flatMap { WebMercator.splitBounds(it).orEmpty() }
     if (config.boundaries.boundingBoxList.isNotEmpty() && regions.any { region -> available.none {
         region.west >= it.west && region.east <= it.east && region.south >= it.south && region.north <= it.north
     } }) return Res.string.unsupported_area_or_zoom
     return null
+}
+
+internal fun validateComposition(settings: MapSaveSettings, root: MapChoice): StringResource? {
+    if (settings.layers.size > 31) return Res.string.layer_limit
+    val opacities = listOf(settings.rootOpacity) + settings.layers.map { it.opacity }
+    if (opacities.any { !it.isFinite() || it !in 0.0..1.0 } ||
+        settings.layers.map { it.id }.let { ids -> ids.distinct().size != ids.size || "base" in ids }) return Res.string.layer_alignment_error
+    val config = root.provider.configFor(root.style)
+    return (listOf(root) + settings.layers.map { it.choice }).firstNotNullOfOrNull { choice ->
+        val source = choice.provider.configFor(choice.style)
+        validateDownload(settings, source) ?: when {
+            source.tileMatrix.tileWidth != config.tileMatrix.tileWidth ||
+                choice.style.content.kind != TileContentKind.RASTER || choice.style.content.rasterFormats.isEmpty() -> Res.string.layer_alignment_error
+            choice.provider.capabilitiesFor(choice.style).offlineDownload != OfflineDownloadPermission.ALLOWED -> Res.string.download_permission_unverified
+            else -> null
+        }
+    }
 }

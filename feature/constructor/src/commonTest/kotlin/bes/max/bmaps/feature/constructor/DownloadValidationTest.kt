@@ -17,6 +17,27 @@ class DownloadValidationTest {
         assertEquals(Res.string.unsupported_area_or_zoom, validateDownload(settings, config.copy(levelLimits = LevelLimitsConfig())))
     }
 
+    @Test fun compositionValidatesEveryProviderAndRechecksChangedZooms() {
+        fun choice(id: String, sourceConfig: ProviderConfig = config, permission: OfflineDownloadPermission = OfflineDownloadPermission.ALLOWED): MapChoice {
+            val style = TileStyle(StyleId("raster"), "Raster", TileEndpoint("https://example.invalid/{z}/{x}/{y}"))
+            return MapChoice(TileProvider(ProviderId(id), id, listOf(style), sourceConfig, emptyList(),
+                ProviderCapabilities(offlineDownload = permission, policyUrl = "https://example.invalid/policy")), style)
+        }
+        val root = choice("osm")
+        val satellite = choice("satellite")
+        val layered = settings.copy(layers = listOf(AdditionalLayer("satellite", satellite, opacity = 0.5)), rootOpacity = 0.3)
+        assertNull(validateComposition(layered, root))
+        val smaller = choice("regional", config.copy(boundaries = BoundariesConfig(listOf(BoundingBox(-5.0, -5.0, 5.0, 5.0)))))
+        assertEquals(Res.string.unsupported_area_or_zoom, validateComposition(layered.copy(layers = listOf(AdditionalLayer("regional", smaller))), root))
+        val restricted = choice("restricted", permission = OfflineDownloadPermission.PROHIBITED)
+        assertEquals(Res.string.download_permission_unverified, validateComposition(layered.copy(layers = listOf(AdditionalLayer("restricted", restricted))), root))
+        val limited = choice("limited", config.copy(levelLimits = LevelLimitsConfig(0, 1)))
+        assertEquals(Res.string.unsupported_area_or_zoom, validateComposition(layered.copy(layers = listOf(AdditionalLayer("limited", limited))), root))
+        assertEquals(Res.string.layer_alignment_error, validateComposition(layered.copy(rootOpacity = Double.NaN), root))
+        val dimensions = choice("large", config.copy(tileMatrix = config.tileMatrix.copy(tileWidth = 512, tileHeight = 512)))
+        assertEquals(Res.string.layer_alignment_error, validateComposition(layered.copy(layers = listOf(AdditionalLayer("large", dimensions))), root))
+    }
+
     @Test fun rejectsSelectionsOutsideDeclaredCoverage() {
         val regional = config.copy(boundaries = BoundariesConfig(listOf(BoundingBox(-5.0, -5.0, 5.0, 5.0))))
         assertEquals(Res.string.unsupported_area_or_zoom, validateDownload(settings, regional))

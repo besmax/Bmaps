@@ -36,11 +36,17 @@ class AndroidDownloadScheduler(private val context: Context, private val storage
     }
 
     override suspend fun schedule(id: BuildJobId) {
-        val work = OneTimeWorkRequestBuilder<MapDownloadWorker>()
-            .setInputData(workDataOf("job" to id.value))
-            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
-            .build()
-        WorkManager.getInstance(context).enqueueUniqueWork("map-${id.value}", ExistingWorkPolicy.KEEP, work).result.await()
+        val progress = storage.observeProgress(id).first().valueOrThrow()
+        val request = storage.request(progress.packageId).valueOrThrow()
+        val work = request.layers.indices.map { index ->
+            OneTimeWorkRequestBuilder<MapDownloadWorker>()
+                .setInputData(workDataOf("job" to id.value, "layer" to index))
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+                .build()
+        }
+        var chain = WorkManager.getInstance(context).beginUniqueWork("map-${id.value}", ExistingWorkPolicy.KEEP, work.first())
+        work.drop(1).forEach { chain = chain.then(it) }
+        chain.enqueue().result.await()
     }
 
     override suspend fun cancel(id: BuildJobId) {
@@ -75,7 +81,7 @@ class MapDownloadWorker(
                     }
             }
             try {
-                when (runner.run(job)) {
+                when (runner.run(job, inputData.getInt("layer", 0))) {
                     is PackageResult.Success -> Result.success()
                     is PackageResult.Failure -> Result.failure()
                 }

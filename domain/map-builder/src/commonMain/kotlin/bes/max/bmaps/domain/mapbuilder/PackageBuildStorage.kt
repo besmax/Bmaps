@@ -16,6 +16,20 @@ interface PackageBuildStorage {
         id: PackageId, layerId: LayerId, tiles: List<DownloadedTile>, failures: List<FailedTile>, receivedBytes: Long,
     ): PackageResult<BuildProgress>
     suspend fun contains(id: PackageId, layerId: LayerId, key: TileKey): PackageResult<Boolean>
+    suspend fun layerComplete(id: PackageId, layerId: LayerId): PackageResult<Boolean> {
+        val request = when (val result = request(id)) {
+            is PackageResult.Success -> result.value
+            is PackageResult.Failure -> return result
+        }
+        val layer = request.layers.firstOrNull { it.id == layerId } ?: return PackageResult.Failure(PackageFailure.NotFound)
+        for (key in PackageTileCoverage(request.bounds, layer.zoomRange, layer.zoomLevels).tiles()) {
+            when (val result = contains(id, layerId, key)) {
+                is PackageResult.Success -> if (!result.value) return PackageResult.Success(false)
+                is PackageResult.Failure -> return result
+            }
+        }
+        return PackageResult.Success(true)
+    }
     suspend fun setState(id: PackageId, state: BuildJobState, failure: PackageFailure? = null): PackageResult<Unit>
     suspend fun finalize(id: PackageId): PackageResult<Unit>
     suspend fun reconcile(): PackageResult<Unit>

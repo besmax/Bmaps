@@ -42,4 +42,14 @@
     <string name="viewer_attribution">Map attribution</string>
     <string name="viewer_attribution_hint">Visit the links below to learn more about the map sources and their terms of use.</string>
     <string name="viewer_open_link">Open link</string>
+    <string name="layers_title">Layers</string>
+    <string name="layers_hint">Layers are listed from bottom to top. All layers share the selected area and zoom levels.</string>
+    <string name="layer_opacity">Opacity: %1$d%%</string>
+    <string name="layer_up">Raise</string>
+    <string name="layer_down">Lower</string>
+    <string name="layer_alignment_error">Layers must have identical bounds, Web Mercator projection, tile dimensions, and downloaded zoom levels.</string>
+    <string name="layers_save">Save</string>
+    <string name="layers_cancel">Cancel</string>
+    <string name="layers_automatic_zoom">Automatic zoom</string>
+    <string name="layers_region">Region %1$d</string>
 </resources>

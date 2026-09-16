@@ -55,7 +55,7 @@ internal class RasterTileSession private constructor(
     companion object {
         suspend fun open(pyramid: TilePyramid, layers: List<RasterLayer>, onEvent: (MapEvent) -> Unit,
                          validate: (ByteArray, Int) -> Boolean = ::hasExpectedRasterDimensions): RasterTileSession {
-            require(layers.isNotEmpty() && layers.map { it.id }.distinct().size == layers.size)
+            require(layers.map { it.id }.distinct().size == layers.size)
             val sources = linkedMapOf<String, TileSource>()
             try {
                 for (layer in layers) sources[layer.id] = layer.source.open()
