@@ -71,11 +71,11 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
                 contentDescription = stringResource(Res.string.viewer_zoom_out),
             )
         }
-        FilledTonalButton(onClick = model::showLayers,
+        MapIconButton(onClick = model::showLayers,
+            iconResId = MapIcons.layers,
+            contentDescription = stringResource(Res.string.layers_title),
             enabled = state.manifest != null && state.error == null,
-            modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(16.dp)) {
-            Text(stringResource(Res.string.layers_title))
-        }
+            modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(16.dp))
         state.error?.let { error ->
             Surface(Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp), shape = MaterialTheme.shapes.medium) {
                 Column(Modifier.padding(16.dp)) {

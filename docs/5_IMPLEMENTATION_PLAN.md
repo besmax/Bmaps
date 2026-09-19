@@ -1,6 +1,6 @@
 # Bmaps Implementation Plan
 
-Planning baseline: 2026-09-08. Last updated: 2026-09-14. Phases 1, 2, and 3A are implemented. Phase 3B's renderer and coordinate implementation is in place; Android deterministic-fixture acceptance remains pending. Phase 3C's provider catalog, fullscreen constructor flow, secure credentials dialog, and OSM rendering are implemented; broader provider entitlement and native acceptance remain pending. Phase 3D area selection and save-settings UI are implemented; its full acceptance matrix is pending. Phase 0's remaining build/CI work is also pending.
+Planning baseline: 2026-09-08. Last updated: 2026-09-19. Phases 1, 2, and 3A are implemented. Phase 3B's renderer and coordinate implementation is in place; Android deterministic-fixture acceptance remains pending. Phase 3C's provider catalog, fullscreen constructor flow, secure credentials dialog, and OSM rendering are implemented; broader provider entitlement and native acceptance remain pending. Phase 3D area selection and save-settings UI are implemented; its full acceptance matrix is pending. Phase 0's remaining build/CI work is also pending.
 
 ## Current implementation status
 
@@ -12,9 +12,10 @@ Planning baseline: 2026-09-08. Last updated: 2026-09-14. Phases 1, 2, and 3A are
 | Phase 4 | Package storage, Room catalog/checkpoints, MBTiles access, finalization/reconciliation implemented; not built or tested | User-run compilation, generated schema review, and native persistence acceptance |
 | Phase 5 | Durable download pipeline, native scheduling, settings submission, library progress and missing-tile restore implemented; not built or tested | User-run compilation and native download/recovery acceptance; see document 12 |
 | Phase 6 | Home library/FAB navigation, local offline viewer, details, filters, deletion, favourite/avatar persistence implemented; not built or tested | User-run Room migration/schema verification and offline/native acceptance; see document 13 |
-| Phases 7–11 | Contracts and plans | Editing, elevation/CRS, sharing, and release hardening |
+| Phase 7 | Raster layer composition, sequential downloads, viewer appearance persistence, continuous download zoom range, and layers icon implemented | User-run builds, tests, and native acceptance; see document 14 |
+| Phases 8–11 | Contracts and plans | Editing, elevation/CRS, sharing, and release hardening |
 
-Current work: Phase 6 implementation is ready for user verification; current state and handoff are in `13_LIBRARY_AND_OFFLINE_VIEWER.md`. Phase 5 download verification remains in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Builds and all test execution are assigned to the user.
+Current work: Phase 7 implementation is ready for user verification; current state and handoff are in `14_RASTER_LAYER_COMPOSITION.md`. Phase 6 handoff remains in `13_LIBRARY_AND_OFFLINE_VIEWER.md`. Phase 5 download verification remains in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Builds and all test execution are assigned to the user.
 
 This plan follows `AGENTS.md` and documents 1–4. Checked boxes represent completed deliverables. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats. The table below preserves the original source-inspection baseline; current Phase 1 decisions are recorded in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 

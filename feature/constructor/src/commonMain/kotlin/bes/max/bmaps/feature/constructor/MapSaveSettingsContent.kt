@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import kotlin.math.roundToInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -22,7 +23,7 @@ import bes.max.bmaps.core.mapengine.ZoomRange
 import bes.max.bmaps.domain.providers.OfflineDownloadPermission
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit, onDismiss: () -> Unit) {
     val map = metroViewModel<OnlineMapViewModel>(mapOwner)
@@ -78,22 +79,31 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
             Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(state.name, model::name, enabled = !download.busy, label = { Text(stringResource(Res.string.map_name)) }, singleLine = true, shape = MaterialTheme.shapes.small)
                 Text(stringResource(Res.string.zoom_levels), style = MaterialTheme.typography.titleSmall)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.availableLevels.forEach { level ->
-                        FilterChip(selected = level in state.selectedLevels, onClick = { model.toggle(level) }, enabled = !download.busy, label = { Text(level.toString()) })
-                    }
+                if (state.availableLevels.isNotEmpty() && state.selectedLevels.isNotEmpty()) {
+                    val minimum = state.selectedLevels.min()
+                    val maximum = state.selectedLevels.max()
+                    val zoomLabel = stringResource(Res.string.zoom_range, minimum, maximum)
+                    Text(zoomLabel)
+                    if (state.availableLevels.size > 1) RangeSlider(
+                        value = minimum.toFloat()..maximum.toFloat(),
+                        onValueChange = { model.selectZoomRange(it.start.roundToInt(), it.endInclusive.roundToInt()) },
+                        valueRange = state.availableLevels.first().toFloat()..state.availableLevels.last().toFloat(),
+                        steps = (state.availableLevels.size - 2).coerceAtLeast(0),
+                        enabled = !download.busy,
+                        modifier = Modifier.semantics { contentDescription = zoomLabel },
+                    )
                 }
                 Text(stringResource(Res.string.layers_title), style = MaterialTheme.typography.titleSmall)
                 Text(stringResource(Res.string.layers_hint), style = MaterialTheme.typography.bodySmall)
                 source?.let { root ->
-                    LayerAppearance("${root.provider.name} · ${root.style.name}", state.rootVisible, state.rootOpacity, !download.busy) { visible, opacity ->
-                        model.layerAppearance(null, visible, opacity)
+                    LayerVisibility("${root.provider.name} · ${root.style.name}", state.rootVisible, !download.busy) { visible ->
+                        model.layerVisibility(null, visible)
                     }
                     root.provider.attributionFor(root.style).forEach { Text(it.text, style = MaterialTheme.typography.bodySmall) }
                 }
                 state.layers.forEachIndexed { index, layer ->
-                    LayerAppearance("${layer.choice.provider.name} · ${layer.choice.style.name}", layer.visible, layer.opacity, !download.busy) { visible, opacity ->
-                        model.layerAppearance(layer.id, visible, opacity)
+                    LayerVisibility("${layer.choice.provider.name} · ${layer.choice.style.name}", layer.visible, !download.busy) { visible ->
+                        model.layerVisibility(layer.id, visible)
                     }
                     layer.choice.provider.attributionFor(layer.choice.style).forEach { Text(it.text, style = MaterialTheme.typography.bodySmall) }
                     Row {
@@ -132,15 +142,10 @@ internal fun formatMegabytes(bytes: Long?): String? = bytes?.let {
 }
 
 @Composable
-private fun LayerAppearance(name: String, visible: Boolean, opacity: Double, enabled: Boolean, change: (Boolean, Double) -> Unit) {
-    Column {
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-            Checkbox(visible, { change(it, opacity) }, enabled = enabled,
-                modifier = Modifier.semantics { contentDescription = name })
-        }
-        Text(stringResource(Res.string.layer_opacity, (opacity * 100).toInt()))
-        Slider(opacity.toFloat(), { change(visible, it.toDouble()) }, enabled = enabled,
+private fun LayerVisibility(name: String, visible: Boolean, enabled: Boolean, change: (Boolean) -> Unit) {
+    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Checkbox(visible, change, enabled = enabled,
             modifier = Modifier.semantics { contentDescription = name })
     }
 }

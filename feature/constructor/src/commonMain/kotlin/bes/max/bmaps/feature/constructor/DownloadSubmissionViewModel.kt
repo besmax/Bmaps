@@ -60,9 +60,9 @@ class DownloadSubmissionViewModel(
         val levels = settings.levels.sorted().toSet()
         val candidate = BuildRequest(PackageId("draft"), settings.name.trim(), settings.bounds,
             listOf(BuildLayerRequest(LayerId("base"), choice.id, config, ZoomRange(levels.min(), levels.max()),
-                zoomLevels = levels, visible = settings.rootVisible, opacity = settings.rootOpacity)) + settings.layers.map { layer ->
+                zoomLevels = levels, visible = settings.rootVisible)) + settings.layers.map { layer ->
                 BuildLayerRequest(LayerId(layer.id), layer.choice.id, layer.choice.provider.configFor(layer.choice.style),
-                    ZoomRange(levels.min(), levels.max()), zoomLevels = levels, visible = layer.visible, opacity = layer.opacity)
+                    ZoomRange(levels.min(), levels.max()), zoomLevels = levels, visible = layer.visible)
             })
         val previous = request
         val submitting = if (previous != null && previous.copy(packageId = candidate.packageId) == candidate) previous
@@ -104,6 +104,7 @@ internal fun validateDownload(settings: MapSaveSettings, config: ProviderConfig)
     if (selected.isEmpty()) return Res.string.zoom_selection_required
     val maximum = config.levelLimits.levelMax ?: return Res.string.unsupported_area_or_zoom
     if (selected.any { it !in config.levelLimits.levelMin..maximum || it !in 0..52 }) return Res.string.unsupported_area_or_zoom
+    if (selected.size != selected.max() - selected.min() + 1) return Res.string.zoom_range_required
     if (config.tileMatrix.coordinateSystem != CoordinateSystemId.WebMercator ||
         config.tileMatrix.tileWidth !in 1..4096 || config.tileMatrix.tileWidth != config.tileMatrix.tileHeight) return Res.string.unsupported_area_or_zoom
     val regions = WebMercator.splitBounds(settings.bounds) ?: return Res.string.unsupported_area_or_zoom
@@ -116,9 +117,7 @@ internal fun validateDownload(settings: MapSaveSettings, config: ProviderConfig)
 
 internal fun validateComposition(settings: MapSaveSettings, root: MapChoice): StringResource? {
     if (settings.layers.size > 31) return Res.string.layer_limit
-    val opacities = listOf(settings.rootOpacity) + settings.layers.map { it.opacity }
-    if (opacities.any { !it.isFinite() || it !in 0.0..1.0 } ||
-        settings.layers.map { it.id }.let { ids -> ids.distinct().size != ids.size || "base" in ids }) return Res.string.layer_alignment_error
+    if (settings.layers.map { it.id }.let { ids -> ids.distinct().size != ids.size || "base" in ids }) return Res.string.layer_alignment_error
     val config = root.provider.configFor(root.style)
     return (listOf(root) + settings.layers.map { it.choice }).firstNotNullOfOrNull { choice ->
         val source = choice.provider.configFor(choice.style)
