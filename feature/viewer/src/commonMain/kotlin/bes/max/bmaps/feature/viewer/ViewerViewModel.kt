@@ -30,6 +30,7 @@ data class ViewerState(
     val layerDraft: List<PackageLayer> = emptyList(),
     val attributionVisible: Boolean = false,
     val busy: Boolean = false,
+    val annotationPyramid: TilePyramid? = null,
 )
 
 @Inject
@@ -40,6 +41,8 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
     val state = mutableState.asStateFlow()
     private val channel = Channel<StringResource>(Channel.BUFFERED)
     val events = channel.receiveAsFlow()
+    private val annotationChannel = Channel<Pair<TilePyramid, MapEvent>>(Channel.UNLIMITED)
+    val annotationEvents = annotationChannel.receiveAsFlow()
     val renderer = RasterMapRenderer()
     private var packageId: PackageId? = null
     private var opening: Job? = null
@@ -52,6 +55,9 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
     init {
         viewModelScope.launch { renderer.events.collect { tagged ->
             if (tagged.generation != generation) return@collect
+            if (tagged.event is MapEvent.Tap || tagged.event is MapEvent.ViewportChanged) {
+                pyramid?.let { annotationChannel.trySend(it to tagged.event) }
+            }
             when (val event = tagged.event) {
                 is MapEvent.ViewportChanged -> viewport = event.viewport
                 is MapEvent.TileLoaded -> mutableState.update { it.copy(loading = false) }
@@ -168,6 +174,8 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
             }
         }
         pyramid = next
+        mutableState.update { it.copy(annotationPyramid = next) }
+        annotationChannel.trySend(next to MapEvent.ViewportChanged(initial, MapWindow(0.0, 0.0, 1.0, 1.0)))
         viewport = initial
         generation++
         mutableState.update { it.copy(selectedLevel = selected, loading = true, error = null, tileWarning = null) }

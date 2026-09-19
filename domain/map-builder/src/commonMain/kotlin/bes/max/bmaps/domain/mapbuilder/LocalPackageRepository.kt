@@ -22,7 +22,7 @@ import kotlinx.io.files.FileNotFoundException
 class LocalPackageRepository(
     private val catalog: PackageCatalog,
     private val storage: PackageFileStorage,
-) : PackageRepository, PackageBuildStorage {
+) : PackageRepository, PackageBuildStorage, AnnotationRepository {
     private val mutex = Mutex()
     private var reconciled = false
     private val sessions = mutableMapOf<PackageId, MutableList<LocalOpenedPackage>>()
@@ -279,6 +279,79 @@ class LocalPackageRepository(
         }
     }
 
+    override suspend fun annotations(packageId: PackageId, bounds: BoundingBox?, after: String?): PackageResult<AnnotationPage> = operation {
+        val record = records.get(packageId.value) ?: fail(PackageFailure.NotFound)
+        if (record.state != PackageState.READY.name) fail(PackageFailure.NotReady)
+        storage.access {
+            val manifest = readManifest(packageId, false)
+            if (manifest.annotations == null) return@access AnnotationPage(emptyList(), null)
+            val rows = AnnotationDatabase.access(asset(packageId.value, false, "annotations.db").toString(), packageId.value) {
+                query(bounds?.let { AnnotationBounds(it.west, it.south, it.east, it.north) }, after, 201)
+            }
+            val items = rows.take(200).map { row ->
+                AnnotationGeoJson.decode(row.geoJson).single().also { require(it.id == row.id) }
+            }
+            AnnotationPage(items, if (rows.size > 200) items.last().id else null)
+        }
+    }
+
+    override suspend fun saveAnnotations(packageId: PackageId, annotations: List<Annotation>): PackageResult<Unit> =
+        changeAnnotations(packageId, annotations, null)
+
+    override suspend fun deleteAnnotation(packageId: PackageId, id: String): PackageResult<Unit> =
+        changeAnnotations(packageId, emptyList(), id)
+
+    private suspend fun changeAnnotations(id: PackageId, values: List<Annotation>, deleteId: String?): PackageResult<Unit> = operation {
+        val record = records.get(id.value) ?: fail(PackageFailure.NotFound)
+        if (record.state != PackageState.READY.name) fail(PackageFailure.NotReady)
+        storage.access {
+            val manifest = readManifest(id, false)
+            val creating = manifest.annotations == null
+            if (creating && values.isEmpty()) return@access
+            val rows = values.map { value ->
+                val bounds = value.boundingBox()
+                AnnotationRecord(value.id, AnnotationGeoJson.feature(value).toString(), bounds.west, bounds.south, bounds.east, bounds.north)
+            }
+            val oldBytes = manifest.annotations?.sizeBytes ?: 0
+            val allowance = (limit(manifest) - size(id.value, false) + oldBytes - MANIFEST_RESERVE).coerceAtLeast(0)
+            requireCapacity(rows.sumOf { it.geoJson.encodeToByteArray().size.toLong() } * 3 + oldBytes + MANIFEST_RESERVE)
+            if (creating) removeTemporaryFiles(id.value, staged = false)
+            val path = if (creating) "annotations.db.part" else "annotations.db"
+            withContext(NonCancellable) {
+                try {
+                    AnnotationDatabase.access(asset(id.value, false, path).toString(), id.value, create = creating) {
+                        change(rows, deleteId, allowance, Clock.System.now().toEpochMilliseconds())
+                    }
+                    if (creating) commitAsset(id.value, path, "annotations.db")
+                } finally {
+                    if (creating) removeTemporaryFiles(id.value, staged = false)
+                }
+                val updated = synchronizeAnnotations(manifest, force = true)
+                val bytes = size(id.value, false)
+                val updatedRecord = record.copy(manifestJson = PackageManifestCodec.encode(updated), sizeBytes = bytes,
+                    updatedAtEpochMillis = updated.updatedAtEpochMillis)
+                val job = records.job(id.value)
+                if (job == null) records.putPackage(updatedRecord) else records.checkpoint(updatedRecord, job.copy(packageBytes = bytes))
+            }
+        }
+    }
+
+    private suspend fun PackageFiles.synchronizeAnnotations(manifest: PackageManifest, force: Boolean = false): PackageManifest {
+        val id = manifest.id.value
+        val files = relativeFiles(id, false)
+        if ("annotations.db" !in files) {
+            if (manifest.annotations != null) fail(PackageFailure.CorruptData)
+            return manifest
+        }
+        val modifiedAt = AnnotationDatabase.access(asset(id, false, "annotations.db").toString(), id) { modifiedAt() }
+        val bytes = assetSize(id, false, "annotations.db")
+        if (!force && manifest.annotations?.sizeBytes == bytes && manifest.updatedAtEpochMillis >= modifiedAt) return manifest
+        val updated = manifest.copy(annotations = PackageAsset("annotations.db", bytes), updatedAtEpochMillis = maxOf(manifest.updatedAtEpochMillis, modifiedAt))
+        val encoded = PackageManifestCodec.encode(updated).encodeToByteArray()
+        write(id, "config.json", Buffer().apply { write(encoded) }, MANIFEST_RESERVE, limit(updated), staged = false)
+        return updated
+    }
+
     override suspend fun setFavourite(id: PackageId, favourite: Boolean): PackageResult<Unit> = operation {
         if (records.get(id.value) == null) fail(PackageFailure.NotFound)
         records.putPreferences((records.preferences(id.value) ?: PackagePreferencesRecord(id.value)).copy(favourite = favourite))
@@ -378,6 +451,9 @@ class LocalPackageRepository(
         for (asset in PackageManifestCodec.assets(manifest)) {
             if (assetSize(manifest.id.value, staged, asset.relativePath) != asset.sizeBytes) fail(PackageFailure.CorruptData)
         }
+        if (manifest.annotations != null) AnnotationDatabase.access(
+            asset(manifest.id.value, staged, "annotations.db").toString(), manifest.id.value, verify = true,
+        ) { }
         for (layer in manifest.layers) {
             if (layer.tileCount == null) fail(PackageFailure.NotReady)
             val database = MbTiles.open(asset(manifest.id.value, staged, layer.tiles.relativePath).toString())
@@ -407,10 +483,11 @@ class LocalPackageRepository(
         return TileCounts(downloaded, failed)
     }
 
-    private fun PackageFiles.readManifest(id: PackageId, staged: Boolean): PackageManifest =
-        PackageManifestCodec.decode(read(id.value, staged, "config.json", MANIFEST_RESERVE.toInt()).decodeToString()).also {
-            require(it.id == id)
-        }
+    private suspend fun PackageFiles.readManifest(id: PackageId, staged: Boolean): PackageManifest {
+        val manifest = PackageManifestCodec.decode(read(id.value, staged, "config.json", MANIFEST_RESERVE.toInt()).decodeToString())
+        require(manifest.id == id)
+        return if (staged) manifest else synchronizeAnnotations(manifest)
+    }
 
     private suspend fun building(id: PackageId, allowFinalizing: Boolean = false): PackageRecord {
         checkComponent(id.value)

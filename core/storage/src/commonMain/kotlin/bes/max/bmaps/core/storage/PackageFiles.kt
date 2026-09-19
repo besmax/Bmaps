@@ -88,7 +88,7 @@ class PackageFiles internal constructor(private val root: Path) {
     }
 
     fun removeTemporaryFiles(id: String, staged: Boolean = true) {
-        relativeFiles(id, staged).filter { it.endsWith(".part") }.forEach {
+        relativeFiles(id, staged).filter { it.endsWith(".part") || it == "annotations.db.part-journal" }.forEach {
             fs.delete(asset(id, staged, it))
         }
     }
@@ -148,6 +148,14 @@ class PackageFiles internal constructor(private val root: Path) {
         } finally {
             fs.delete(temporary, mustExist = false)
         }
+    }
+
+    fun commitAsset(id: String, temporary: String, destination: String) {
+        val source = asset(id, false, temporary)
+        val target = asset(id, false, destination)
+        syncPath(source.toString(), false)
+        fs.atomicMove(source, target)
+        syncPath(checkNotNull(target.parent).toString(), true)
     }
 
     fun promote(id: String) {

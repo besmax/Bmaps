@@ -13,6 +13,58 @@ import kotlinx.io.bytestring.ByteString
 import kotlinx.io.files.*
 
 internal class PackageStorageScenarios(private val database: (String) -> PackageDatabase) {
+    suspend fun annotationsSurviveRestartAndStayIsolated() = fixture { root ->
+        var db = database(Path(root, "catalog.db").toString())
+        val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
+        var repository = LocalPackageRepository(PackageCatalog(db), files)
+        val (request, manifest) = fixtureRequest(ZoomRange(0, 0))
+        val second = PackageId("annotation-second")
+        val tile = DownloadedTile(TileKey(0, 0, 0), ByteString(byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)))
+        try {
+            for (id in listOf(request.packageId, second)) {
+                repository.prepare(request.copy(packageId = id), manifest.copy(id = id)).success()
+                repository.write(id, manifest.layers.single().id, listOf(tile), emptyList(), 8).success()
+                repository.finalize(id).success()
+            }
+            val id = request.packageId
+            val east = Annotation("east", AnnotationKind.MARKER, listOf(GeographicCoordinate(0.0, 179.0)), color = "#123456", icon = "future")
+            val west = east.copy(id = "west", coordinates = listOf(GeographicCoordinate(0.0, -179.0)))
+            val middle = east.copy(id = "middle", coordinates = listOf(GeographicCoordinate(0.0, 0.0)))
+            repository.saveAnnotations(id, listOf(east, west, middle)).success()
+            assertTrue(repository.annotations(second).success().items.isEmpty())
+            assertEquals(setOf("east", "west"), repository.annotations(id, BoundingBox(170.0, -1.0, -170.0, 1.0)).success().items.map { it.id }.toSet())
+            assertEquals(listOf("middle"), repository.annotations(id, BoundingBox(-1.0, -1.0, 1.0, 1.0)).success().items.map { it.id })
+            val before = files.access { read(id.value, false, "config.json", 1_048_576) }
+            val lots = (0..210).map { middle.copy(id = "point-$it", description = "payload".repeat(200)) }
+            repository.saveAnnotations(id, lots).success()
+            // Simulate SQLite commit followed by process death before the manifest replacement.
+            files.access { write(id.value, "config.json", Buffer().apply { write(before) }, 1_048_576, 300_000_000, staged = false) }
+            db.close()
+            db = database(Path(root, "catalog.db").toString())
+            repository = LocalPackageRepository(PackageCatalog(db), files)
+            repository.reconcile().success()
+            val session = repository.open(id).success()
+            try { assertNotNull(session.manifest.annotations) } finally { session.close() }
+            val page = repository.annotations(id).success()
+            assertEquals(200, page.items.size)
+            val next = repository.annotations(id, after = assertNotNull(page.nextCursor)).success()
+            assertEquals(214, (page.items + next.items).map { it.id }.distinct().size)
+            assertEquals(east, page.items.first { it.id == "east" })
+            val path = files.access { asset(id.value, false, "annotations.db").toString() }
+            assertFailsWith<StorageLimitExceeded> {
+                AnnotationDatabase.access(path, id.value) {
+                    change(listOf(AnnotationRecord("rollback", AnnotationGeoJson.encode(listOf(middle.copy(id = "rollback"))), 0.0, 0.0, 0.0, 0.0)), null, 1, 0)
+                }
+            }
+            assertFalse(repository.annotations(id, after = "point-z").success().items.any { it.id == "rollback" })
+            repository.deleteAnnotation(id, "east").success()
+            assertFalse(repository.annotations(id).success().items.any { it.id == "east" })
+            repository.delete(id).success()
+            assertFalse(files.access { exists(id.value, false) })
+            assertTrue(repository.annotations(second).success().items.isEmpty())
+        } finally { db.close() }
+    }
+
     suspend fun layerConfigurationSurvivesReopening() = fixture { root ->
         var db = database(Path(root, "catalog.db").toString())
         val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))

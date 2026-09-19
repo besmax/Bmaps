@@ -13,9 +13,10 @@ Planning baseline: 2026-09-08. Last updated: 2026-09-19. Phases 1, 2, and 3A are
 | Phase 5 | Durable download pipeline, native scheduling, settings submission, library progress and missing-tile restore implemented; not built or tested | User-run compilation and native download/recovery acceptance; see document 12 |
 | Phase 6 | Home library/FAB navigation, local offline viewer, details, filters, deletion, favourite/avatar persistence implemented; not built or tested | User-run Room migration/schema verification and offline/native acceptance; see document 13 |
 | Phase 7 | Raster layer composition, sequential downloads, viewer appearance persistence, continuous download zoom range, and layers icon implemented | User-run builds, tests, and native acceptance; see document 14 |
-| Phases 8–11 | Contracts and plans | Editing, elevation/CRS, sharing, and release hardening |
+| Phase 8 | Package-local annotations, SVG marker catalog, colors, geometry editing with Undo, viewport queries, and GeoJSON implemented | User-run builds, tests, and native acceptance; see document 15 |
+| Phases 9–11 | Contracts and plans | Elevation/CRS, sharing, and release hardening |
 
-Current work: Phase 7 implementation is ready for user verification; current state and handoff are in `14_RASTER_LAYER_COMPOSITION.md`. Phase 6 handoff remains in `13_LIBRARY_AND_OFFLINE_VIEWER.md`. Phase 5 download verification remains in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Builds and all test execution are assigned to the user.
+Current work: Phase 8 implementation is ready for user verification; current state and handoff are in `15_ANNOTATIONS_AND_GEOJSON.md`. Phase 7 handoff remains in `14_RASTER_LAYER_COMPOSITION.md`. Phase 6 handoff remains in `13_LIBRARY_AND_OFFLINE_VIEWER.md`. Phase 5 download verification remains in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Builds and all test execution are assigned to the user.
 
 This plan follows `AGENTS.md` and documents 1–4. Checked boxes represent completed deliverables. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats. The table below preserves the original source-inspection baseline; current Phase 1 decisions are recorded in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 
@@ -242,12 +243,14 @@ Acceptance: two aligned raster layers render in the expected order; each opacity
 
 Dependencies: Phase 6; can proceed independently of Phase 7.
 
-- [ ] Define annotation IDs, point/line/polygon geometry, properties, and domain operations in the agreed domain owner.
-- [ ] Implement per-package `annotations.db` access in `core:storage`; choose and document SQLite integration without placing annotations in the central Room database.
-- [ ] Define schema versions, transactions, migration behavior, and viewport bounding-box filtering, including geographic edge cases.
-- [ ] Implement create/edit/delete flows for markers, routes, and polygons; invoke geometry input validation in presentation.
-- [ ] Use dedicated presentation layer classes such as `MarkersLayer`, `RouteLayer`, and `PolygonLayer` for visibility, selection, and popup state.
-- [ ] Implement GeoJSON serialization/import with explicit coordinate and property mapping and a documented supported geometry subset.
+- [x] Define annotation IDs, point/line/polygon geometry, properties, and domain operations in the agreed domain owner.
+- [x] Implement per-package `annotations.db` access in `core:storage`; choose and document SQLite integration without placing annotations in the central Room database.
+- [x] Define schema versions, transactions, migration behavior, and viewport bounding-box filtering, including geographic edge cases.
+- [x] Implement create/edit/delete flows for markers, routes, and polygons; invoke geometry input validation in presentation.
+- [x] Use dedicated presentation layer classes such as `MarkersLayer`, `RouteLayer`, and `PolygonLayer` for visibility, selection, and popup state.
+- [x] Implement GeoJSON serialization/import with explicit coordinate and property mapping and a documented supported geometry subset.
+
+Implementation and authored regression scenarios are present; builds, tests, and native acceptance remain with the user. See `15_ANNOTATIONS_AND_GEOJSON.md` for the supported GeoJSON/SVG subsets and verification handoff.
 
 Acceptance: annotations survive restart and remain isolated between packages; viewport queries return the expected objects; GeoJSON round trips preserve supported geometry and properties; editing does not overload the main screen ViewModel.
 

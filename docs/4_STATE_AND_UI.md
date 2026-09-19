@@ -50,3 +50,7 @@ Map renderer state, tile events, and zoom controls belong to the ViewModel-owned
 `core:ui` owns reusable composables, theme definitions, fonts, and shared icons. Components accept immutable display values, localized accessibility descriptions, modifiers, and callbacks. They do not resolve ViewModels or access repositories; feature ViewModels retain interaction state and validation. Extract components when reuse is concrete, keeping feature-specific UI local. Shared component-owned resources belong in `core:ui`; feature wording remains in feature resources.
 
 `MapIconButton` provides a themed translucent surface, a 20 dp icon, and a minimum 48 dp layout size. Online and offline maps use it with `MapIcons` for Back, zoom, and offline layer controls; the constructor also supplies its own area-selection icon. `MapIcons` exposes shared drawable resources without exposing the generated resource class.
+
+## Phase 8 annotation editing
+
+`AnnotationEditorViewModel` is scoped to the viewer navigation entry independently of `ViewerViewModel`. It owns one immutable editor state and Channel-backed error events, with dedicated marker/route/polygon managers for visibility and selection. The viewer forwards renderer tap/viewport events without owning annotation persistence or edit history. Geometry validation runs in the editor before saves; drafts and Undo snapshots remain presentation state until a transactional repository mutation succeeds. See `15_ANNOTATIONS_AND_GEOJSON.md`.

@@ -15,6 +15,7 @@ class PackageStorageDeviceTest {
         packageDatabase(Room.databaseBuilder<PackageDatabase>(InstrumentationRegistry.getInstrumentation().targetContext, path))
     }
 
+    @Test fun annotationsSurviveRestartAndStayIsolated() = runBlocking { scenarios.annotationsSurviveRestartAndStayIsolated() }
     @Test fun layerConfigurationSurvivesReopening() = runBlocking { scenarios.layerConfigurationSurvivesReopening() }
     @Test fun recoverAndReopen() = runBlocking { scenarios.recoverAndReopen() }
     @Test fun reconcilePromotionAndMissingAssets() = runBlocking { scenarios.reconcilePromotionAndMissingAssets() }

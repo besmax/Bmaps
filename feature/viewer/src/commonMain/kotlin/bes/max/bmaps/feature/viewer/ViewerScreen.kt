@@ -1,6 +1,8 @@
 package bes.max.bmaps.feature.viewer
 
 import bmaps.feature.viewer.generated.resources.*
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
@@ -30,12 +32,23 @@ import org.jetbrains.compose.resources.getString
 fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
     val model = metroViewModel<ViewerViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
+    val annotations = metroViewModel<AnnotationEditorViewModel>()
+    val annotationState by annotations.state.collectAsStateWithLifecycle()
+    val overlays = remember(annotationState.items, annotationState.layers, annotationState.draft, state.annotationPyramid) {
+        annotationOverlays(annotationState, state.annotationPyramid)
+    }
     val snackbar = remember { SnackbarHostState() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val uriHandler = LocalUriHandler.current
     val attribution = state.manifest?.layers.orEmpty().flatMap { it.attribution }.distinct()
 
-    LaunchedEffect(packageId, model) { model.open(packageId) }
+    LaunchedEffect(packageId, model, annotations) { annotations.open(packageId); model.open(packageId) }
+    LaunchedEffect(model, annotations) { model.annotationEvents.collect { (pyramid, event) -> annotations.mapEvent(pyramid, event) } }
+    LaunchedEffect(annotations, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            annotations.events.collect { snackbar.showSnackbar(getString(it)) }
+        }
+    }
 
     LaunchedEffect(model, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -43,7 +56,18 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
         }
     }
     Box(Modifier.fillMaxSize()) {
-        RasterMap(model.renderer, Modifier.fillMaxSize())
+        RasterMap(model.renderer, Modifier.fillMaxSize(), overlays.markers, overlays.paths, annotations::select) { marker ->
+            Box(Modifier.size(48.dp).clickable(role = Role.Button) { annotations.select(marker.id, marker.position) }, contentAlignment = Alignment.BottomCenter) {
+                MarkerIcon(marker.icon, marker.color, marker.label.ifBlank { stringResource(Res.string.annotations_place) }, Modifier.size(36.dp))
+            }
+        }
+        if (annotationState.draft == null) FilledTonalButton(
+            onClick = { annotations.panel(true) },
+            enabled = state.manifest != null && state.error == null && !annotationState.busy,
+            modifier = Modifier.align(Alignment.BottomStart).safeDrawingPadding().padding(16.dp),
+        ) { Text(stringResource(Res.string.annotations_title)) }
+        AnnotationEditorContent(annotations, annotationState,
+            Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp))
 
         MapIconButton(
             onClick = onBack,

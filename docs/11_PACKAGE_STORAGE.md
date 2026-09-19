@@ -76,3 +76,7 @@ Room schema version 2 adds device-local package favourite/avatar preferences wit
 ## Phase 7 layer settings
 
 Ready packages support atomic `config.json` replacement through `PackageRepository.setLayerPresentation`. Only visibility, opacity, render order, and the modification timestamp change; tile files and layer IDs remain stable. The file is authoritative and Room metadata follows. Reconciliation removes interrupted `.part` writes before validating the inventory and restores Room metadata from the committed manifest. Package payload limits account for replacing the previous manifest; physical free-space checks still cover the temporary write. A layer completion query uses MBTiles counts to gate subsequent workers without rescanning every tile. See `14_RASTER_LAYER_COMPOSITION.md`.
+
+## Phase 8 annotation storage
+
+`core:storage` now opens package-local `annotations.db` through bundled SQLite, with owner verification, explicit schema versioning, atomic batches, bounded serialized rows, and indexed viewport-envelope queries. `LocalPackageRepository` shares its existing operation lock across annotation operations and package deletion. Initial database creation uses a temporary asset; subsequent SQLite commits precede recoverable manifest/catalog updates. See `15_ANNOTATIONS_AND_GEOJSON.md` for schema, query, and interruption details.

@@ -35,6 +35,7 @@ internal object PackageManifestCodec {
             val coverage = PackageTileCoverage(layer.bounds, layer.zoomRange, layer.zoomLevels)
             require(layer.tileCount == null || layer.tileCount == coverage.count)
         }
+        require(manifest.annotations == null || manifest.annotations.relativePath == "annotations.db")
         val assets = assets(manifest)
         require(assets.map { it.relativePath }.toSet().size == assets.size)
         assets.forEach {

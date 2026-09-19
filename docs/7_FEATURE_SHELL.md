@@ -18,7 +18,7 @@ Android creates one `AndroidAppGraph` lazily on `BmapsApplication`, registered i
 
 iOS creates one `IosAppGraph` lazily for the application process and reuses it across `MainViewController` instances. The graph uses the platform contributions from `core:datastore`.
 
-Application-scoped repository, DataStore, and ViewModel factory bindings use `SingleIn(AppScope::class)`. ViewModels are unscoped Metro map contributions; `metroViewModel()` resolves them through the current `ViewModelStoreOwner`. The root native owner retains `ShellViewModel`, while the preferences navigation dialog owns `PreferencesViewModel` and clears it when popped.
+Application-scoped repository, DataStore, and ViewModel factory bindings use `SingleIn(AppScope::class)`. Contributed ViewModel classes must be public so the umbrella graph can discover them across module boundaries. Feature-only state may remain internal. ViewModels are unscoped Metro map contributions; `metroViewModel()` resolves them through the current `ViewModelStoreOwner`. The root native owner retains `ShellViewModel`, while the preferences navigation dialog owns `PreferencesViewModel` and clears it when popped.
 
 The DataStore artifact is an API dependency of `core:datastore` because its types appear in generated Metro factories used by the umbrella graph. The iOS adapter uses only Okio's path conversion required by DataStore's factory API; this is not an alternate application file-IO implementation. Custom application file IO remains assigned to `kotlinx-io-core`.
 

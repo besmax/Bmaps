@@ -123,3 +123,9 @@ Both commands passed, with 10 host tests and no test failures. Apps were not lau
 ## Phase 6 library preferences
 
 `PackageSummary` exposes favourite status, a stable avatar key, and exact downloaded zoom levels. `PackageQuery.favouritesOnly` participates in database filtering and cursor identity. `PackageRepository.setFavourite` and `setAvatar` update a separate Room preference record. These device-local choices do not alter manifest version 1, package assets, or total package bytes. Room schema version 2 includes a non-destructive 1-to-2 migration and cascading preference deletion. See document 13 for rendering and verification limits.
+
+## Phase 8 annotations
+
+`AnnotationRepository` queries, upserts batches, and deletes stable annotation IDs within a package. `Annotation` holds WGS-84 point/line/single-ring-polygon geometry, name, description, RGB hex color, stable SVG icon key, and arbitrary nonreserved JSON properties. Presentation invokes `AnnotationValidation` before mutations. The GeoJSON boundary validates external input separately; structural repository operations assume validated geometry.
+
+The optional manifest annotation asset is fixed to `annotations.db`. SQLite schema version 1 is independent of manifest version 1 and Room schema version 2. Committed annotation rows are authoritative; package recovery reconciles their size and timestamp into the manifest and catalog. The GeoJSON subset, limits, property mapping, viewport query semantics, SVG catalog extension, and recovery protocol are specified in `15_ANNOTATIONS_AND_GEOJSON.md`.
