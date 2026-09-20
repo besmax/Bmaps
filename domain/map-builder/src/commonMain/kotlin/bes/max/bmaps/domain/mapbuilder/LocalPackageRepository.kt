@@ -289,7 +289,7 @@ class LocalPackageRepository(
                 query(bounds?.let { AnnotationBounds(it.west, it.south, it.east, it.north) }, after, 201)
             }
             val items = rows.take(200).map { row ->
-                AnnotationGeoJson.decode(row.geoJson).single().also { require(it.id == row.id) }
+                AnnotationGeoJson.decodeStoredFeature(row.geoJson).also { require(it.id == row.id) }
             }
             AnnotationPage(items, if (rows.size > 200) items.last().id else null)
         }

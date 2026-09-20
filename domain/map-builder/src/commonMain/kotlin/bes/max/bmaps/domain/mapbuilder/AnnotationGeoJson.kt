@@ -45,7 +45,7 @@ object AnnotationGeoJson {
             put("coordinates", when (value.kind) {
                 AnnotationKind.MARKER -> points.single()
                 AnnotationKind.LINE -> JsonArray(points)
-                AnnotationKind.POLYGON -> JsonArray(listOf(JsonArray(points + points.first())))
+                AnnotationKind.POLYGON -> JsonArray(listOf(JsonArray(points + listOf(points.first()))))
             })
         })
         put("properties", buildJsonObject {
@@ -55,7 +55,12 @@ object AnnotationGeoJson {
         })
     }
 
-    internal fun parseFeature(feature: JsonObject): Annotation {
+    internal fun decodeStoredFeature(text: String): Annotation {
+        require(text.length <= 256_000 && text.encodeToByteArray().size <= 256_000)
+        return parseFeature(json.parseToJsonElement(text).jsonObject, recoverClosingPosition = true)
+    }
+
+    private fun parseFeature(feature: JsonObject, recoverClosingPosition: Boolean = false): Annotation {
         require(feature["type"]?.jsonPrimitive?.content == "Feature" && "crs" !in feature)
         val geometry = feature.getValue("geometry").jsonObject
         require("crs" !in geometry)
@@ -76,8 +81,16 @@ object AnnotationGeoJson {
             AnnotationKind.LINE -> { require(raw.size <= AnnotationValidation.MAX_VERTICES); raw.map(::coordinate) }
             AnnotationKind.POLYGON -> {
                 require(raw.size == 1) { "Polygon holes are not supported" }
-                require(raw.single().jsonArray.size <= AnnotationValidation.MAX_VERTICES + 1)
-                val ring = raw.single().jsonArray.map(::coordinate)
+                val storedRing = raw.single().jsonArray
+                val positions = if (recoverClosingPosition && storedRing.size >= 5 &&
+                    storedRing.takeLast(2).all { it is JsonPrimitive && !it.isString && it.doubleOrNull != null } &&
+                    JsonArray(storedRing.takeLast(2)) == storedRing.first()
+                ) {
+                    // Older saves flattened the closing position into two scalar ring entries.
+                    storedRing.dropLast(2) + listOf(storedRing.first())
+                } else storedRing
+                require(positions.size <= AnnotationValidation.MAX_VERTICES + 1)
+                val ring = positions.map(::coordinate)
                 require(ring.size >= 4 && ring.first() == ring.last())
                 ring.dropLast(1)
             }

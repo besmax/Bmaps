@@ -3,6 +3,7 @@ package bes.max.bmaps.domain.mapbuilder
 import bes.max.bmaps.core.database.*
 import bes.max.bmaps.core.mapengine.*
 import bes.max.bmaps.core.mbtiles.*
+import bes.max.bmaps.core.mbtiles.TileAddress
 import bes.max.bmaps.core.storage.*
 import bes.max.bmaps.domain.providers.*
 import kotlin.random.Random
@@ -30,7 +31,16 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             val east = Annotation("east", AnnotationKind.MARKER, listOf(GeographicCoordinate(0.0, 179.0)), color = "#123456", icon = "future")
             val west = east.copy(id = "west", coordinates = listOf(GeographicCoordinate(0.0, -179.0)))
             val middle = east.copy(id = "middle", coordinates = listOf(GeographicCoordinate(0.0, 0.0)))
-            repository.saveAnnotations(id, listOf(east, west, middle)).success()
+            val polygon = Annotation("area", AnnotationKind.POLYGON, listOf(
+                GeographicCoordinate(10.0, 10.0), GeographicCoordinate(10.0, 12.0), GeographicCoordinate(12.0, 11.0)
+            ))
+            repository.saveAnnotations(id, listOf(east, west, middle, polygon)).success()
+            val legacyPolygon = """{"type":"Feature","id":"area","geometry":{"type":"Polygon","coordinates":[[[10,10],[12,10],[11,12],10,10]]},"properties":{}}"""
+            val annotationPath = files.access { asset(id.value, false, "annotations.db").toString() }
+            AnnotationDatabase.access(annotationPath, id.value) {
+                change(listOf(AnnotationRecord("area", legacyPolygon, 10.0, 10.0, 12.0, 12.0)), null, 300_000_000, modifiedAt())
+            }
+            assertEquals(listOf(polygon), repository.annotations(id, BoundingBox(10.5, 10.5, 11.5, 11.5)).success().items)
             assertTrue(repository.annotations(second).success().items.isEmpty())
             assertEquals(setOf("east", "west"), repository.annotations(id, BoundingBox(170.0, -1.0, -170.0, 1.0)).success().items.map { it.id }.toSet())
             assertEquals(listOf("middle"), repository.annotations(id, BoundingBox(-1.0, -1.0, 1.0, 1.0)).success().items.map { it.id })
@@ -48,7 +58,8 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             val page = repository.annotations(id).success()
             assertEquals(200, page.items.size)
             val next = repository.annotations(id, after = assertNotNull(page.nextCursor)).success()
-            assertEquals(214, (page.items + next.items).map { it.id }.distinct().size)
+            assertEquals(215, (page.items + next.items).map { it.id }.distinct().size)
+            assertEquals(polygon, page.items.first { it.id == "area" })
             assertEquals(east, page.items.first { it.id == "east" })
             val path = files.access { asset(id.value, false, "annotations.db").toString() }
             assertFailsWith<StorageLimitExceeded> {
