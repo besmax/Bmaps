@@ -73,10 +73,44 @@ sealed interface MapEvent {
 data class MapWindow(val left: Double, val top: Double, val right: Double, val bottom: Double)
 
 class RasterMapController {
-    private val commands = kotlinx.coroutines.channels.Channel<Double>(kotlinx.coroutines.channels.Channel.CONFLATED)
-    internal val zooms = commands.receiveAsFlow()
-    fun zoomIn() { commands.trySend(2.0) }
-    fun zoomOut() { commands.trySend(0.5) }
+    private val channel = kotlinx.coroutines.channels.Channel<CameraCommand>(kotlinx.coroutines.channels.Channel.CONFLATED)
+    internal val commands = channel.receiveAsFlow()
+    private val resultChannel = kotlinx.coroutines.channels.Channel<CameraMoveResult>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+    val results = resultChannel.receiveAsFlow()
+    private var current: CameraCommand? = null
+
+    fun zoomIn() = submit(CameraCommand.Zoom(2.0))
+    fun zoomOut() = submit(CameraCommand.Zoom(0.5))
+    fun moveTo(session: Long, requestId: Long, viewport: MapViewport) = submit(CameraCommand.Move(session, requestId, viewport))
+    fun cancelMove() = submit(CameraCommand.Cancel())
+
+    private fun submit(command: CameraCommand) {
+        current?.let { finish(it, CameraMoveOutcome.CANCELLED) }
+        current = command
+        channel.trySend(command)
+    }
+
+    internal fun isCurrent(command: CameraCommand) = current === command
+
+    internal fun finish(command: CameraCommand, outcome: CameraMoveOutcome, camera: MapCameraSnapshot? = null) {
+        if (current !== command) return
+        current = null
+        if (command is CameraCommand.Move) resultChannel.trySend(CameraMoveResult(command.requestId, command.session, outcome, camera))
+    }
+
+    internal fun retire(session: Long) {
+        val command = current
+        if (command is CameraCommand.Move && command.session == session) cancelMove()
+    }
 }
+
+internal sealed interface CameraCommand {
+    class Zoom(val factor: Double) : CameraCommand
+    class Move(val session: Long, val requestId: Long, val viewport: MapViewport) : CameraCommand
+    class Cancel : CameraCommand
+}
+
+enum class CameraMoveOutcome { COMPLETED, CANCELLED, REJECTED }
+data class CameraMoveResult(val requestId: Long, val session: Long, val outcome: CameraMoveOutcome, val camera: MapCameraSnapshot?)
 
 enum class MapUnavailableReason { PYRAMID_DIMENSIONS, VIEWPORT_PRECISION, INITIALIZATION, SOURCE_CLEANUP }

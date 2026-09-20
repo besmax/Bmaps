@@ -40,6 +40,8 @@ internal fun AnnotationEditorContent(model: AnnotationEditorViewModel, state: An
                 }
             }
             Text(stringResource(Res.string.annotations_viewport_list), style = MaterialTheme.typography.labelMedium)
+            if (state.catalogTooMany) Text(stringResource(Res.string.annotations_cluster_too_many), color = MaterialTheme.colorScheme.error)
+            if (state.catalogFailed) Text(stringResource(Res.string.annotations_cluster_unavailable), color = MaterialTheme.colorScheme.error)
             if (state.items.isEmpty()) Text(stringResource(Res.string.annotations_empty))
             state.items.forEach { item ->
                 TextButton({ model.select(item.id) }, enabled = !state.busy) {

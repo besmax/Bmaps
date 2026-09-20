@@ -23,7 +23,7 @@ Modules containing Compose Multiplatform screens, ViewModels, and presentation-l
 * **`feature:library`**
     * **Responsibility:** Home UI for local packages, constructor FAB, search/status/favourite filters, incremental loading, details, avatar preferences, and confirmed deletion. Retains download progress and recovery actions. Sharing remains Phase 10.
 * **`feature:viewer`**
-    * **Responsibility:** The offline map rendering screen. Phase 6 owns package sessions, regional raster configuration, exact-level selection, lifecycle viewport retention, details, and favourite/avatar editing. Depends on `domain:map-builder`, `core:map-engine`, `core:ui`, and `core:di`. Phase 7 owns raster layer composition. Phase 8 adds a separate annotation editor, kind-specific layer managers, SVG marker icons, Undo, and GeoJSON controls. DEM overlays remain a subsequent phase.
+    * **Responsibility:** The offline map rendering screen. Phase 6 owns package sessions, regional raster configuration, exact-level selection, lifecycle viewport retention, details, and favourite/avatar editing. Depends on `domain:map-builder`, `core:map-engine`, `core:ui`, and `core:di`. Phase 7 owns raster layer composition. Phase 8 adds a separate annotation editor, kind-specific layer managers, SVG marker icons, Undo, GeoJSON controls, and presentation-only clustering for nearby markers, small lines, and polygons. DEM overlays remain a subsequent phase.
 
 ## 3. Domain Layer (Business Logic & Contracts)
 Modules containing pure use cases, models, and interface contracts.

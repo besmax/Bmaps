@@ -2,21 +2,62 @@ package bes.max.bmaps.feature.viewer
 
 import androidx.lifecycle.ViewModelStore
 import bes.max.bmaps.core.mapengine.*
+import bes.max.bmaps.core.datastore.*
 import bes.max.bmaps.domain.mapbuilder.*
 import bes.max.bmaps.domain.mapbuilder.Annotation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.*
 import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AnnotationEditorTest {
+    @Test fun persistedClusteringPreferenceUpdatesOpenViewerWithoutLosingObjects() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val owner = ViewModelStore()
+        try {
+            val repository = MemoryAnnotations().apply {
+                values = listOf(Annotation("pin", AnnotationKind.MARKER, listOf(GeographicCoordinate(0.0, 0.0))))
+            }
+            val preferences = MemoryPreferences()
+            val model = AnnotationEditorViewModel(repository, preferences)
+            owner.put("editor", model)
+            model.open(PackageId("one")); runCurrent()
+            assertTrue(model.state.value.catalogReady)
+            preferences.setDisplayPreferences(ThemePreference.SYSTEM, false); runCurrent()
+            assertFalse(model.state.value.clusteringEnabled)
+            assertEquals(1, annotationOverlays(model.state.value, TilePyramid(ZoomRange(0, 0))).markers.size)
+            preferences.setDisplayPreferences(ThemePreference.SYSTEM, true); runCurrent()
+            assertTrue(model.state.value.clusteringEnabled)
+        } finally { owner.clear(); runCurrent(); Dispatchers.resetMain() }
+    }
+
+    @Test fun catalogLimitAndRetryNeverExposeIncompleteCounts() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val owner = ViewModelStore()
+        try {
+            val repository = MemoryAnnotations().apply {
+                values = (0..1000).map { Annotation("p$it", AnnotationKind.MARKER, listOf(GeographicCoordinate(0.0, 0.0))) }
+            }
+            val model = AnnotationEditorViewModel(repository, MemoryPreferences())
+            owner.put("editor", model)
+            model.open(PackageId("one")); runCurrent()
+            assertFalse(model.state.value.catalogReady)
+            assertTrue(model.state.value.catalogTooMany)
+            repository.values = repository.values.take(1000)
+            model.retry(); runCurrent()
+            assertTrue(model.state.value.catalogReady)
+            assertEquals(1000, model.state.value.catalog.size)
+        } finally { owner.clear(); runCurrent(); Dispatchers.resetMain() }
+    }
+
     @Test fun drawingUndoEditingAndCancelPreserveCommittedGeometry() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val owner = ViewModelStore()
         try {
             val repository = MemoryAnnotations()
-            val model = AnnotationEditorViewModel(repository)
+            val model = AnnotationEditorViewModel(repository, MemoryPreferences())
             owner.put("editor", model)
             model.open(PackageId("one")); runCurrent()
             model.start(AnnotationKind.POLYGON)
@@ -47,7 +88,7 @@ class AnnotationEditorTest {
         val owner = ViewModelStore()
         try {
             val repository = MemoryAnnotations()
-            val model = AnnotationEditorViewModel(repository)
+            val model = AnnotationEditorViewModel(repository, MemoryPreferences())
             owner.put("editor", model)
             model.open(PackageId("one")); runCurrent()
             model.start(AnnotationKind.MARKER); model.addPoint(GeographicCoordinate(1.0, 2.0)); model.color("#43A047")
@@ -85,5 +126,14 @@ private class MemoryAnnotations : AnnotationRepository {
     override suspend fun deleteAnnotation(packageId: PackageId, id: String): PackageResult<Unit> {
         values = values.filterNot { it.id == id }
         return PackageResult.Success(Unit)
+    }
+}
+
+private class MemoryPreferences : UserPreferencesRepository {
+    override val preferences = MutableStateFlow(UserPreferences())
+    override suspend fun setTheme(theme: ThemePreference) { preferences.value = preferences.value.copy(theme = theme) }
+    override suspend fun setDefaultCoordinateSystem(identifier: String) { preferences.value = preferences.value.copy(defaultCoordinateSystem = identifier) }
+    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean) {
+        preferences.value = preferences.value.copy(theme = theme, clusterMapObjects = clusterMapObjects)
     }
 }

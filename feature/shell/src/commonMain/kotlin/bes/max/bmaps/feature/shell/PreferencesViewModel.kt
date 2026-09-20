@@ -24,6 +24,7 @@ data class PreferencesState(
     val isLoading: Boolean = true,
     val selectedTheme: ThemePreference = ThemePreference.SYSTEM,
     val defaultCoordinateSystem: String = "EPSG:4326",
+    val clusterMapObjects: Boolean = true,
     val isSaving: Boolean = false,
     val error: PreferencesError? = null,
 )
@@ -57,6 +58,7 @@ class PreferencesViewModel(private val preferencesRepository: UserPreferencesRep
                     isLoading = false,
                     selectedTheme = preferences.theme,
                     defaultCoordinateSystem = preferences.defaultCoordinateSystem,
+                    clusterMapObjects = preferences.clusterMapObjects,
                 )
             } catch (exception: CancellationException) {
                 throw exception
@@ -71,13 +73,18 @@ class PreferencesViewModel(private val preferencesRepository: UserPreferencesRep
         mutableState.update { it.copy(selectedTheme = theme, error = null) }
     }
 
+    fun clusterMapObjects(enabled: Boolean) {
+        if (state.value.isLoading || state.value.isSaving || state.value.error == PreferencesError.LOAD) return
+        mutableState.update { it.copy(clusterMapObjects = enabled, error = null) }
+    }
+
     fun save() {
         val current = state.value
         if (current.isLoading || current.isSaving || current.error == PreferencesError.LOAD) return
         mutableState.update { it.copy(isSaving = true, error = null) }
         viewModelScope.launch {
             try {
-                preferencesRepository.setTheme(current.selectedTheme)
+                preferencesRepository.setDisplayPreferences(current.selectedTheme, current.clusterMapObjects)
                 eventChannel.send(PreferencesEvent.Saved)
             } catch (exception: CancellationException) {
                 throw exception

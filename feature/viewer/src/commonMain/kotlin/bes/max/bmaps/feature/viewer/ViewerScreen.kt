@@ -1,7 +1,8 @@
 package bes.max.bmaps.feature.viewer
 
 import bmaps.feature.viewer.generated.resources.*
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -12,14 +13,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bes.max.bmaps.core.mapengine.RasterMap
+import bes.max.bmaps.core.mapengine.MapPoint
 import bes.max.bmaps.core.ui.components.MapIconButton
 import bes.max.bmaps.core.ui.components.MapIcons
 import bes.max.bmaps.domain.mapbuilder.*
@@ -34,13 +40,28 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
     val state by model.state.collectAsStateWithLifecycle()
     val annotations = metroViewModel<AnnotationEditorViewModel>()
     val annotationState by annotations.state.collectAsStateWithLifecycle()
-    val overlays = remember(annotationState.items, annotationState.layers, annotationState.draft, state.annotationPyramid) {
-        annotationOverlays(annotationState, state.annotationPyramid)
-    }
+    val camera by model.renderer.camera.collectAsStateWithLifecycle()
+    val density = LocalDensity.current.density
+    val renderData = annotationState.renderData()
+    val fallback = remember(renderData, state.annotationPyramid) { annotationOverlays(annotationState, state.annotationPyramid) }
+    val overlays = annotationState.presentation?.takeIf {
+        it.data == renderData && it.display.pyramid == state.annotationPyramid && it.display.camera?.session == camera?.session
+    }?.overlays ?: fallback
     val snackbar = remember { SnackbarHostState() }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val uriHandler = LocalUriHandler.current
     val attribution = state.manifest?.layers.orEmpty().flatMap { it.attribution }.distinct()
+    val handleOverlayClick: (String, MapPoint) -> Unit = { id, position ->
+        overlays.targets[id]?.let { annotations.clickOverlay(it, position, model.renderer.controller) }
+    }
+
+    LaunchedEffect(annotations, state.annotationPyramid, camera, density) {
+        annotations.cameraChanged(state.annotationPyramid, camera, density)
+    }
+    LaunchedEffect(annotations, model) { model.renderer.controller.results.collect(annotations::cameraResult) }
+    DisposableEffect(annotations, model) {
+        onDispose { annotations.cancelExpansion(); model.renderer.controller.cancelMove() }
+    }
 
     LaunchedEffect(packageId, model, annotations) { annotations.open(packageId); model.open(packageId) }
     LaunchedEffect(model, annotations) { model.annotationEvents.collect { (pyramid, event) -> annotations.mapEvent(pyramid, event) } }
@@ -56,9 +77,20 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
         }
     }
     Box(Modifier.fillMaxSize()) {
-        RasterMap(model.renderer, Modifier.fillMaxSize(), overlays.markers, overlays.paths, annotations::select) { marker ->
-            Box(Modifier.size(48.dp).clickable(role = Role.Button) { annotations.select(marker.id, marker.position) }, contentAlignment = Alignment.BottomCenter) {
-                MarkerIcon(marker.icon, marker.color, marker.label.ifBlank { stringResource(Res.string.annotations_place) }, Modifier.size(36.dp))
+        RasterMap(model.renderer, Modifier.fillMaxSize(), overlays.markers, overlays.paths, handleOverlayClick,
+            onGestureStart = annotations::cancelExpansion) { marker ->
+            val cluster = overlays.targets[marker.id] as? AnnotationHit.Cluster
+            if (cluster != null) {
+                AnnotationClusterBadge(cluster.ids.size) { handleOverlayClick(marker.id, marker.position) }
+            } else {
+                val label = marker.label.ifBlank { stringResource(Res.string.annotations_place) }
+                Box(Modifier.size(48.dp).clearAndSetSemantics {
+                    role = Role.Button
+                    contentDescription = label
+                    onClick { handleOverlayClick(marker.id, marker.position); true }
+                }, contentAlignment = Alignment.BottomCenter) {
+                    MarkerIcon(marker.icon, marker.color, marker.label.ifBlank { stringResource(Res.string.annotations_place) }, Modifier.size(36.dp))
+                }
             }
         }
         if (annotationState.draft == null) FilledTonalButton(
@@ -84,13 +116,13 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             MapIconButton(
-                onClick = model.renderer.controller::zoomIn,
+                onClick = { annotations.cancelExpansion(); model.renderer.controller.zoomIn() },
                 iconResId = MapIcons.zoomIn,
                 contentDescription = stringResource(Res.string.viewer_zoom_in),
             )
 
             MapIconButton(
-                onClick = model.renderer.controller::zoomOut,
+                onClick = { annotations.cancelExpansion(); model.renderer.controller.zoomOut() },
                 iconResId = MapIcons.zoomOut,
                 contentDescription = stringResource(Res.string.viewer_zoom_out),
             )
@@ -116,6 +148,21 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
         )
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
+    if (annotationState.clusterMembers.isNotEmpty()) AlertDialog(
+        onDismissRequest = annotations::dismissSelection,
+        title = { Text(stringResource(Res.string.annotations_cluster_title, annotationState.clusterMembers.size)) },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 440.dp)) {
+                item { Text(stringResource(Res.string.annotations_cluster_hint)) }
+                items(annotationState.clusterMembers, key = { it.id }) { item ->
+                    TextButton({ annotations.select(item.id) }) {
+                        Text(listOf(item.name, stringResource(item.kind.label())).filter { it.isNotBlank() }.joinToString(" · "))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(annotations::dismissSelection) { Text(stringResource(Res.string.viewer_done)) } },
+    )
     if (state.layersVisible) AlertDialog(
         onDismissRequest = model::dismissLayers,
         title = { Text(stringResource(Res.string.layers_title)) },

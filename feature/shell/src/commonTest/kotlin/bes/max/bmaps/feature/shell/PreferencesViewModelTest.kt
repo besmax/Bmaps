@@ -46,12 +46,14 @@ class PreferencesViewModelTest {
         val viewModel = retain(PreferencesViewModel(repository))
         runCurrent()
         viewModel.selectTheme(ThemePreference.DARK)
+        viewModel.clusterMapObjects(false)
         assertEquals(ThemePreference.SYSTEM, repository.current.value.theme)
         viewModel.save()
         viewModel.save()
         runCurrent()
         assertEquals(1, repository.writes)
         assertEquals(ThemePreference.DARK, repository.current.value.theme)
+        assertFalse(repository.current.value.clusterMapObjects)
         val received = mutableListOf<PreferencesEvent>()
         val firstCollector = launch { viewModel.events.take(1).toList(received) }
         runCurrent()
@@ -69,11 +71,14 @@ class PreferencesViewModelTest {
         val viewModel = retain(PreferencesViewModel(repository))
         runCurrent()
         viewModel.selectTheme(ThemePreference.DARK)
+        viewModel.clusterMapObjects(false)
         viewModel.save()
         runCurrent()
         assertEquals(PreferencesError.SAVE, viewModel.state.value.error)
         assertFalse(viewModel.state.value.isSaving)
         assertEquals(ThemePreference.DARK, viewModel.state.value.selectedTheme)
+        assertFalse(viewModel.state.value.clusterMapObjects)
+        assertTrue(repository.current.value.clusterMapObjects)
         assertEquals(ThemePreference.SYSTEM, repository.current.value.theme)
         val received = mutableListOf<PreferencesEvent>()
         val collector = launch { viewModel.events.toList(received) }
@@ -92,10 +97,12 @@ class PreferencesViewModelTest {
         val first = retain(PreferencesViewModel(repository))
         runCurrent()
         first.selectTheme(ThemePreference.DARK)
+        first.clusterMapObjects(false)
         stores.first().clear()
         val second = retain(PreferencesViewModel(repository))
         runCurrent()
         assertEquals(ThemePreference.SYSTEM, second.state.value.selectedTheme)
+        assertTrue(second.state.value.clusterMapObjects)
         assertEquals(0, repository.writes)
     }
 
@@ -180,10 +187,13 @@ private class FakePreferences : UserPreferencesRepository {
         emitAll(current)
     }
     override suspend fun setTheme(theme: ThemePreference) {
+        setDisplayPreferences(theme, current.value.clusterMapObjects)
+    }
+    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean) {
         beforeSave()
         if (failSave) error("Write failed")
         writes++
-        current.value = current.value.copy(theme = theme)
+        current.value = current.value.copy(theme = theme, clusterMapObjects = clusterMapObjects)
     }
     override suspend fun setDefaultCoordinateSystem(identifier: String) {
         current.value = current.value.copy(defaultCoordinateSystem = identifier)

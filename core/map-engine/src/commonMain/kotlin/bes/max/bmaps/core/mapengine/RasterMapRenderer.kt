@@ -1,6 +1,7 @@
 package bes.max.bmaps.core.mapengine
 
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.animation.core.tween
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -22,19 +23,24 @@ class RasterMapRenderer {
     private val size = MutableStateFlow(IntSize.Zero)
     private val mutableState = MutableStateFlow(RasterRendererState())
     internal val state = mutableState.asStateFlow()
+    private val mutableCamera = MutableStateFlow<MapCameraSnapshot?>(null)
+    val camera = mutableCamera.asStateFlow()
     private val eventChannel = Channel<RasterRendererEvent>(64, BufferOverflow.DROP_OLDEST)
     val events = eventChannel.receiveAsFlow()
     val controller = RasterMapController()
     private val runner = Mutex()
     private var retainedContent: Content? = null
     private var retainedViewport = MapViewport()
+    private var sessionCounter = 0L
 
     fun setContent(generation: Int, config: RasterMapConfig, layers: List<RasterLayer>) {
         require(layers.isNotEmpty() && layers.map { it.id }.distinct().size == layers.size)
         content.value = Content(generation, config, layers)
+        mutableCamera.value = null
+        controller.cancelMove()
     }
 
-    fun clearContent() { content.value = null }
+    fun clearContent() { content.value = null; mutableCamera.value = null; controller.cancelMove() }
     internal fun resize(value: IntSize) {
         if (value.width > 0 && value.height > 0) size.value = value
     }
@@ -70,6 +76,7 @@ class RasterMapRenderer {
             return@coroutineScope
         }
         var state: MapState? = null
+        val rendererSession = ++sessionCounter
         var tiles: RasterTileSession? = null
         try {
             tiles = RasterTileSession.open(config.pyramid, layers, { emit(it) })
@@ -89,10 +96,20 @@ class RasterMapRenderer {
             if (!config.interactions.pan) map.disableScrolling()
             if (!config.interactions.zoom) map.disableZooming()
             map.onTap { x, y -> emit(MapEvent.Tap(MapPoint(x, y))) }
+            fun snapshot(): MapCameraSnapshot = MapCameraSnapshot(
+                rendererSession, config.pyramid, MapViewport(MapPoint(map.centroidX, map.centroidY), map.scale / fit),
+                MapWindow(
+                    map.centroidX - size.width / (2.0 * width * map.scale),
+                    map.centroidY - size.height / (2.0 * height * map.scale),
+                    map.centroidX + size.width / (2.0 * width * map.scale),
+                    map.centroidY + size.height / (2.0 * height * map.scale),
+                ), size, fit, requestedMax / fit, config.minScale, config.interactions.zoom, content.generation,
+            )
             map.setStateChangeListener {
                 val center = MapPoint(centroidX, centroidY)
                 if (center.isValid && scale.isFinite() && scale > 0) {
                     retainedViewport = MapViewport(center, scale / fit)
+                    mutableCamera.value = snapshot()
                     emit(
                         MapEvent.ViewportChanged(
                             retainedViewport, MapWindow(
@@ -115,16 +132,44 @@ class RasterMapRenderer {
                 )
             }
             mutableState.value = RasterRendererState(map)
+            mutableCamera.value = snapshot()
             controller.let { controls ->
                 launch {
-                    controls.zooms.collectLatest { factor ->
-                        map.scrollTo(
-                            map.centroidX, map.centroidY,
-                            destScale = (map.scale * factor).coerceIn(
-                                config.minScale * fit,
-                                requestedMax
-                            )
-                        )
+                    controls.commands.collectLatest { command ->
+                        if (!controls.isCurrent(command)) return@collectLatest
+                        try {
+                            val current = snapshot()
+                            val requested = when (command) {
+                                is CameraCommand.Cancel -> return@collectLatest
+                                is CameraCommand.Zoom -> current.viewport.copy(scale = current.viewport.scale * command.factor)
+                                is CameraCommand.Move -> {
+                                    if (command.session != rendererSession) {
+                                        controls.finish(command, CameraMoveOutcome.REJECTED)
+                                        return@collectLatest
+                                    }
+                                    command.viewport
+                                }
+                            }
+                            val destination = cameraDestination(current, requested)
+                            if (destination == null) {
+                                controls.finish(command, CameraMoveOutcome.REJECTED)
+                                return@collectLatest
+                            }
+                            map.scrollTo(destination.center.x, destination.center.y,
+                                destScale = destination.scale * fit, animationSpec = tween(300))
+                            // MapCompose starts the animation asynchronously. Wait for it to
+                            // settle before reporting the camera used to render the overlays.
+                            if (command is CameraCommand.Move) delay(340)
+                            if (!controls.isCurrent(command)) return@collectLatest
+                            val actual = snapshot()
+                            mutableCamera.value = actual
+                            controls.finish(command, CameraMoveOutcome.COMPLETED, actual)
+                        } catch (cancelled: CancellationException) {
+                            controls.finish(command, CameraMoveOutcome.CANCELLED)
+                            throw cancelled
+                        } catch (_: Exception) {
+                            controls.finish(command, CameraMoveOutcome.REJECTED)
+                        }
                     }
                 }
             }
@@ -135,6 +180,8 @@ class RasterMapRenderer {
             emit(MapEvent.Unavailable(MapUnavailableReason.INITIALIZATION))
         } finally {
             mutableState.value = RasterRendererState()
+            controller.retire(rendererSession)
+            if (mutableCamera.value?.session == rendererSession) mutableCamera.value = null
             withContext(NonCancellable) {
                 try {
                     state?.shutdownAndJoin()

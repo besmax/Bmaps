@@ -87,4 +87,9 @@
     <string name="annotations_export_hint">Select and copy the GeoJSON below. It includes all objects in this map.</string>
     <string name="annotations_geojson_error">Unsupported or invalid GeoJSON. Check geometry, coordinates, properties, and size limits.</string>
     <string name="annotations_export_error">Could not export GeoJSON. Export supports up to 1,000 objects and 4 MB.</string>
+    <string name="annotations_cluster_title">%1$d map objects</string>
+    <string name="annotations_cluster_hint">These objects cannot be separated further at the available zoom. Choose an object to view its details. Some may be outside the visible map.</string>
+    <string name="annotations_cluster_accessibility">%1$d map objects. Zoom in or show objects. Some may be outside the visible map.</string>
+    <string name="annotations_cluster_too_many">Clustering is unavailable for maps with more than 1,000 objects. Showing objects in the visible area.</string>
+    <string name="annotations_cluster_unavailable">Clustering is temporarily unavailable. Showing objects in the visible area.</string>
 </resources>

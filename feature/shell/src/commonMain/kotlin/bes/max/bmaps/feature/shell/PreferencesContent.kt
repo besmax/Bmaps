@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Switch
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -86,6 +88,20 @@ fun PreferencesContent(onDismiss: () -> Unit, viewModel: PreferencesViewModel = 
                             })
                         }
                     }
+                }
+                Row(
+                    Modifier.fillMaxWidth().toggleable(
+                        value = state.clusterMapObjects, enabled = !state.isSaving,
+                        role = Role.Switch, onValueChange = viewModel::clusterMapObjects,
+                    ).padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(Res.string.cluster_map_objects))
+                        Text(stringResource(Res.string.cluster_map_objects_hint), style = MaterialTheme.typography.bodySmall)
+                    }
+                    Switch(checked = state.clusterMapObjects, onCheckedChange = null, enabled = !state.isSaving)
                 }
                 Text(stringResource(Res.string.default_coordinate_system), style = MaterialTheme.typography.titleMedium)
                 Text(if (state.defaultCoordinateSystem == "EPSG:4326") stringResource(Res.string.wgs_84) else state.defaultCoordinateSystem)

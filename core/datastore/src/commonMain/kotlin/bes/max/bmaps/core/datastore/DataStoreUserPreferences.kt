@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import bes.max.bmaps.core.di.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
@@ -20,6 +21,7 @@ class DataStoreUserPreferences(private val dataStore: DataStore<Preferences>) : 
         UserPreferences(
             theme = ThemePreference.entries.firstOrNull { it.name == stored[ThemeKey] } ?: ThemePreference.SYSTEM,
             defaultCoordinateSystem = stored[CoordinateSystemKey] ?: "EPSG:4326",
+            clusterMapObjects = stored[ClusterMapObjectsKey] ?: true,
         )
     }.distinctUntilChanged()
 
@@ -31,9 +33,17 @@ class DataStoreUserPreferences(private val dataStore: DataStore<Preferences>) : 
         dataStore.edit { it[CoordinateSystemKey] = identifier }
     }
 
+    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean) {
+        dataStore.edit {
+            it[ThemeKey] = theme.name
+            it[ClusterMapObjectsKey] = clusterMapObjects
+        }
+    }
+
     private companion object {
         val ThemeKey = stringPreferencesKey("theme")
         val CoordinateSystemKey = stringPreferencesKey("default_coordinate_system")
+        val ClusterMapObjectsKey = booleanPreferencesKey("cluster_map_objects")
     }
 }
 

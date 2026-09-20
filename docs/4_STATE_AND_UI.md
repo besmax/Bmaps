@@ -54,3 +54,5 @@ Map renderer state, tile events, and zoom controls belong to the ViewModel-owned
 ## Phase 8 annotation editing
 
 `AnnotationEditorViewModel` is scoped to the viewer navigation entry independently of `ViewerViewModel`. It owns one immutable editor state and Channel-backed error events, with dedicated marker/route/polygon managers for visibility and selection. The viewer forwards renderer tap/viewport events without owning annotation persistence or edit history. Geometry validation runs in the editor before saves; drafts and Undo snapshots remain presentation state until a transactional repository mutation succeeds. See `15_ANNOTATIONS_AND_GEOJSON.md`.
+
+The viewer clusters nearby markers, small lines, and small polygons from a complete package snapshot of up to 1,000 objects. Large or region-crossing shapes remain visible. Cluster badges carry exact member counts and open the member selection dialog; a selected object and active draft remain unclustered. Clustering is presentation state and is recomputed from camera snapshots; it is never persisted.

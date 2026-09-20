@@ -1,4 +1,6 @@
 <resources>
+    <string name="cluster_map_objects">Cluster map objects</string>
+    <string name="cluster_map_objects_hint">Group nearby markers, small lines, and polygons into numbered circles.</string>
     <string name="appearance">Appearance</string>
     <string name="bmaps">Bmaps</string>
     <string name="build">Build</string>

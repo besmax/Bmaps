@@ -62,3 +62,5 @@ Native smoke evidence and final test results are recorded in the implementation 
 ## Phase 8 vector overlays
 
 `RasterMap` accepts renderer-independent `MapMarker` and `MapPath` values plus composable marker content and a selection callback carrying the local map position. It attaches overlays to the active engine using a composition effect and removes them when content or the engine changes. Paths support strokes and translucent polygon fills; markers use the viewer's tintable SVG catalog. Geographic annotation models, edit history, visibility, and validation stay in the viewer/domain layers. MapComposeMP remains encapsulated. The native marker/path API was inspected in the cached 1.1.3 sources; rendering acceptance remains pending.
+
+The renderer also exposes a latest `MapCameraSnapshot` flow containing the active pyramid, fit-relative viewport, measured layout, fit scale, effective maximum scale, and visible window. Consumers use this for screen-distance calculations without depending on MapComposeMP types. Camera snapshots are cleared when an engine session is retired.
