@@ -20,12 +20,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bes.max.bmaps.core.mapengine.ZoomRange
-import bes.max.bmaps.domain.providers.OfflineDownloadPermission
+import bes.max.bmaps.domain.providers.*
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit, onDismiss: () -> Unit) {
+fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit, onDismiss: () -> Unit, onCredentials: (String) -> Unit) {
     val map = metroViewModel<OnlineMapViewModel>(mapOwner)
     val area = metroViewModel<AreaSelectionViewModel>(mapOwner)
     val model = metroViewModel<MapSaveSettingsViewModel>()
@@ -46,6 +46,7 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
     val currentSource by rememberUpdatedState(source)
     val dismiss by rememberUpdatedState(onDismiss)
     val started by rememberUpdatedState(onStarted)
+    val credentials by rememberUpdatedState(onCredentials)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(model, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -56,7 +57,12 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
         }
     }
     LaunchedEffect(submission, lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { submission.events.collect { started() } }
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { submission.events.collect { event ->
+            when (event) {
+                DownloadSubmissionEvent.Started -> started()
+                DownloadSubmissionEvent.ElevationCredentials -> credentials(OPENTOPOGRAPHY_CREDENTIAL)
+            }
+        } }
     }
     if (state.addingLayer) AlertDialog(
         onDismissRequest = { model.showLayerPicker(false) },
@@ -116,8 +122,26 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
                 Text(stringResource(Res.string.estimated_size_mb, formatMegabytes(state.estimate?.estimatedPackageBytes) ?: stringResource(Res.string.unavailable)),
                     style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.tertiary)
                 Text(stringResource(Res.string.tile_count_estimate, state.estimate?.tileCount ?: 0), style = MaterialTheme.typography.bodySmall)
-                Text(stringResource(Res.string.map_without_elevation), style = MaterialTheme.typography.bodySmall)
-                if ((state.estimate?.estimatedPackageBytes ?: 0) > 300_000_000L) Text(stringResource(Res.string.package_size_limit_exceeded), color = MaterialTheme.colorScheme.error)
+                Text(stringResource(Res.string.elevation_title), style = MaterialTheme.typography.titleSmall)
+                ElevationDataset.entries.forEach { dataset ->
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        RadioButton(selected = state.elevationDataset == dataset,
+                            onClick = { model.elevation(dataset) }, enabled = !download.busy)
+                        TextButton(onClick = { model.elevation(dataset) }, enabled = !download.busy) {
+                            Text(stringResource(elevationTitle(dataset)))
+                        }
+                    }
+                    if (state.elevationDataset == dataset) elevationDescription(dataset)?.let {
+                        Text(stringResource(it), style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                if (state.elevationDataset != ElevationDataset.NONE) {
+                    Text(stringResource(Res.string.elevation_download_hint), style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { onCredentials(OPENTOPOGRAPHY_CREDENTIAL) }, enabled = !download.busy) {
+                        Text(stringResource(Res.string.elevation_manage_key))
+                    }
+                }
+                if ((state.estimate?.estimatedLargestLayerBytes ?: 0) > bes.max.bmaps.domain.mapbuilder.PackageSizePolicy.MAX_LAYER_BYTES) Text(stringResource(Res.string.package_size_limit_exceeded), color = MaterialTheme.colorScheme.error)
                 if (source?.provider?.capabilitiesFor(source.style)?.offlineDownload == OfflineDownloadPermission.PROHIBITED) {
                     Text(stringResource(Res.string.offline_download_prohibited), color = MaterialTheme.colorScheme.error)
                 }
@@ -148,4 +172,22 @@ private fun LayerVisibility(name: String, visible: Boolean, enabled: Boolean, ch
         Checkbox(visible, change, enabled = enabled,
             modifier = Modifier.semantics { contentDescription = name })
     }
+}
+
+private fun elevationTitle(dataset: ElevationDataset) = when (dataset) {
+    ElevationDataset.SRTM15Plus -> Res.string.elevation_srtm15
+    ElevationDataset.NASADEM -> Res.string.elevation_nasadem
+    ElevationDataset.COP30 -> Res.string.elevation_cop30
+    ElevationDataset.COP90 -> Res.string.elevation_cop90
+    ElevationDataset.EU_DTM -> Res.string.elevation_eu_dtm
+    ElevationDataset.NONE -> Res.string.elevation_none
+}
+
+private fun elevationDescription(dataset: ElevationDataset) = when (dataset) {
+    ElevationDataset.SRTM15Plus -> Res.string.elevation_srtm15_description
+    ElevationDataset.NASADEM -> Res.string.elevation_nasadem_description
+    ElevationDataset.COP30 -> Res.string.elevation_cop30_description
+    ElevationDataset.COP90 -> Res.string.elevation_cop90_description
+    ElevationDataset.EU_DTM -> Res.string.elevation_eu_dtm_description
+    ElevationDataset.NONE -> null
 }

@@ -19,7 +19,7 @@ internal object PackageManifestCodec {
         checkComponent(manifest.id.value)
         require(manifest.layers.isNotEmpty() && manifest.layers.size <= 32)
         require(manifest.layers.map { it.id }.toSet().size == manifest.layers.size)
-        require(manifest.sizePolicy.maxBytes > 0)
+        require(manifest.sizePolicy.maxLayerBytes > 0)
         require(manifest.zoomRange.min == manifest.layers.minOf { it.zoomRange.min } &&
             manifest.zoomRange.max == manifest.layers.maxOf { it.zoomRange.max })
         manifest.layers.forEachIndexed { index, layer ->

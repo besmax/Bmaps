@@ -8,6 +8,8 @@ import androidx.compose.runtime.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
+import bes.max.bmaps.domain.providers.OPENTOPOGRAPHY_CREDENTIAL
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -20,6 +22,8 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 fun ProviderCredentialsContent(identifier: String, onDismiss: () -> Unit) {
     val model = metroViewModel<ProviderCredentialsViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
+    val openTopography = identifier == OPENTOPOGRAPHY_CREDENTIAL
     LaunchedEffect(identifier) { model.load(identifier) }
     val dismiss by rememberUpdatedState(onDismiss)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -31,10 +35,16 @@ fun ProviderCredentialsContent(identifier: String, onDismiss: () -> Unit) {
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 0.dp,
         onDismissRequest = { if (!state.saving) onDismiss() },
-        title = { Text(stringResource(Res.string.provider_api_key)) },
+        title = { Text(stringResource(if (openTopography) Res.string.elevation_manage_key else Res.string.provider_api_key)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(Res.string.provider_key_instructions))
+                Text(stringResource(if (openTopography) Res.string.elevation_key_instructions else Res.string.provider_key_instructions))
+                state.keyRequestUrl?.let { url ->
+                    TextButton(onClick = {
+                        try { uriHandler.openUri(url) }
+                        catch (_: Exception) { model.linkFailed() }
+                    }) { Text(stringResource(Res.string.elevation_get_key)) }
+                }
                 if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
                 if (state.hasSavedCredential) Text(stringResource(Res.string.key_saved_securely), style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(state.draft, model::edit, label = { Text(if (state.hasSavedCredential) stringResource(Res.string.replace_api_key) else stringResource(Res.string.api_key)) }, singleLine = true, shape = MaterialTheme.shapes.small,

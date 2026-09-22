@@ -62,6 +62,7 @@ class LocalPackageRepository(
         }
         PackageManifestCodec.validate(manifest)
         require(manifest.id == request.packageId && manifest.bounds == request.bounds && manifest.name == request.name)
+        require(manifest.elevationDataset == request.elevationDataset)
         require(manifest.sizePolicy == request.sizePolicy && request.layers.size == manifest.layers.size)
         require(manifest.elevation == null && manifest.annotations == null && manifest.auxiliaryAssets.isEmpty())
         request.layers.zip(manifest.layers).forEach { (source, layer) ->
@@ -96,7 +97,7 @@ class LocalPackageRepository(
                         "bmaps_package_id" to record.id,
                     )).close()
                 }
-                val bytes = enforceLimit(record.id, true, limit(draft))
+                val bytes = checkLayerSizes(draft, true)
                 records.checkpoint(record.copy(sizeBytes = bytes), job.copy(packageBytes = bytes))
             } catch (failure: Exception) {
                 if (failure is CancellationException) throw failure
@@ -125,17 +126,18 @@ class LocalPackageRepository(
         }
         storage.access {
             try {
-                val bytesBefore = size(id.value, true)
                 val path = asset(id.value, true, layer.tiles.relativePath)
                 val databaseBytes = assetSize(id.value, true, layer.tiles.relativePath)
                 requireCapacity(databaseBytes + writes.sumOf { it.bytes.size.toLong() } + 1_048_576)
                 val database = MbTiles.open(path.toString(), writable = true)
                 try {
                     database.write(writes, failures.map { MissingTile(it.key.address(), it.reason?.name ?: "MISSING") },
-                        (limit(manifest) - (bytesBefore - databaseBytes) - MANIFEST_RESERVE).coerceAtLeast(0))
+                        manifest.sizePolicy.effectiveLayerLimit)
+                } catch (_: MbTilesSizeExceeded) {
+                    throw PackageStorageException(PackageFailure.SizeLimitExceeded(manifest.sizePolicy.effectiveLayerLimit, null))
                 } finally { database.close() }
                 val counts = counts(manifest, true)
-                val size = enforceLimit(id.value, true, limit(manifest))
+                val size = checkLayerSizes(manifest, true)
                 val updated = job.copy(state = BuildJobState.RUNNING.name, completedTiles = counts.downloaded,
                     failedTiles = counts.failed, receivedBytes = job.receivedBytes + receivedBytes, packageBytes = size, failure = null)
                 records.checkpoint(record.copy(state = PackageState.BUILDING.name, sizeBytes = size,
@@ -186,6 +188,56 @@ class LocalPackageRepository(
         }
     }
 
+    override suspend fun elevationComplete(id: PackageId): PackageResult<Boolean> = operation {
+        val draft = PackageManifestCodec.decode(building(id, allowFinalizing = true).manifestJson)
+        storage.access {
+            val elevation = draft.elevation ?: return@access false
+            elevation.relativePath in relativeFiles(id.value, true) &&
+                assetSize(id.value, true, elevation.relativePath) == elevation.sizeBytes && validElevation(id, elevation.relativePath)
+        }
+    }
+
+    override suspend fun beginElevation(id: PackageId): PackageResult<Unit> = operation {
+        val record = building(id)
+        val draft = PackageManifestCodec.decode(record.manifestJson)
+        require(draft.elevationDataset != bes.max.bmaps.domain.providers.ElevationDataset.NONE)
+        storage.access {
+            beginStream(id.value, ELEVATION_PATH)
+            val bytes = size(id.value, true)
+            records.checkpoint(record.copy(manifestJson = PackageManifestCodec.encode(draft.copy(elevation = null)),
+                hasElevationData = false, sizeBytes = bytes), job(id).copy(packageBytes = bytes))
+        }
+    }
+
+    override suspend fun appendElevation(id: PackageId, bytes: ByteArray, count: Int): PackageResult<Unit> = operation {
+        building(id)
+        storage.access { appendStream(id.value, ELEVATION_PATH, bytes, count) }
+    }
+
+    override suspend fun finishElevation(id: PackageId): PackageResult<Unit> = operation {
+        val record = building(id)
+        val draft = PackageManifestCodec.decode(record.manifestJson)
+        val job = job(id)
+        storage.access {
+            if (!validElevation(id, "$ELEVATION_PATH.part")) fail(PackageFailure.CorruptData)
+            val length = assetSize(id.value, true, "$ELEVATION_PATH.part")
+            finishStream(id.value, ELEVATION_PATH)
+            val updated = draft.copy(elevation = PackageAsset(ELEVATION_PATH, length))
+            val bytes = checkLayerSizes(draft, true)
+            records.checkpoint(record.copy(manifestJson = PackageManifestCodec.encode(updated), sizeBytes = bytes,
+                hasElevationData = true), job.copy(packageBytes = bytes, receivedBytes = job.receivedBytes + length))
+        }
+    }
+
+    override suspend fun discardElevation(id: PackageId): PackageResult<Unit> = operation {
+        storage.access { discardStream(id.value, ELEVATION_PATH) }
+    }
+
+    private fun PackageFiles.validElevation(id: PackageId, path: String, staged: Boolean = true): Boolean {
+        val size = assetSize(id.value, staged, path)
+        return TiffHeader.isValid(readPrefix(id.value, staged, path, 16), size)
+    }
+
     override suspend fun finalize(id: PackageId): PackageResult<Unit> = operation {
         checkComponent(id.value)
         val existing = records.get(id.value) ?: fail(PackageFailure.NotFound)
@@ -198,6 +250,10 @@ class LocalPackageRepository(
         val job = job(id)
         val draft = PackageManifestCodec.decode(record.manifestJson)
         storage.access {
+            val requestedElevation = json.decodeFromString<BuildRequest>(job.requestJson).elevationDataset
+            if (requestedElevation != bes.max.bmaps.domain.providers.ElevationDataset.NONE &&
+                (draft.elevation == null || draft.elevationDataset != requestedElevation ||
+                    !validElevation(id, draft.elevation.relativePath))) fail(PackageFailure.NotReady)
             val counts = counts(draft, true)
             if (counts.downloaded != job.totalTiles || counts.failed != 0L) fail(PackageFailure.NotReady)
             val finalizing = record.copy(state = PackageState.FINALIZING.name)
@@ -208,10 +264,10 @@ class LocalPackageRepository(
                 layers = draft.layers.map { it.copy(tileCount = coverage(it).count,
                     tiles = it.tiles.copy(sizeBytes = assetSize(id.value, true, it.tiles.relativePath))) })
             val encoded = PackageManifestCodec.encode(manifest).encodeToByteArray()
-            write(id.value, "config.json", Buffer().apply { write(encoded) }, MANIFEST_RESERVE, limit(manifest))
+            write(id.value, "config.json", Buffer().apply { write(encoded) }, MANIFEST_RESERVE, Long.MAX_VALUE)
             verify(manifest, true)
             promote(id.value)
-            val bytes = enforceLimit(id.value, false, limit(manifest))
+            val bytes = checkLayerSizes(manifest, false)
             records.checkpoint(finalizing.copy(state = PackageState.READY.name, manifestJson = encoded.decodeToString(),
                 sizeBytes = bytes, updatedAtEpochMillis = manifest.updatedAtEpochMillis, hasElevationData = manifest.elevation != null),
                 finalJob.copy(state = BuildJobState.COMPLETED.name, packageBytes = bytes))
@@ -270,7 +326,7 @@ class LocalPackageRepository(
                     layer.copy(visible = setting.visible, opacity = setting.opacity, renderOrder = setting.order)
                 })
             val encoded = PackageManifestCodec.encode(updated)
-            write(id.value, "config.json", Buffer().apply { write(encoded.encodeToByteArray()) }, MANIFEST_RESERVE, limit(updated), staged = false)
+            write(id.value, "config.json", Buffer().apply { write(encoded.encodeToByteArray()) }, MANIFEST_RESERVE, Long.MAX_VALUE, staged = false)
             val bytes = size(id.value, false)
             val updatedRecord = record.copy(manifestJson = encoded, sizeBytes = bytes, updatedAtEpochMillis = updated.updatedAtEpochMillis)
             val job = records.job(id.value)
@@ -313,14 +369,13 @@ class LocalPackageRepository(
                 AnnotationRecord(value.id, AnnotationGeoJson.feature(value).toString(), bounds.west, bounds.south, bounds.east, bounds.north)
             }
             val oldBytes = manifest.annotations?.sizeBytes ?: 0
-            val allowance = (limit(manifest) - size(id.value, false) + oldBytes - MANIFEST_RESERVE).coerceAtLeast(0)
             requireCapacity(rows.sumOf { it.geoJson.encodeToByteArray().size.toLong() } * 3 + oldBytes + MANIFEST_RESERVE)
             if (creating) removeTemporaryFiles(id.value, staged = false)
             val path = if (creating) "annotations.db.part" else "annotations.db"
             withContext(NonCancellable) {
                 try {
                     AnnotationDatabase.access(asset(id.value, false, path).toString(), id.value, create = creating) {
-                        change(rows, deleteId, allowance, Clock.System.now().toEpochMilliseconds())
+                        change(rows, deleteId, Long.MAX_VALUE, Clock.System.now().toEpochMilliseconds())
                     }
                     if (creating) commitAsset(id.value, path, "annotations.db")
                 } finally {
@@ -348,7 +403,7 @@ class LocalPackageRepository(
         if (!force && manifest.annotations?.sizeBytes == bytes && manifest.updatedAtEpochMillis >= modifiedAt) return manifest
         val updated = manifest.copy(annotations = PackageAsset("annotations.db", bytes), updatedAtEpochMillis = maxOf(manifest.updatedAtEpochMillis, modifiedAt))
         val encoded = PackageManifestCodec.encode(updated).encodeToByteArray()
-        write(id, "config.json", Buffer().apply { write(encoded) }, MANIFEST_RESERVE, limit(updated), staged = false)
+        write(id, "config.json", Buffer().apply { write(encoded) }, MANIFEST_RESERVE, Long.MAX_VALUE, staged = false)
         return updated
     }
 
@@ -445,11 +500,17 @@ class LocalPackageRepository(
     }
 
     private suspend fun PackageFiles.verify(manifest: PackageManifest, staged: Boolean) {
-        enforceLimit(manifest.id.value, staged, limit(manifest))
+        if (manifest.elevationDataset != bes.max.bmaps.domain.providers.ElevationDataset.NONE && manifest.elevation == null) {
+            fail(PackageFailure.CorruptData)
+        }
+        checkLayerSizes(manifest, staged)
         if (relativeFiles(manifest.id.value, staged) !=
             PackageManifestCodec.assets(manifest).map { it.relativePath }.toSet() + "config.json") fail(PackageFailure.CorruptData)
         for (asset in PackageManifestCodec.assets(manifest)) {
             if (assetSize(manifest.id.value, staged, asset.relativePath) != asset.sizeBytes) fail(PackageFailure.CorruptData)
+        }
+        manifest.elevation?.let {
+            if (!validElevation(manifest.id, it.relativePath, staged)) fail(PackageFailure.CorruptData)
         }
         if (manifest.annotations != null) AnnotationDatabase.access(
             asset(manifest.id.value, staged, "annotations.db").toString(), manifest.id.value, verify = true,
@@ -501,7 +562,14 @@ class LocalPackageRepository(
 
     private suspend fun job(id: PackageId): DownloadJobRecord = records.job(id.value) ?: fail(PackageFailure.NotFound)
     private fun coverage(layer: PackageLayer) = PackageTileCoverage(layer.bounds, layer.zoomRange, layer.zoomLevels)
-    private fun limit(manifest: PackageManifest) = minOf(manifest.sizePolicy.maxBytes, PackageSizePolicy.INITIAL_MAX_BYTES)
+    private fun PackageFiles.checkLayerSizes(manifest: PackageManifest, staged: Boolean): Long {
+        val limit = manifest.sizePolicy.effectiveLayerLimit
+        for (layer in manifest.layers) {
+            val bytes = assetSize(manifest.id.value, staged, layer.tiles.relativePath)
+            if (bytes > limit) throw StorageLimitExceeded(limit, bytes)
+        }
+        return size(manifest.id.value, staged)
+    }
 
     private suspend fun summary(record: PackageRecord): PackageSummary {
         val manifest = record.manifestJson.takeIf { it.isNotEmpty() }?.let {
@@ -572,7 +640,7 @@ internal fun failureOf(error: Throwable): PackageFailure = when (error) {
     is FileNotFoundException -> PackageFailure.NotFound
     is PackageAlreadyExists -> PackageFailure.Conflict
     is StorageLimitExceeded -> PackageFailure.SizeLimitExceeded(error.limit, error.required)
-    is MbTilesSizeExceeded -> PackageFailure.SizeLimitExceeded(PackageSizePolicy.INITIAL_MAX_BYTES, null)
+    is MbTilesSizeExceeded -> PackageFailure.SizeLimitExceeded(PackageSizePolicy.MAX_LAYER_BYTES, null)
     is StorageCapacityExceeded -> PackageFailure.InsufficientStorage(error.required)
     is IllegalArgumentException, is UnsafePackagePath -> PackageFailure.CorruptData
     else -> PackageFailure.Io

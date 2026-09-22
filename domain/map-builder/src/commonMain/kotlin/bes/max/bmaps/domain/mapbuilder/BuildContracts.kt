@@ -27,11 +27,16 @@ data class BuildRequest(
     val bounds: BoundingBox,
     val layers: List<BuildLayerRequest>,
     val sizePolicy: PackageSizePolicy = PackageSizePolicy(),
+    val elevationDataset: bes.max.bmaps.domain.providers.ElevationDataset = bes.max.bmaps.domain.providers.ElevationDataset.NONE,
 )
 
 data class PlannedTile(val layerId: LayerId, val key: TileKey)
 
-data class BuildEstimate(val tileCount: Long, val estimatedPackageBytes: Long?)
+data class BuildEstimate(
+    val tileCount: Long,
+    val estimatedPackageBytes: Long?,
+    val estimatedLargestLayerBytes: Long? = estimatedPackageBytes,
+)
 
 interface DownloadPlanner {
     suspend fun estimate(request: BuildRequest): PackageResult<BuildEstimate>

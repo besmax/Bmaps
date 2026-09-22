@@ -51,7 +51,7 @@ HTTP is consumed inside Ktor's scoped streaming `execute` block, in chunks with 
 
 MapComposeMP 1.1.3's source confirms its provider signature is `suspend getTileStream(row: Int, col: Int, zoomLvl: Int): RawSource?`; the renderer closes the source after decoding and does not recover from arbitrary provider exceptions. The thin renderer bridge and user-visible failure handling are therefore part of 3B/3C.
 
-The per-tile response bound is separate from the 300,000,000-byte total offline-package limit. Package budgeting, storage overhead, and download finalization remain in Phases 4–5.
+The per-tile response bound is separate from the 300,000,000-byte limit on each offline MBTiles layer. Elevation streaming uses an independent request type with 64-bit byte counters and no configured DEM byte cap; physical capacity is enforced on each write.
 
 ## Credential storage
 
@@ -89,7 +89,7 @@ The ArcGIS metadata retrieved on 2026-09-09 advertises JPEG, 256 × 256 tiles, E
 - Android uses OkHttp's 64 MiB disk cache under the app cache directory.
 - iOS uses a dedicated NSURLCache with 8 MiB memory and 64 MiB disk capacity and the native protocol cache policy. The uncached session has no URL cache.
 
-The engines honor HTTP freshness and conditional validation. No default no-cache headers or bulk prefetch are added. Only viewport requests are made. Cache files are disposable OS cache data, separate from encrypted credentials and future offline packages; they do not make a downloaded package or count toward its 300,000,000-byte limit. No Ktor `HttpCache` body-buffering plugin is installed.
+The engines honor HTTP freshness and conditional validation. No default no-cache headers or bulk prefetch are added. Only viewport requests are made. Cache files are disposable OS cache data, separate from encrypted credentials and future offline packages; they do not make a downloaded package or count toward a tile layer’s 300,000,000-byte limit. No Ktor `HttpCache` body-buffering plugin is installed.
 
 The Android native-cache host test uses a local server to verify fresh responses survive client recreation, stale responses send ETag conditional requests and reuse the body after 304, and uncached requests continue to reach the server. Common transport tests verify opt-in routing and rejection of cached query URLs. iOS runtime inspection found 55 persisted OSM responses in its dedicated cache; iOS conditional-revalidation automation remains future verification.
 
@@ -132,3 +132,9 @@ adb shell am instrument -w -e class bes.max.bmaps.AndroidCredentialCipherTest be
 - [Thunderforest tile API](https://www.thunderforest.com/docs/map-tiles-api/) and [terms](https://www.thunderforest.com/terms/), checked 2026-09-09.
 - [ArcGIS service metadata](https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer?f=pjson) and [Esri basemap licensing/attribution requirements](https://developers.arcgis.com/javascript/latest/references/core/layers/WebTileLayer/), checked 2026-09-09.
 - [Apple URLCache](https://developer.apple.com/documentation/foundation/urlcache).
+
+## OpenTopography elevation downloads
+
+The same secure credential store and dialog now support the `opentopography` identifier. `OpenTopographySource` resolves keys at each attempt, and `HttpStreamTransport` uses the uncached client with bounded chunks and no redirects. Missing/rejected keys offer entry/replacement; access denial and rate limits remain separate. See `16_ELEVATION_DOWNLOADS.md` for datasets, provider constraints, persistence, and manual checks.
+
+OpenTopography API and account URLs are owned by `OpenTopographyEndpoints` in `domain:providers`. The credential ViewModel exposes the applicable account URL in state; Compose only asks the platform URI handler to open that value. Endpoint URLs are not embedded in UI code or localized resources.

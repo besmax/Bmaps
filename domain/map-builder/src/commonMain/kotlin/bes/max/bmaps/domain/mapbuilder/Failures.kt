@@ -21,6 +21,12 @@ sealed interface PackageFailure {
     @Serializable
     data object AuthenticationRequired : PackageFailure
     @Serializable
+    data object ElevationCredentialsRequired : PackageFailure
+    @Serializable
+    data object ElevationAccessDenied : PackageFailure
+    @Serializable
+    data object ElevationUnavailable : PackageFailure
+    @Serializable
     data class RateLimited(val retryAfterMillis: Long?) : PackageFailure
     @Serializable
     data object ProviderDownloadNotAllowed : PackageFailure

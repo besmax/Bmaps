@@ -38,7 +38,7 @@ Package queries now include incomplete states by default, allowing the library t
 ## Finalization and reconciliation
 
 1. Create the package and job in one Room transaction before allocating files. Duplicate IDs with a different request conflict. An identical persisted request returns its existing job ID.
-2. Write bounded tile batches. Check physical free space for database/journal growth. Bound committed database pages using the effective package allowance and reserve 1 MiB for the manifest. All assets share `min(manifest limit, 300,000,000)` bytes. Temporary SQLite journals need additional free space; they are not payload progress.
+2. Write bounded tile batches. Check physical free space for database/journal growth. Bound each layer’s committed database pages by `min(sizePolicy.maxLayerBytes, 300,000,000)` bytes. Other layers, elevation, annotations, and metadata do not reduce that allowance. Finalization/opening recheck each MBTiles asset individually. There is no aggregate package-size cap; `config.json` retains a separate 1 MiB format bound. Temporary SQLite journals need additional free space; they are not payload progress.
 3. Require all requested tiles and zero unresolved failures. Persist FINALIZING in Room.
 4. Close databases, record asset sizes and each layer's expected tile count, write/synchronize `config.json`, and verify SQLite integrity, exact requested coordinate coverage, counts, asset sizes, and the complete file inventory. PNG/JPEG signatures are screened on writes/reads; full pixel decoding remains the renderer's responsibility.
 5. Synchronize package files, atomically rename staging to ready, synchronize the parent directories, then commit READY/COMPLETED together in Room.
@@ -49,7 +49,7 @@ Reconciliation does not silently delete user package data. Corrupt or missing as
 
 ## Manifest and elevation
 
-Version 1 serialization explicitly writes defaults, including `"elevation": null`. Every newly constructed package currently has no elevation data, and the library summary persists `hasElevationData = false`. The settings dialog states that elevation is not included. A future DEM import/download can populate the existing `PackageAsset` with the `.geotiff` path and size; no empty DEM file is created today.
+Version 1 serialization explicitly writes defaults. None retains `"elevation": null`; selected OpenTopography downloads persist `elevationDataset`, stream `elevation.geotiff` into staging, and record its `PackageAsset` and `hasElevationData = true` only after file commit. Requested elevation is required for finalization and checked on package opening. TIFF header screening is implemented; full GeoTIFF parsing and sampling remain future work. See `16_ELEVATION_DOWNLOADS.md` for interruption recovery, size limits, and verification.
 
 Final layers carry `tileCount` as completeness evidence in addition to exact zoom selection. Drafts have a null count and cannot be opened. Phase 1 manifests remain serializable, but opening legacy/imported files without this evidence, arbitrary MBTiles layouts, checksums, and externally produced packages requires the Phase 10 importer. A supplied SHA-256 digest is currently rejected rather than accepted without verification.
 

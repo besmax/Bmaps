@@ -14,6 +14,95 @@ import kotlinx.io.bytestring.ByteString
 import kotlinx.io.files.*
 
 internal class PackageStorageScenarios(private val database: (String) -> PackageDatabase) {
+    suspend fun eachLayerHasItsOwnLimitAndElevationIsExcluded() = fixture { root ->
+        var db = database(Path(root, "catalog.db").toString())
+        val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
+        var repository = LocalPackageRepository(PackageCatalog(db), files)
+        val (baseRequest, baseManifest) = fixtureRequest()
+        val policy = PackageSizePolicy(maxLayerBytes = 262_144)
+        val overlayId = LayerId("overlay")
+        val request = baseRequest.copy(sizePolicy = policy, elevationDataset = ElevationDataset.COP30,
+            layers = baseRequest.layers + baseRequest.layers.single().copy(id = overlayId))
+        val manifest = baseManifest.copy(sizePolicy = policy, elevationDataset = ElevationDataset.COP30,
+            layers = baseManifest.layers + baseManifest.layers.single().copy(id = overlayId,
+                tiles = PackageAsset("layers/overlay.mbtiles", 0)))
+        val id = request.packageId
+        val dem = ByteArray(300_000).apply { byteArrayOf(73, 73, 42, 0, 8, 0, 0, 0).copyInto(this) }
+        fun tile(key: TileKey, length: Int) = DownloadedTile(key, ByteString(ByteArray(length).apply {
+            byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10).copyInto(this)
+        }))
+        try {
+            repository.prepare(request, manifest).success()
+            repository.beginElevation(id).success()
+            repository.appendElevation(id, dem, dem.size).success()
+            repository.finishElevation(id).success()
+            val keys = PackageTileCoverage(request.bounds, ZoomRange(0, 1), emptySet()).tiles().toList()
+            val baseId = manifest.layers.first().id
+            val oversized = repository.write(id, baseId, listOf(tile(keys.first(), 300_000)), emptyList(), 300_000)
+            assertEquals(PackageFailure.SizeLimitExceeded(policy.maxLayerBytes, null), assertIs<PackageResult.Failure>(oversized).reason)
+            assertFalse(repository.contains(id, baseId, keys.first()).success())
+            repository.setState(id, BuildJobState.RUNNING).success()
+            for (layer in manifest.layers) {
+                repository.write(id, layer.id, keys.map { tile(it, 32_000) }, emptyList(), 160_000).success()
+            }
+            repository.finalize(id).success()
+            db.close()
+            db = database(Path(root, "catalog.db").toString())
+            repository = LocalPackageRepository(PackageCatalog(db), files)
+            val opened = repository.open(id).success()
+            assertTrue(opened.manifest.layers.all { it.tiles.sizeBytes <= policy.maxLayerBytes })
+            assertTrue(opened.manifest.layers.sumOf { it.tiles.sizeBytes } > policy.maxLayerBytes)
+            assertEquals(300_000L, opened.manifest.elevation?.sizeBytes)
+            opened.close()
+            repository.saveAnnotations(id, listOf(Annotation("point", AnnotationKind.MARKER,
+                listOf(GeographicCoordinate(0.0, 0.0))))).success()
+            repository.open(id).success().close()
+        } finally { db.close() }
+    }
+
+    suspend fun elevationIsRequiredAndSurvivesRestart() = fixture { root ->
+        var db = database(Path(root, "catalog.db").toString())
+        val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
+        var repository = LocalPackageRepository(PackageCatalog(db), files)
+        val (baseRequest, baseManifest) = fixtureRequest(ZoomRange(0, 0))
+        val request = baseRequest.copy(elevationDataset = ElevationDataset.COP30)
+        val manifest = baseManifest.copy(elevationDataset = ElevationDataset.COP30)
+        val id = request.packageId
+        val tile = DownloadedTile(TileKey(0, 0, 0), ByteString(byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)))
+        val tiff = byteArrayOf(73, 73, 42, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        try {
+            repository.prepare(request, manifest).success()
+            repository.write(id, manifest.layers.single().id, listOf(tile), emptyList(), 8).success()
+            assertEquals(PackageFailure.NotReady, assertIs<PackageResult.Failure>(repository.finalize(id)).reason)
+            repository.beginElevation(id).success()
+            repository.appendElevation(id, "invalid".encodeToByteArray(), 7).success()
+            assertEquals(PackageFailure.CorruptData, assertIs<PackageResult.Failure>(repository.finishElevation(id)).reason)
+            repository.discardElevation(id).success()
+            repository.beginElevation(id).success()
+            repository.appendElevation(id, tiff, tiff.size).success()
+            db.close()
+            db = database(Path(root, "catalog.db").toString())
+            repository = LocalPackageRepository(PackageCatalog(db), files)
+            repository.reconcile().success()
+            assertFalse(repository.elevationComplete(id).success())
+            assertFalse(files.access { relativeFiles(id.value, true).any { it.endsWith(".part") } })
+            repository.beginElevation(id).success()
+            repository.appendElevation(id, tiff, tiff.size).success()
+            repository.finishElevation(id).success()
+            assertTrue(repository.elevationComplete(id).success())
+            repository.finalize(id).success()
+            db.close()
+            db = database(Path(root, "catalog.db").toString())
+            repository = LocalPackageRepository(PackageCatalog(db), files)
+            val opened = repository.open(id).success()
+            assertEquals(ElevationDataset.COP30, opened.manifest.elevationDataset)
+            assertEquals(PackageAsset("elevation.geotiff", tiff.size.toLong()), opened.manifest.elevation)
+            assertTrue(repository.observe(id).first().success().hasElevationData)
+            assertContentEquals(tiff, files.access { read(id.value, false, "elevation.geotiff", 100) })
+            opened.close()
+        } finally { db.close() }
+    }
+
     suspend fun annotationsSurviveRestartAndStayIsolated() = fixture { root ->
         var db = database(Path(root, "catalog.db").toString())
         val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
@@ -225,7 +314,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             assertEquals(listOf("b"), favouritePage.items.map { it.id })
             assertEquals(listOf("c"), catalog.observe(favourites, 1, favouritePage.nextCursor).first().items.map { it.id })
             assertFailsWith<IllegalArgumentException> { catalog.observe(favourites, 2, first.nextCursor) }
-            val tiles = MbTiles.create(Path(root, "fixture.mbtiles").toString(), mapOf("format" to "png"))
+            val tiles = MbTiles.create(Path(SystemFileSystem.resolve(root), "fixture.mbtiles").toString(), mapOf("format" to "png"))
             try {
                 val address = TileAddress(2, 1, 0)
                 assertEquals(3L, MbTiles.tmsRow(address))

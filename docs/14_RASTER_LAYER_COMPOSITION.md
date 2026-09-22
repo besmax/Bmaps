@@ -10,7 +10,7 @@ A two-thumb, integer-stepped range slider selects minimum and maximum zoom, incl
 
 Every layer inherits exactly the selected geographic bounds and zoom levels. Presentation validates each provider’s declared coverage, Web Mercator projection, square tile dimensions, supported zoom levels, raster content, and configured download permission before submission. Tile dimensions must match across providers. Changing zoom selection triggers validation again on submission. Credential resolution and current provider capability checks remain in the existing provider/download infrastructure. No reprojection, offsets, tile resizing, or zoom substitution is attempted. Reopening an incompatible package reports an alignment error before renderer configuration.
 
-Tile count and size estimates include all requested layers regardless of visibility. All layer assets share the existing 300,000,000-byte package limit. At most 32 layers are supported. Layers can be hidden without excluding them from the download.
+Tile count and size estimates include all requested layers regardless of visibility. Each tile layer has its own 300,000,000-byte limit, including MBTiles overhead. Total package size can exceed 300 MB, and elevation/annotations do not consume a layer’s allowance. At most 32 layers are supported. Layers can be hidden without excluding them from the download.
 
 ## Configuration and rendering
 
@@ -48,4 +48,4 @@ Manual acceptance:
 3. Interrupt during the overlay and between workers. Restore after app/process restart; verify no network access to the completed root provider.
 4. Open offline and change each opacity independently, hide the root, hide all layers, and reorder the root above/below the satellite layer. Confirm alignment and expected blending.
 5. Save, close, and reopen to verify settings. Preview a second edit and cancel to verify rollback. Exercise existing sparse packages and date-line halves.
-6. Reject mismatched provider coverage, matrix dimensions, CRS, or selected levels before composition. Verify atomic settings recovery and package limits under storage pressure.
+6. Reject mismatched provider coverage, matrix dimensions, CRS, or selected levels before composition. Verify atomic settings recovery and per-layer limits and whole-download free-space checks under storage pressure.

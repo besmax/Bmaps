@@ -90,7 +90,7 @@ class KtorHttpTransport(private val clients: HttpClients) : HttpTransport {
     }
 }
 
-private fun retryAfter(value: String?): Long? {
+internal fun retryAfter(value: String?): Long? {
     if (value == null) return null
     value.toLongOrNull()?.let { return if (it >= 0) it.coerceAtMost(Long.MAX_VALUE / 1000) * 1000 else null }
     return try {

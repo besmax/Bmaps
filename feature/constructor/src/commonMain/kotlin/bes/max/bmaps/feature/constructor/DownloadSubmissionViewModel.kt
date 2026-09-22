@@ -4,6 +4,8 @@ package bes.max.bmaps.feature.constructor
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import bes.max.bmaps.core.datastore.ProviderCredentials
+import bes.max.bmaps.core.datastore.CredentialResult
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
 import bes.max.bmaps.domain.mapbuilder.*
@@ -24,15 +26,21 @@ data class DownloadSubmissionState(
     val error: StringResource? = null, val policyError: StringResource? = null,
 )
 
+sealed interface DownloadSubmissionEvent {
+    data object Started : DownloadSubmissionEvent
+    data object ElevationCredentials : DownloadSubmissionEvent
+}
+
 @Inject
 @ViewModelKey
 @ContributesIntoMap(AppScope::class)
 class DownloadSubmissionViewModel(
     private val storage: PackageBuildStorage, private val executor: DownloadExecutor, private val planner: DownloadPlanner,
+    private val credentials: ProviderCredentials,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(DownloadSubmissionState())
     val state = mutableState.asStateFlow()
-    private val channel = Channel<Unit>(Channel.BUFFERED)
+    private val channel = Channel<DownloadSubmissionEvent>(Channel.BUFFERED)
     val events = channel.receiveAsFlow()
     private var request: BuildRequest? = null
 
@@ -63,26 +71,34 @@ class DownloadSubmissionViewModel(
                 zoomLevels = levels, visible = settings.rootVisible)) + settings.layers.map { layer ->
                 BuildLayerRequest(LayerId(layer.id), layer.choice.id, layer.choice.provider.configFor(layer.choice.style),
                     ZoomRange(levels.min(), levels.max()), zoomLevels = levels, visible = layer.visible)
-            })
+            }, elevationDataset = settings.elevationDataset)
         val previous = request
         val submitting = if (previous != null && previous.copy(packageId = candidate.packageId) == candidate) previous
             else candidate.copy(packageId = PackageId(Uuid.random().toString())).also { request = it }
         mutableState.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
+                if (settings.elevationDataset != ElevationDataset.NONE &&
+                    credentials.read(OPENTOPOGRAPHY_CREDENTIAL) !is CredentialResult.Available) {
+                    mutableState.update { it.copy(error = Res.string.elevation_key_required) }
+                    channel.send(DownloadSubmissionEvent.ElevationCredentials)
+                    return@launch
+                }
                 val estimate = planner.estimate(submitting)
-                val bytes = (estimate as? PackageResult.Success)?.value?.estimatedPackageBytes
+                val estimated = (estimate as? PackageResult.Success)?.value
+                val bytes = estimated?.estimatedPackageBytes
+                val layerBytes = estimated?.estimatedLargestLayerBytes
                 val capacity = (storage.availableBytes() as? PackageResult.Success)?.value
                 val failure = when {
-                    bytes == null -> Res.string.selection_estimate_unavailable
-                    bytes > PackageSizePolicy.INITIAL_MAX_BYTES -> Res.string.package_size_limit_exceeded
+                    bytes == null || layerBytes == null -> Res.string.selection_estimate_unavailable
+                    layerBytes > submitting.sizePolicy.effectiveLayerLimit -> Res.string.package_size_limit_exceeded
                     capacity == null -> Res.string.download_storage_unavailable
-                    capacity < bytes * 2 -> Res.string.download_insufficient_storage
+                    bytes > capacity / 2 -> Res.string.download_insufficient_storage
                     else -> null
                 }
                 if (failure != null) { mutableState.update { it.copy(error = failure, availableBytes = capacity) }; return@launch }
                 when (val result = executor.start(submitting)) {
-                    is PackageResult.Success -> channel.send(Unit)
+                    is PackageResult.Success -> channel.send(DownloadSubmissionEvent.Started)
                     is PackageResult.Failure -> mutableState.update { it.copy(error = when (result.reason) {
                         PackageFailure.ProviderDownloadNotAllowed -> Res.string.download_permission_unverified
                         PackageFailure.AuthenticationRequired -> Res.string.download_credentials_required
@@ -99,6 +115,7 @@ class DownloadSubmissionViewModel(
 }
 
 internal fun validateDownload(settings: MapSaveSettings, config: ProviderConfig): StringResource? {
+    if (!settings.elevationDataset.supportsRequest(settings.bounds)) return Res.string.elevation_area_unsupported
     if (settings.name.isBlank() || settings.name.length > 120 || settings.name.any { it.code < 32 }) return Res.string.invalid_map_name
     val selected = settings.levels
     if (selected.isEmpty()) return Res.string.zoom_selection_required

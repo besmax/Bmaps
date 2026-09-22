@@ -1,6 +1,6 @@
 <resources>
     <string name="library_network_failed">The connection failed. Check your network, then restore this map.</string>
-    <string name="library_size_limit">The map reached its size limit. Recreate it with a smaller area or fewer zoom levels.</string>
+    <string name="library_size_limit">A tile layer reached the 300 MB limit. Recreate the map with a smaller area or fewer zoom levels.</string>
     <string name="library_storage_full">Storage is full. Free some space, then restore this map.</string>
     <string name="library_rate_limited">The provider is limiting requests. Wait before restoring.</string>
     <string name="library_tiles_unavailable">The provider did not return some tiles. You can try them again with Restore.</string>
@@ -53,4 +53,10 @@
     <string name="avatar_city">City</string>
     <string name="avatar_camp">Camp</string>
     <string name="library_no_matches">No maps match these filters.</string>
+    <string name="library_elevation_key_required">OpenTopography rejected the key, or it is missing. If it expired or was revoked, save a new key and retry this download. Completed map tiles are kept.</string>
+    <string name="library_elevation_access_denied">OpenTopography denied access. Check your account and dataset access, or replace your API key, then retry.</string>
+    <string name="library_elevation_unavailable">OpenTopography cannot supply elevation for this area or request. Check dataset coverage and request limits.</string>
+    <string name="library_elevation_replace_key">Replace OpenTopography key</string>
+    <string name="library_finishing_assets">Downloading elevation and finishing map</string>
+    <string name="library_assets_incomplete">Map tiles are saved. The remaining download or finalization needs to be retried.</string>
 </resources>

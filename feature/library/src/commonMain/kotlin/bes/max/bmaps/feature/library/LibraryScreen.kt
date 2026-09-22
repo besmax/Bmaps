@@ -23,7 +23,7 @@ import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.getString
 
 @Composable
-fun LibraryScreen(onBuildMap: () -> Unit, onOpenMap: (PackageId) -> Unit) {
+fun LibraryScreen(onBuildMap: () -> Unit, onOpenMap: (PackageId) -> Unit, onCredentials: (String) -> Unit) {
     val model = metroViewModel<LibraryViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -62,7 +62,7 @@ fun LibraryScreen(onBuildMap: () -> Unit, onOpenMap: (PackageId) -> Unit) {
                         Text(stringResource(when (progress.state) {
                             BuildJobState.QUEUED -> Res.string.library_queued
                             BuildJobState.FINALIZING -> Res.string.library_finalizing
-                            else -> Res.string.library_downloading
+                            else -> if (progress.missingTiles == 0L) Res.string.library_finishing_assets else Res.string.library_downloading
                         }))
                         LinearProgressIndicator(progress = { if (progress.totalTiles == 0L) 0f else
                             (progress.completedTiles.toDouble() / progress.totalTiles).toFloat() }, modifier = Modifier.fillMaxWidth())
@@ -97,11 +97,15 @@ fun LibraryScreen(onBuildMap: () -> Unit, onOpenMap: (PackageId) -> Unit) {
                         Text(stringResource(Res.string.library_size, megabytes(map.sizeBytes)))
                         Text(stringResource(if (map.hasElevationData) Res.string.library_elevation_present else Res.string.library_no_elevation))
                         if (map.state in setOf(PackageState.FAILED, PackageState.PAUSED)) {
-                            Text(stringResource(Res.string.library_missing_warning, map.missingTiles), color = MaterialTheme.colorScheme.error)
+                            Text(if (map.missingTiles == 0L) stringResource(Res.string.library_assets_incomplete)
+                                else stringResource(Res.string.library_missing_warning, map.missingTiles), color = MaterialTheme.colorScheme.error)
                             state.progress.find { it.packageId == map.id }?.failure?.let { failure ->
                                 Text(stringResource(when (failure) {
                                     PackageFailure.NetworkUnavailable -> Res.string.library_network_failed
                                     PackageFailure.AuthenticationRequired -> Res.string.library_credentials_required
+                                    PackageFailure.ElevationCredentialsRequired -> Res.string.library_elevation_key_required
+                                    PackageFailure.ElevationAccessDenied -> Res.string.library_elevation_access_denied
+                                    PackageFailure.ElevationUnavailable -> Res.string.library_elevation_unavailable
                                     PackageFailure.ProviderDownloadNotAllowed -> Res.string.library_provider_blocked
                                     is PackageFailure.SizeLimitExceeded -> Res.string.library_size_limit
                                     is PackageFailure.InsufficientStorage -> Res.string.library_storage_full
@@ -110,6 +114,12 @@ fun LibraryScreen(onBuildMap: () -> Unit, onOpenMap: (PackageId) -> Unit) {
                                     PackageFailure.Conflict -> Res.string.library_source_changed
                                     else -> Res.string.library_action_failed
                                 }))
+                            }
+                            if (state.progress.find { it.packageId == map.id }?.failure in
+                                setOf(PackageFailure.ElevationCredentialsRequired, PackageFailure.ElevationAccessDenied)) {
+                                TextButton(onClick = { onCredentials(bes.max.bmaps.domain.providers.OPENTOPOGRAPHY_CREDENTIAL) }) {
+                                    Text(stringResource(Res.string.library_elevation_replace_key))
+                                }
                             }
                             TextButton(onClick = { model.restore(map.id) }, enabled = map.id !in state.busy) { Text(stringResource(Res.string.library_restore)) }
                         } else if (map.state in setOf(PackageState.CORRUPT, PackageState.MISSING)) {

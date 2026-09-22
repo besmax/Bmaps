@@ -42,10 +42,33 @@ class DownloadRunner(
     private val storage: PackageBuildStorage,
     private val providers: ProviderRepository,
     private val sources: DownloadSourceOpener,
+    private val elevation: ElevationSource,
 ) {
     private val lock = Mutex()
     private val running = mutableMapOf<BuildJobId, Job>()
     private val downloads = Semaphore(4)
+
+    private suspend fun downloadElevation(request: BuildRequest) {
+        if (request.elevationDataset == ElevationDataset.NONE || storage.elevationComplete(request.packageId).valueOrThrow()) return
+        storage.beginElevation(request.packageId).valueOrThrow()
+        try {
+            val result = elevation.download(request.elevationDataset, request.bounds) { bytes, count ->
+                storage.appendElevation(request.packageId, bytes, count).valueOrThrow()
+            }
+            val failure = when (result) {
+                ElevationDownloadResult.Complete -> null
+                ElevationDownloadResult.CredentialsRequired -> PackageFailure.ElevationCredentialsRequired
+                ElevationDownloadResult.AccessDenied -> PackageFailure.ElevationAccessDenied
+                ElevationDownloadResult.NoData, ElevationDownloadResult.InvalidRequest -> PackageFailure.ElevationUnavailable
+                ElevationDownloadResult.Network -> PackageFailure.NetworkUnavailable
+                is ElevationDownloadResult.RateLimited -> PackageFailure.RateLimited(result.retryAfterMillis)
+            }
+            if (failure != null) throw PackageStorageException(failure)
+            storage.finishElevation(request.packageId).valueOrThrow()
+        } finally {
+            withContext(NonCancellable) { storage.discardElevation(request.packageId) }
+        }
+    }
 
     suspend fun stop(id: BuildJobId) { lock.withLock { running[id] }?.cancelAndJoin() }
 
@@ -62,7 +85,7 @@ class DownloadRunner(
             if (progress.state !in setOf(BuildJobState.QUEUED, BuildJobState.RUNNING, BuildJobState.FINALIZING)) {
                 return PackageResult.Failure(PackageFailure.Conflict)
             }
-            if (progress.state == BuildJobState.FINALIZING || progress.missingTiles == 0L) {
+            if (progress.state == BuildJobState.FINALIZING) {
                 storage.finalize(progress.packageId).valueOrThrow()
                 return PackageResult.Success(Unit)
             }
@@ -118,6 +141,7 @@ class DownloadRunner(
             }
             val final = storage.observeProgress(id).first().valueOrThrow()
             if (final.missingTiles > 0) throw PackageStorageException(PackageFailure.TileUnavailable)
+            downloadElevation(request)
             storage.finalize(request.packageId).valueOrThrow()
             return PackageResult.Success(Unit)
         } catch (cancelled: CancellationException) {

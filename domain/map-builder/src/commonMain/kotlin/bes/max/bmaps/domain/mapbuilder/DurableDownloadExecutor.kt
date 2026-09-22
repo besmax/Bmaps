@@ -48,7 +48,7 @@ class DurableDownloadExecutor(
             }
             val manifest = PackageManifest(PackageManifest.CURRENT_SCHEMA_VERSION, request.packageId, request.name,
                 request.bounds, ZoomRange(layers.minOf { it.zoomRange.min }, layers.maxOf { it.zoomRange.max }),
-                0, 0, layers, sizePolicy = request.sizePolicy)
+                0, 0, layers, sizePolicy = request.sizePolicy, elevationDataset = request.elevationDataset)
             val id = storage.prepare(request, manifest).valueOrThrow()
             if (storage.observeProgress(id).first().valueOrThrow().state != BuildJobState.COMPLETED) enqueue(id)
             id

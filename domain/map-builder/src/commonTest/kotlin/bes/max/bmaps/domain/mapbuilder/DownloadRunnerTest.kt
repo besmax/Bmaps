@@ -16,7 +16,7 @@ class DownloadRunnerTest {
         val missing = TileKey(1, 0, 0)
         var unavailable = true
         var closed = 0
-        val runner = DownloadRunner(storage, fixtureProviders(), DownloadSourceOpener {
+        val runner = runner(storage, fixtureProviders(), DownloadSourceOpener {
             OnlineSourceResult.Available(object : TileSource {
                 override suspend fun read(key: TileKey): TileReadResult {
                     attempts[key] = (attempts[key] ?: 0) + 1
@@ -45,7 +45,7 @@ class DownloadRunnerTest {
         val storage = MemoryBuildStorage()
         val entered = CompletableDeferred<Unit>()
         var closed = false
-        val runner = DownloadRunner(storage, fixtureProviders(), DownloadSourceOpener {
+        val runner = runner(storage, fixtureProviders(), DownloadSourceOpener {
             OnlineSourceResult.Available(object : TileSource {
                 override suspend fun read(key: TileKey): TileReadResult { entered.complete(Unit); awaitCancellation() }
                 override suspend fun close() { closed = true }
@@ -65,7 +65,7 @@ class DownloadRunnerTest {
     @Test
     fun networkFailureRemainsMissingAndActionable() = runTest {
         val storage = MemoryBuildStorage()
-        val runner = DownloadRunner(storage, fixtureProviders(), DownloadSourceOpener {
+        val runner = runner(storage, fixtureProviders(), DownloadSourceOpener {
             OnlineSourceResult.Available(object : TileSource {
                 override suspend fun read(key: TileKey) = TileReadResult.Failed(TileReadFailure.NETWORK)
                 override suspend fun close() = Unit
@@ -81,7 +81,7 @@ class DownloadRunnerTest {
     @Test
     fun revokedPermissionPreventsNetworkAccess() = runTest {
         val storage = MemoryBuildStorage()
-        val runner = DownloadRunner(storage, fixtureProviders(OfflineDownloadPermission.PROHIBITED), DownloadSourceOpener {
+        val runner = runner(storage, fixtureProviders(OfflineDownloadPermission.PROHIBITED), DownloadSourceOpener {
             error("A prohibited provider must never be opened")
         })
         assertEquals(PackageFailure.ProviderDownloadNotAllowed, assertIs<PackageResult.Failure>(runner.run(jobId)).reason)
@@ -94,7 +94,7 @@ class DownloadRunnerTest {
         PackageTileCoverage(request.bounds, ZoomRange(0, 1), emptySet()).tiles().forEach {
             storage.write(packageId, layerId, listOf(DownloadedTile(it, bytes)), emptyList(), bytes.size.toLong())
         }
-        val runner = DownloadRunner(storage, fixtureProviders(OfflineDownloadPermission.PROHIBITED), DownloadSourceOpener {
+        val runner = runner(storage, fixtureProviders(OfflineDownloadPermission.PROHIBITED), DownloadSourceOpener {
             error("Finalization must use already stored tiles")
         })
         assertIs<PackageResult.Success<Unit>>(runner.run(jobId))
@@ -105,9 +105,20 @@ class DownloadRunnerTest {
     fun aStaleScheduledTaskCannotResumeAManuallyPausedMap() = runTest {
         val storage = MemoryBuildStorage()
         storage.setState(packageId, BuildJobState.PAUSED)
-        val runner = DownloadRunner(storage, fixtureProviders(), DownloadSourceOpener { error("Paused work must not fetch tiles") })
+        val runner = runner(storage, fixtureProviders(), DownloadSourceOpener { error("Paused work must not fetch tiles") })
         assertEquals(PackageFailure.Conflict, assertIs<PackageResult.Failure>(runner.run(jobId)).reason)
         assertEquals(BuildJobState.PAUSED, storage.progress.value.state)
+    }
+
+    @Test fun plannerSeparatesLargestLayerFromCombinedLayersAndElevation() = runTest {
+        val layers = request.layers.map { it.copy(zoomRange = ZoomRange(0, 6), zoomLevels = emptySet()) }
+        val selected = request.copy(layers = layers + layers.single().copy(id = LayerId("overlay")),
+            elevationDataset = ElevationDataset.COP30)
+        val estimate = TileDownloadPlanner().estimate(selected).valueOrThrow()
+        assertTrue(assertNotNull(estimate.estimatedLargestLayerBytes) < PackageSizePolicy.MAX_LAYER_BYTES)
+        assertTrue(assertNotNull(estimate.estimatedPackageBytes) > PackageSizePolicy.MAX_LAYER_BYTES)
+        assertEquals(TileDownloadPlanner().estimate(selected.copy(elevationDataset = ElevationDataset.NONE)).valueOrThrow().estimatedLargestLayerBytes,
+            estimate.estimatedLargestLayerBytes)
     }
 
     @Test
@@ -127,7 +138,7 @@ class DownloadRunnerTest {
         val storage = MemoryBuildStorage(request.copy(layers = request.layers + overlay))
         val opened = mutableListOf<LayerId>()
         var rootUnavailable = true
-        val runner = DownloadRunner(storage, fixtureProviders(), DownloadSourceOpener { layer ->
+        val runner = runner(storage, fixtureProviders(), DownloadSourceOpener { layer ->
             opened += layer.id
             OnlineSourceResult.Available(object : TileSource {
                 override suspend fun read(key: TileKey): TileReadResult =
@@ -155,9 +166,74 @@ class DownloadRunnerTest {
 
     @Test fun additionalWorkerCannotRunBeforeRootCompletes() = runTest {
         val storage = MemoryBuildStorage(request.copy(layers = request.layers + request.layers.single().copy(id = LayerId("overlay"))))
-        val runner = DownloadRunner(storage, fixtureProviders(), DownloadSourceOpener { error("Root is incomplete") })
+        val runner = runner(storage, fixtureProviders(), DownloadSourceOpener { error("Root is incomplete") })
         assertEquals(PackageFailure.TileUnavailable, assertIs<PackageResult.Failure>(runner.run(jobId, 1)).reason)
         assertEquals(0L, storage.progress.value.completedTiles)
+    }
+
+    private fun runner(storage: PackageBuildStorage, providers: ProviderRepository, sources: DownloadSourceOpener,
+        elevation: ElevationSource = ElevationSource { _, _, _ -> error("Elevation was not requested") }) =
+        DownloadRunner(storage, providers, sources, elevation)
+
+    @Test fun elevationAuthenticationFailureRetainsTilesAndRetryUsesNewSource() = runTest {
+        val storage = MemoryBuildStorage(request.copy(elevationDataset = ElevationDataset.COP30))
+        PackageTileCoverage(request.bounds, ZoomRange(0, 1), emptySet()).tiles().forEach {
+            storage.write(packageId, layerId, listOf(DownloadedTile(it, bytes)), emptyList(), 0)
+        }
+        var authorized = false
+        var calls = 0
+        val runner = runner(storage, fixtureProviders(), DownloadSourceOpener { error("Tiles are complete") },
+            ElevationSource { dataset, _, consume ->
+                calls++
+                assertEquals(ElevationDataset.COP30, dataset)
+                if (!authorized) ElevationDownloadResult.CredentialsRequired else {
+                    consume(byteArrayOf(1, 2, 3), 3)
+                    ElevationDownloadResult.Complete
+                }
+            })
+        assertEquals(PackageFailure.ElevationCredentialsRequired, assertIs<PackageResult.Failure>(runner.run(jobId)).reason)
+        assertEquals(0L, storage.progress.value.missingTiles)
+        assertFalse(storage.finalized)
+        assertEquals(0, storage.partialElevationBytes)
+        authorized = true
+        storage.setState(packageId, BuildJobState.QUEUED)
+        assertIs<PackageResult.Success<Unit>>(runner.run(jobId))
+        assertTrue(storage.elevationReady)
+        assertTrue(storage.finalized)
+        assertEquals(2, calls)
+    }
+
+    @Test fun cancelledElevationDiscardsPartialFileAndRestartsWithoutTiles() = runTest {
+        val storage = MemoryBuildStorage(request.copy(elevationDataset = ElevationDataset.COP90))
+        PackageTileCoverage(request.bounds, ZoomRange(0, 1), emptySet()).tiles().forEach {
+            storage.write(packageId, layerId, listOf(DownloadedTile(it, bytes)), emptyList(), 0)
+        }
+        val entered = CompletableDeferred<Unit>()
+        val runner = runner(storage, fixtureProviders(), DownloadSourceOpener { error("Tiles are complete") },
+            ElevationSource { _, _, consume ->
+                consume(byteArrayOf(1), 1)
+                entered.complete(Unit)
+                awaitCancellation()
+            })
+        val execution = launch { runner.run(jobId) }
+        entered.await()
+        runner.stop(jobId)
+        execution.join()
+        assertEquals(BuildJobState.PAUSED, storage.progress.value.state)
+        assertEquals(0, storage.partialElevationBytes)
+        assertFalse(storage.elevationReady)
+        assertFalse(storage.finalized)
+    }
+
+    @Test fun completedElevationIsNotFetchedAgainAfterFinalizationFailure() = runTest {
+        val storage = MemoryBuildStorage(request.copy(elevationDataset = ElevationDataset.NASADEM))
+        PackageTileCoverage(request.bounds, ZoomRange(0, 1), emptySet()).tiles().forEach {
+            storage.write(packageId, layerId, listOf(DownloadedTile(it, bytes)), emptyList(), 0)
+        }
+        storage.elevationReady = true
+        val runner = runner(storage, fixtureProviders(), DownloadSourceOpener { error("Tiles are complete") })
+        assertIs<PackageResult.Success<Unit>>(runner.run(jobId))
+        assertTrue(storage.finalized)
     }
 
     private class MemoryBuildStorage(val build: BuildRequest = request) : PackageBuildStorage {
@@ -166,6 +242,15 @@ class DownloadRunnerTest {
         private val downloaded = mutableSetOf<Pair<LayerId, TileKey>>()
         private val failed = mutableSetOf<Pair<LayerId, TileKey>>()
         var finalized = false
+        var elevationReady = false
+        var partialElevationBytes = 0
+        override suspend fun elevationComplete(id: PackageId) = PackageResult.Success(elevationReady)
+        override suspend fun beginElevation(id: PackageId): PackageResult<Unit> { partialElevationBytes = 0; return PackageResult.Success(Unit) }
+        override suspend fun appendElevation(id: PackageId, bytes: ByteArray, count: Int): PackageResult<Unit> {
+            partialElevationBytes += count; return PackageResult.Success(Unit)
+        }
+        override suspend fun finishElevation(id: PackageId): PackageResult<Unit> { elevationReady = true; return PackageResult.Success(Unit) }
+        override suspend fun discardElevation(id: PackageId): PackageResult<Unit> { partialElevationBytes = 0; return PackageResult.Success(Unit) }
 
         override suspend fun availableBytes() = PackageResult.Success(1_000_000_000L)
         override suspend fun prepare(request: BuildRequest, manifest: PackageManifest) = PackageResult.Success(jobId)
@@ -185,6 +270,7 @@ class DownloadRunnerTest {
         }
         override suspend fun finalize(id: PackageId): PackageResult<Unit> {
             check(downloaded.size.toLong() == total && failed.isEmpty())
+            check(build.elevationDataset == ElevationDataset.NONE || elevationReady)
             finalized = true
             progress.value = progress.value.copy(state = BuildJobState.COMPLETED)
             return PackageResult.Success(Unit)

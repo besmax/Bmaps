@@ -1,6 +1,8 @@
 package bes.max.bmaps.feature.constructor
 
 import bes.max.bmaps.core.datastore.*
+import bes.max.bmaps.domain.providers.OPENTOPOGRAPHY_CREDENTIAL
+import bes.max.bmaps.domain.providers.OpenTopographyEndpoints
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.*
@@ -20,6 +22,9 @@ class ProviderCredentialsViewModelTest {
                 override suspend fun remove(identifier: String): CredentialWriteResult { removed = true; return result }
             }
             val model = ProviderCredentialsViewModel(repository)
+            model.load(OPENTOPOGRAPHY_CREDENTIAL)
+            runCurrent()
+            assertEquals(OpenTopographyEndpoints.account, model.state.value.keyRequestUrl)
             model.edit(" ")
             model.save("test")
             runCurrent()

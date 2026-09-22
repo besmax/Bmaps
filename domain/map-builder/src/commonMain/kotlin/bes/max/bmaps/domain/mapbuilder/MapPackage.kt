@@ -16,10 +16,15 @@ data class PackageId(val value: String)
 @Serializable
 data class LayerId(val value: String)
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @Serializable
-data class PackageSizePolicy(val maxBytes: Long = INITIAL_MAX_BYTES) {
+data class PackageSizePolicy(
+    @kotlinx.serialization.json.JsonNames("maxBytes")
+    val maxLayerBytes: Long = MAX_LAYER_BYTES,
+) {
+    val effectiveLayerLimit: Long get() = minOf(maxLayerBytes, MAX_LAYER_BYTES)
     companion object {
-        const val INITIAL_MAX_BYTES: Long = 300_000_000L
+        const val MAX_LAYER_BYTES: Long = 300_000_000L
     }
 }
 
@@ -61,6 +66,7 @@ data class PackageManifest(
     val elevation: PackageAsset? = null,
     val auxiliaryAssets: List<PackageAsset> = emptyList(),
     val sizePolicy: PackageSizePolicy = PackageSizePolicy(),
+    val elevationDataset: bes.max.bmaps.domain.providers.ElevationDataset = bes.max.bmaps.domain.providers.ElevationDataset.NONE,
 ) {
     companion object {
         const val CURRENT_SCHEMA_VERSION: Int = 1

@@ -13,6 +13,8 @@ kotlin {
         implementation(libs.kotlinx.coroutines.core)
     }
     sourceSets.commonTest.dependencies {
+        implementation(project(":core:datastore"))
+        implementation(project(":core:network"))
         implementation(libs.ktor.client.mock)
         implementation(libs.kotlinx.coroutines.test)
     }

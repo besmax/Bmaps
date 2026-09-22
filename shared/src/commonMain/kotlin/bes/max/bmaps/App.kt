@@ -44,6 +44,7 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
             NavHost(navController = navigation, startDestination = startDestination.route) {
                 composable(ShellDestination.LIBRARY.route) {
                     LibraryScreen(onBuildMap = { navigate(ShellDestination.CONSTRUCTOR) },
+                        onCredentials = { navigation.navigate("provider-credentials/$it") },
                         onOpenMap = { navigation.navigate("viewer/${it.value}") { launchSingleTop = true } })
                 }
                 composable(ShellDestination.CONSTRUCTOR.route) {
@@ -62,6 +63,7 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
                 dialog(MapSettingsRoute) {
                     val mapEntry = remember(it) { navigation.getBackStackEntry(MapRoute) }
                     MapSaveSettingsContent(mapEntry,
+                        onCredentials = { navigation.navigate("provider-credentials/$it") },
                         onStarted = { navigation.navigate(ShellDestination.LIBRARY.route) {
                             popUpTo(ShellDestination.LIBRARY.route)
                             launchSingleTop = true

@@ -150,6 +150,36 @@ class PackageFiles internal constructor(private val root: Path) {
         }
     }
 
+    fun beginStream(id: String, relativePath: String) {
+        val path = asset(id, true, "$relativePath.part")
+        fs.createDirectories(checkNotNull(path.parent))
+        fs.delete(asset(id, true, relativePath), mustExist = false)
+        fs.sink(path).close()
+    }
+
+    fun appendStream(id: String, relativePath: String, bytes: ByteArray, count: Int) {
+        require(count in 1..bytes.size)
+        requireCapacity(count.toLong() + 65_536)
+        fs.sink(asset(id, true, "$relativePath.part"), append = true).buffered().use { it.write(bytes, 0, count) }
+    }
+
+    fun finishStream(id: String, relativePath: String) {
+        val source = asset(id, true, "$relativePath.part")
+        val destination = asset(id, true, relativePath)
+        syncPath(source.toString(), false)
+        fs.atomicMove(source, destination)
+        syncPath(checkNotNull(destination.parent).toString(), true)
+    }
+
+    fun discardStream(id: String, relativePath: String) {
+        fs.delete(asset(id, true, "$relativePath.part"), mustExist = false)
+    }
+
+    fun readPrefix(id: String, staged: Boolean, relativePath: String, count: Int): ByteArray {
+        val size = assetSize(id, staged, relativePath)
+        return fs.source(asset(id, staged, relativePath)).buffered().use { it.readByteArray(minOf(size, count.toLong()).toInt()) }
+    }
+
     fun commitAsset(id: String, temporary: String, destination: String) {
         val source = asset(id, false, temporary)
         val target = asset(id, false, destination)

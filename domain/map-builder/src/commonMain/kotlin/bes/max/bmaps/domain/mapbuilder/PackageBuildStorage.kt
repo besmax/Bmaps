@@ -30,6 +30,11 @@ interface PackageBuildStorage {
         }
         return PackageResult.Success(true)
     }
+    suspend fun elevationComplete(id: PackageId): PackageResult<Boolean> = PackageResult.Success(false)
+    suspend fun beginElevation(id: PackageId): PackageResult<Unit> = PackageResult.Failure(PackageFailure.UnsupportedContent)
+    suspend fun appendElevation(id: PackageId, bytes: ByteArray, count: Int): PackageResult<Unit> = PackageResult.Failure(PackageFailure.UnsupportedContent)
+    suspend fun finishElevation(id: PackageId): PackageResult<Unit> = PackageResult.Failure(PackageFailure.UnsupportedContent)
+    suspend fun discardElevation(id: PackageId): PackageResult<Unit> = PackageResult.Success(Unit)
     suspend fun setState(id: PackageId, state: BuildJobState, failure: PackageFailure? = null): PackageResult<Unit>
     suspend fun finalize(id: PackageId): PackageResult<Unit>
     suspend fun reconcile(): PackageResult<Unit>

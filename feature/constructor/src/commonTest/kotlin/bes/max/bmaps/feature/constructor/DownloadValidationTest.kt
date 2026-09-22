@@ -9,6 +9,17 @@ class DownloadValidationTest {
     private val settings = MapSaveSettings("2026-09-11_15:38", BoundingBox(-10.0, -10.0, 10.0, 10.0), setOf(0, 1, 2))
     private val config = ProviderConfig(levelLimits = LevelLimitsConfig(0, 4))
 
+    @Test fun validatesElevationBeforeSubmissionWithoutBlockingTileOnlyDateLineMaps() {
+        val crossing = settings.copy(bounds = BoundingBox(179.0, 0.0, -179.0, 1.0))
+        assertNull(validateDownload(crossing, config))
+        assertEquals(Res.string.elevation_area_unsupported,
+            validateDownload(crossing.copy(elevationDataset = ElevationDataset.COP30), config))
+        assertEquals(Res.string.elevation_area_unsupported,
+            validateDownload(settings.copy(elevationDataset = ElevationDataset.COP30), config))
+        assertNull(validateDownload(settings.copy(bounds = BoundingBox(10.0, 45.0, 10.1, 45.1),
+            elevationDataset = ElevationDataset.COP30), config))
+    }
+
     @Test fun validatesBeforeSubmission() {
         assertNull(validateDownload(settings, config))
         assertEquals(Res.string.zoom_range_required, validateDownload(settings.copy(levels = setOf(0, 2)), config))

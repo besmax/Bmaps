@@ -27,7 +27,7 @@
     <string name="download_draft_notice">Downloading is not available yet. Save settings keeps this draft for the current map session.</string>
     <string name="invalid_map_name">Enter a map name.</string>
     <string name="invalid_api_key">Enter a valid API key without spaces.</string>
-    <string name="package_size_limit_exceeded">Estimate exceeds the 300 MB package limit. Choose a smaller area or fewer levels.</string>
+    <string name="package_size_limit_exceeded">A tile layer exceeds the 300 MB limit. Choose a smaller area or fewer zoom levels.</string>
     <string name="estimated_size_mb">Estimated size: %1$s MB</string>
     <string name="go_to_library">Go to library</string>
     <string name="link_unavailable">Link unavailable</string>
@@ -92,4 +92,23 @@
     <string name="layer_add">Add provider layer</string>
     <string name="layer_remove">Remove</string>
     <string name="layer_limit">A map can contain at most 32 layers.</string>
+    <string name="elevation_title">Elevation data</string>
+    <string name="elevation_none">None</string>
+    <string name="elevation_srtm15">SRTM15+</string>
+    <string name="elevation_srtm15_description">Global land topography and ocean bathymetry at 15 arc seconds (roughly 500 m). Smallest download; coarse detail.</string>
+    <string name="elevation_nasadem">NASADEM</string>
+    <string name="elevation_nasadem_description">Reprocessed SRTM elevation at approximately 30 m. Coverage is limited to the SRTM survey region.</string>
+    <string name="elevation_cop30">Copernicus GLO-30</string>
+    <string name="elevation_cop30_description">Global surface elevation at approximately 30 m. Includes the effects of vegetation and buildings.</string>
+    <string name="elevation_cop90">Copernicus GLO-90</string>
+    <string name="elevation_cop90_description">Global surface elevation at approximately 90 m. A smaller download than GLO-30.</string>
+    <string name="elevation_eu_dtm">Europe DTM</string>
+    <string name="elevation_eu_dtm_description">Terrain elevation at approximately 30 m for continental Europe. Unavailable outside its coverage.</string>
+    <string name="elevation_area_unsupported">Elevation is unavailable for this selection. Choose a smaller area that does not cross the date line, or select None.</string>
+    <string name="elevation_download_hint">Downloads a GeoTIFF from OpenTopography. Estimated size includes elevation; actual size may vary. Elevation display is not available yet.</string>
+    <string name="elevation_manage_key">OpenTopography API key</string>
+    <string name="elevation_key_required">Save an OpenTopography API key, then tap Download again.</string>
+    <string name="elevation_key_instructions">Get your personal API key from OpenTopography. It is stored securely on this device. If your old key has expired or been revoked, replace it with a new one. After saving, retry the download.</string>
+    <string name="elevation_get_key">Get an API key</string>
+    <string name="elevation_link_failed">Could not open the browser. Visit your provider account to get your API key.</string>
 </resources>

@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.datastore.*
 import bes.max.bmaps.core.di.AppScope
+import bes.max.bmaps.domain.providers.OPENTOPOGRAPHY_CREDENTIAL
+import bes.max.bmaps.domain.providers.OpenTopographyEndpoints
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -19,6 +21,7 @@ import kotlinx.coroutines.launch
 
 data class ProviderCredentialsState(
     val draft: String = "",
+    val keyRequestUrl: String? = null,
     val loading: Boolean = false,
     val hasSavedCredential: Boolean = false,
     val saving: Boolean = false,
@@ -38,7 +41,8 @@ class ProviderCredentialsViewModel(private val credentials: ProviderCredentials)
 
     fun load(identifier: String) {
         if (state.value.loading || state.value.hasSavedCredential) return
-        mutableState.update { it.copy(loading = true, error = null) }
+        mutableState.update { it.copy(loading = true, error = null,
+            keyRequestUrl = if (identifier == OPENTOPOGRAPHY_CREDENTIAL) OpenTopographyEndpoints.account else null) }
         viewModelScope.launch {
             try {
                 val result = credentials.read(identifier)
@@ -53,6 +57,8 @@ class ProviderCredentialsViewModel(private val credentials: ProviderCredentials)
             catch (_: Exception) { mutableState.update { it.copy(loading = false, error = Res.string.saved_key_unavailable) } }
         }
     }
+
+    fun linkFailed() { mutableState.update { it.copy(error = Res.string.elevation_link_failed) } }
 
     fun edit(value: String) {
         if (!state.value.saving) mutableState.update { it.copy(draft = value.take(4096), error = null) }

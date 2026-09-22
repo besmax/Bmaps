@@ -7,6 +7,7 @@ import org.jetbrains.compose.resources.StringResource
 import androidx.lifecycle.ViewModel
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
+import bes.max.bmaps.domain.providers.ElevationDataset
 import bes.max.bmaps.domain.mapbuilder.BuildEstimate
 import bes.max.bmaps.domain.mapbuilder.TileAreaEstimate
 import dev.zacsweers.metro.ContributesIntoMap
@@ -23,12 +24,14 @@ import kotlin.time.Clock
 
 data class AdditionalLayer(val id: String, val choice: MapChoice, val visible: Boolean = true)
 data class MapSaveSettings(val name: String, val bounds: BoundingBox, val levels: Set<Int>,
-    val layers: List<AdditionalLayer> = emptyList(), val rootVisible: Boolean = true)
+    val layers: List<AdditionalLayer> = emptyList(), val rootVisible: Boolean = true,
+    val elevationDataset: ElevationDataset = ElevationDataset.NONE)
 data class MapSaveSettingsState(
     val name: String = "", val availableLevels: List<Int> = emptyList(), val selectedLevels: Set<Int> = emptySet(),
     val estimate: BuildEstimate? = null, val error: StringResource? = null,
     val layers: List<AdditionalLayer> = emptyList(), val rootVisible: Boolean = true,
     val addingLayer: Boolean = false,
+    val elevationDataset: ElevationDataset = ElevationDataset.NONE,
 )
 
 @Inject
@@ -52,7 +55,8 @@ class MapSaveSettingsViewModel : ViewModel() {
         mutableState.value = MapSaveSettingsState(previous?.name ?: defaultMapName(), available,
             previous?.levels?.intersect(available.toSet())?.takeIf { it.isNotEmpty() }
                 ?.let { (it.min()..it.max()).toSet() } ?: setOf(range.min),
-            layers = previous?.layers.orEmpty(), rootVisible = previous?.rootVisible ?: true)
+            layers = previous?.layers.orEmpty(), rootVisible = previous?.rootVisible ?: true,
+            elevationDataset = previous?.elevationDataset ?: ElevationDataset.NONE)
         estimate()
     }
     fun showLayerPicker(show: Boolean) { mutableState.value = state.value.copy(addingLayer = show) }
@@ -84,6 +88,10 @@ class MapSaveSettingsViewModel : ViewModel() {
         mutableState.value = if (id == null) state.value.copy(rootVisible = visible)
         else state.value.copy(layers = state.value.layers.map { if (it.id == id) it.copy(visible = visible) else it })
     }
+    fun elevation(dataset: ElevationDataset) {
+        mutableState.value = state.value.copy(elevationDataset = dataset, error = null)
+        estimate()
+    }
     fun name(value: String) { mutableState.value = state.value.copy(name = value.take(120), error = null) }
     fun selectZoomRange(minimum: Int, maximum: Int) {
         val available = state.value.availableLevels
@@ -97,19 +105,23 @@ class MapSaveSettingsViewModel : ViewModel() {
         val name = current.name.trim()
         val error = when {
             name.isBlank() || name.any { it.code < 32 } -> Res.string.invalid_map_name
+            !current.elevationDataset.supportsRequest(area) -> Res.string.elevation_area_unsupported
             current.selectedLevels.isEmpty() -> Res.string.zoom_selection_required
             current.estimate?.estimatedPackageBytes == null -> Res.string.selection_estimate_unavailable
             else -> null
         }
         mutableState.value = current.copy(error = error)
-        if (error == null) eventChannel.trySend(MapSaveSettings(name, area, current.selectedLevels.toSet(), current.layers, current.rootVisible))
+        if (error == null) eventChannel.trySend(MapSaveSettings(name, area, current.selectedLevels.toSet(), current.layers, current.rootVisible, current.elevationDataset))
     }
     private fun estimate() {
         val area = bounds ?: return
         val single = TileAreaEstimate.estimate(area, state.value.selectedLevels, 32_000)
         mutableState.value = state.value.copy(estimate = single.let {
             val count = state.value.layers.size + 1
-            TileAreaEstimate.estimate(if (it.tileCount <= Long.MAX_VALUE / count) it.tileCount * count else Long.MAX_VALUE)
+            val tiles = TileAreaEstimate.estimate(if (it.tileCount <= Long.MAX_VALUE / count) it.tileCount * count else Long.MAX_VALUE)
+            val demBytes = state.value.elevationDataset.estimatedBytes(area)
+            tiles.copy(estimatedPackageBytes = tiles.estimatedPackageBytes?.takeIf { it <= Long.MAX_VALUE - demBytes }?.plus(demBytes),
+                estimatedLargestLayerBytes = single.estimatedPackageBytes)
         })
     }
 }

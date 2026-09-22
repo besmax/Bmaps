@@ -172,7 +172,7 @@ Verification on 2026-09-09–10: three constructor tests pass on Android host an
 - [ ] Verify pan/zoom, provider switching, background/foreground transitions, cancellation, missing tiles, and network recovery on Android and iOS.
 - [ ] Record native runtime results and resolve integration failures before download orchestration.
 
-Acceptance for Phase 3: both apps pan and zoom real approved sources; deterministic coordinate/network tests pass; failures are recoverable and tile resources are released. The 300,000,000-byte package limit is enforced by later offline storage/download work, not online rendering.
+Acceptance for Phase 3: both apps pan and zoom real approved sources; deterministic coordinate/network tests pass; failures are recoverable and tile resources are released. The 300,000,000-byte per-layer limit is enforced by offline storage/download work, not online rendering.
 
 ### Phase 4 — Implement package storage and local tile access
 
@@ -356,3 +356,15 @@ Source: [published Material3 1.9.0 metadata](https://central.sonatype.com/artifa
 ## Bmaps styling — 2026-09-11
 
 Applied the supplied dark palette, derived light colors, bundled Inter fonts, tabular typography, rounded shapes, vector navigation icons, floating map controls, responsive margins, amber selection visuals, and themed dialogs. Current functionality and theme preferences are preserved. Glass surfaces use translucency rather than backdrop blur. See `10_BMAPS_DESIGN.md`. Builds and runtime verification remain with the user.
+
+### Elevation download increment — 2026-09-22
+
+Implemented optional SRTM15+, NASADEM, COP30, COP90, and EU_DTM downloads with None as default; encrypted personal API key entry and replacement; bounded GeoTIFF streaming into the map package; durable dataset selection, asset metadata, and elevation availability; restore without redownloading completed tiles. Requested elevation is required for package completion. See `16_ELEVATION_DOWNLOADS.md`. Phase 9 TIFF sampling/CRS/overlay tasks remain unchecked.
+
+Manual API and device testing is reserved for the user. Automated verification passed: 9 networking host tests, 3 OpenTopography provider host tests, 29 map-builder host tests, 5 focused constructor validation/credential host tests, and the native iOS package elevation persistence/recovery test (47 tests total). Shared Android and iOS simulator compilation passed, including Metro graph wiring. No live OpenTopography calls or manual device checks were performed. Broader test runs exposed unrelated failures in the existing OsmAnd download-policy assertion (`ProviderContractsTest.osmandDoesNotInheritPublicOsmDownloadPolicy`) and Android host main-dispatcher cleanup (`OnlineMapViewModelTest.selectionRetryPreservesViewportAndIgnoresRetiredEvents`); neither implementation was changed in this increment.
+
+### Per-layer size limits and provider endpoints — 2026-09-22
+
+Supersedes the original total-package policy: every MBTiles layer has an independent 300,000,000-byte allowance including database overhead. Elevation, annotations, and metadata are excluded; only physical capacity constrains total package size. Submission/warnings use the largest estimated layer, while combined estimates remain the basis for free-space checks. The version-1 policy writes `maxLayerBytes` and accepts legacy `maxBytes` on read. DEM streaming has no configured 300 MB cap and uses 64-bit byte accounting. OpenTopography URLs now belong to provider configuration and reach Compose through credential ViewModel state.
+
+Verification: 60 automated tests passed (10 networking, 3 OpenTopography provider, 31 map-builder host, 9 focused constructor, and 7 native iOS storage tests). Shared Android and iOS simulator compilation passed. The native fixture now resolves its temporary path before opening SQLite, satisfying the existing no-symlink open policy. Tests cover independent layer limits, transactional rollback, combined size above one layer’s allowance, elevation/annotation exclusion, legacy policy decoding, estimate separation, and provider-owned account links. Manual testing remains with the user.

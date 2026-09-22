@@ -11,11 +11,20 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 class ManifestContractsTest {
+    @Test fun legacySizePolicyReadsAsLayerLimitAndWritesExplicitField() {
+        val oldPolicy = Json.decodeFromString<PackageSizePolicy>("""{"maxBytes":123456}""")
+        assertEquals(123456L, oldPolicy.maxLayerBytes)
+        val encoded = Json.encodeToString(oldPolicy)
+        assertEquals("""{"maxLayerBytes":123456}""", encoded)
+        assertEquals(PackageSizePolicy(), Json.decodeFromString<PackageSizePolicy>("{}"))
+        assertEquals(300_000_000L, PackageSizePolicy(Long.MAX_VALUE).effectiveLayerLimit)
+    }
+
     @Test
     fun versionOneFixtureSupportsMixedRasterLayersAndOptionalAssets() {
         val manifest = Json.decodeFromString<PackageManifest>(manifestFixture)
         assertEquals(ManifestCompatibility.SUPPORTED, manifest.compatibility())
-        assertEquals(300_000_000L, manifest.sizePolicy.maxBytes)
+        assertEquals(300_000_000L, manifest.sizePolicy.maxLayerBytes)
         assertEquals(setOf(RasterTileFormat.PNG), manifest.layers[0].content.rasterFormats)
         assertEquals(setOf(RasterTileFormat.JPEG), manifest.layers[1].content.rasterFormats)
         assertEquals("layers/satellite.mbtiles", manifest.layers[1].tiles.relativePath)
