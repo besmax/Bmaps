@@ -259,6 +259,7 @@ Acceptance: annotations survive restart and remain isolated between packages; vi
 Dependencies: Phases 3–4 and 6; resolve CRS/DEM decisions before implementation.
 
 - [ ] Run bounded feasibility spikes for SK-91 transformations and TIFF/GeoTIFF reading on both platforms using independently sourced reference fixtures.
+- [x] Implement the libtiff reader feasibility harness, Android/iOS bindings, explicit WGS 84 subset, bounded strip/tile reads, and host reference checks. See `17_ELEVATION_READER.md` (2026-09-27). Mobile execution, all-dataset validation and the separate SK-91 spike remain pending; this does not complete the combined feasibility gate above.
 - [ ] Document supported CRS definitions, transformation accuracy, DEM encodings, and rejected variants in the product specification.
 - [ ] Implement transformation interfaces in `core:map-engine`; keep storage coordinates distinct from user-selected display coordinates.
 - [ ] Add coordinate-system selection and formatted coordinate display through presentation and preferences.

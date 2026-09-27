@@ -2,6 +2,8 @@
 
 Implemented 2026-09-22. This increment downloads and packages elevation assets; it does not parse elevations, transform coordinates, or display terrain. Manual API and device testing remains with the user.
 
+The subsequent libtiff reader feasibility increment is documented in `17_ELEVATION_READER.md`. It does not yet connect reader sessions to downloaded packages or change completion-time header screening.
+
 ## Selection and credentials
 
 Map download settings offer None (default), SRTM15+, NASADEM, Copernicus GLO-30, Copernicus GLO-90, and Europe DTM, with localized descriptions. Protocol IDs are `SRTM15Plus`, `NASADEM`, `COP30`, `COP90`, and `EU_DTM`. Selection survives the key dialog and is persisted in `BuildRequest.elevationDataset`. Legacy requests deserialize to `NONE`.

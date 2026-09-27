@@ -20,6 +20,7 @@ Bmaps is an offline-first, privacy-focused map constructor and viewer. It allows
 * **Opacity Control:** Independent transparency/opacity sliders for each rendered tile layer.
 * **Annotations & Overlays:** Users can place markers (pins), draw routes, and highlight areas (polygons) on top of the map.
 * **Elevation Data (DEM):** Integration of Digital Elevation Models to extract and display altitude information, parsing data from `.tiff` or `.geotiff` files.
+    * Phase 9's libtiff feasibility reader supports a bounded, single-band, north-up WGS 84 subset. Its output is raw samples with unknown physical units/vertical reference; viewer altitude is pending provider verification. Supported encodings, rejected variants, pixel semantics and memory limits are specified in `17_ELEVATION_READER.md`.
 
 ## 3. Storage Architecture
 Maps are stored entirely locally to maintain offline capabilities. Each downloaded map is packaged into an isolated folder within the device's internal storage.
