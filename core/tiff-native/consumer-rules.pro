@@ -1,0 +1,1 @@
+-keep class bes.max.bmaps.core.tiff.NativeDem { *; }

@@ -1,0 +1,95 @@
+{
+  "float32-numeric-nodata.tif": {
+    "sha256": "4b37ea4a0e129d3e39d00c88bf6af5fec29ab426a1fc5a2469ff3ac7a4a3fb23"
+  },
+  "float32-tiled-bigtiff.tif": {
+    "sha256": "dfd579cb1eae9112c8e8ea3c5e862469914a5e5dc4939de58a110813e505e593"
+  },
+  "float64-be.tif": {
+    "sha256": "ae9c38ba14d42fe8175f697b7acd22c0aea5bbe4f93326c84f320c3f78f389aa"
+  },
+  "gdal-n43.tif": {
+    "sha256": "ecf22011289482838b3d180d3f5aecad04f4d7f75b5e92b22dba6c84ad544809",
+    "reference_samples": [
+      {
+        "row": 0,
+        "column": 0,
+        "value": 294
+      },
+      {
+        "row": 10,
+        "column": 10,
+        "value": 384
+      },
+      {
+        "row": 100,
+        "column": 100,
+        "value": 111
+      },
+      {
+        "row": 119,
+        "column": 119,
+        "value": 190
+      },
+      {
+        "row": 120,
+        "column": 120,
+        "value": 182
+      }
+    ]
+  },
+  "int16-be-deflate.tif": {
+    "sha256": "b532b14bb26af5533d8df92add63b7dc636d4f7051a5f081364428b57e58ace4"
+  },
+  "int16-be-lzw.tif": {
+    "sha256": "e0db2a577622f733e6f60c586b73fad4e7394b4eb463a0328bdb5d4078e03f8a"
+  },
+  "int16-be-none.tif": {
+    "sha256": "3361139f938236d9b1b221496075b7ffb03110df1a164d084884c876759c0750"
+  },
+  "int16-be-packbits.tif": {
+    "sha256": "b7ef1a625801dd35d9a7b91cddd795cb485a10233329a4681e120a65d8b6b300"
+  },
+  "int16-le-deflate.tif": {
+    "sha256": "9d945f853ef6bdc76ce5d87fdde5b9c26e3c7345f6de33287968752180c11b7b"
+  },
+  "int16-le-lzw.tif": {
+    "sha256": "da8dc822febbd28b09a4de759db350c98a6ae76c6c88c1a15ffe21ad916ad926"
+  },
+  "int16-le-none.tif": {
+    "sha256": "357586d260f5725ebca636a2c9f4afa51b4c420eca080eba5db879980ed7ed56"
+  },
+  "int16-le-packbits.tif": {
+    "sha256": "9919cae99c0e6e01144dea6398aa4913dd59ade8f476d09b6b7c4764fc585b1d"
+  },
+  "invalid.tif": {
+    "sha256": "a003eeba6e491487cf6b98d745550c2a096fc1f5aa05cb22511fc72f14e03198"
+  },
+  "missing-georeference.tif": {
+    "sha256": "35769ed6293b42be0208213495a59fec9b6175982b967b4a45cd5c6bf87ec983"
+  },
+  "oversized-strip.tif": {
+    "sha256": "893c6d9e6a4d691497af2ba02f9ae9b6374e9e3ef61c33dcd5c709b724da6625"
+  },
+  "truncated-strip.tif": {
+    "sha256": "9c97c63aaeb01a338b86d0e82ac6417b5c8209707d5d4df21a9fcc8dbc2e27ab"
+  },
+  "uint32.tif": {
+    "sha256": "54d1c64305a17cf6c5c1c08c166545fc26febb8ac15eecd3c7583677f805eaa8"
+  },
+  "unsupported-crs.tif": {
+    "sha256": "a8408e19bda8abd41c499e725314120a92a1bb3cdbfba782ad727162658d1f96"
+  },
+  "unsupported-int64.tif": {
+    "sha256": "228765b82997d18e25c717897e52e0f96eff82bc33055ae3dbb81a1966fa955b"
+  },
+  "unsupported-multiband.tif": {
+    "sha256": "b8410037c15ca24c56fe1a181ec818d9760f86d15e71987a0979c5d852a2b4de"
+  },
+  "unsupported-orientation.tif": {
+    "sha256": "692d72b9fb305be978282c6ddc015d6c90114bcf8426082dd50e739d7529e187"
+  },
+  "unsupported-transform.tif": {
+    "sha256": "b603865c4a45d83f6846ec93e7b2f20d53449beb95afd5adf0ab8587c3dd6b77"
+  }
+}
