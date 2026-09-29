@@ -101,4 +101,9 @@
     <string name="position_elevation_outside">Elevation: outside coverage</string>
     <string name="position_elevation_unsupported">Elevation: unsupported data</string>
     <string name="position_elevation_unavailable">Elevation: could not read data</string>
+    <string name="position_transform_accuracy">Coordinate transform accuracy: ±%1$s m</string>
+    <string name="position_transform_outside">Coordinate transformation is outside its area of use</string>
+    <string name="position_transform_resources_missing">Required offline transformation data is unavailable</string>
+    <string name="position_transform_failed">Coordinate transformation failed</string>
+    <string name="position_coordinate_epoch">Coordinate epoch: %1$s</string>
 </resources>

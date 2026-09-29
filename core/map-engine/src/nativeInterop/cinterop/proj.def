@@ -1,0 +1,4 @@
+headers = bmaps_proj.h
+package = bes.max.bmaps.core.mapengine.native
+staticLibraries = libbmaps_proj.a libproj.a libbmaps_proj_sqlite.a
+linkerOpts = -lc++ -lm

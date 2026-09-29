@@ -60,8 +60,12 @@ Isolated infrastructure modules. Cross-dependencies within this layer must be mi
 * **`core:tiff-native`**
     * **Responsibility:** Internal libtiff C wrapper and Android JNI packaging. A standalone Android library is required because the Android KMP plugin does not support `externalNativeBuild`. The C sources are also compiled for iOS by the storage convention plugin. No business logic, DI graph, or iOS framework is defined here.
     * **Build:** `app.tiff.android` and `app.tiff.ios` own native configuration; `app.tiff.source` resolves the checksum-pinned source archive from the central catalog. Only required lossless DEM codecs are enabled.
+* **`core:proj-native`**
+    * **Responsibility:** Internal PROJ C wrapper and Android JNI library. The same sources are embedded through iOS cinterop in `core:map-engine`. Bundles the matching PROJ database and an independently namespaced SQLite amalgamation; no framework, UI, or domain logic.
+    * **Build:** `app.proj.source`, `app.proj.android`, and `app.proj.ios` convention plugins own pinned source extraction, native compilation, and resource embedding.
 * **`core:map-engine`**
-    * **Responsibility:** Wrappers for `MapComposeMP`. Encapsulates geospatial mathematics, bounding box calculations, and coordinate system transformations (WGS-84, SK-91).
+    * **Responsibility:** Wrappers for `MapComposeMP`. Encapsulates geospatial mathematics, bounding box calculations, and coordinate system transformations, including WGS 84 EPSG:4326, Pulkovo 1942 EPSG:4284, and PZ-90.11 EPSG:9475 via PROJ.
+    * **Phase 9:** Owns the PROJ adapter behind the transformation contract. Native packaging uses Android JNI/iOS cinterop and convention plugins, catalog-pinned sources, embedded `proj.db`, and an isolated SQLite amalgamation. Only grid-free offline operations are eligible. Source implementation is present; native compilation and runtime acceptance remain pending.
     * **Phase 3B:** Owns the bounded MapComposeMP raster adapter, source-session cleanup, Web Mercator/XYZ mathematics, and regional tile-pyramid configuration.
     * **Contract ownership:** Renderer-independent coordinates, CRS identifiers, bounds, tile keys, content descriptors, and tile-source/transform interfaces. Public contracts do not expose MapComposeMP types. Tile matrix enumeration belongs to `domain:map-builder`; reusable coordinate mathematics belongs here.
 * **`core:di`**

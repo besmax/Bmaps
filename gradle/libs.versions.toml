@@ -1,4 +1,8 @@
 [versions]
+proj = "9.6.2"
+proj-sha256 = "53d0cafaee3bb2390264a38668ed31d90787de05e71378ad7a8f35bb34c575d1"
+proj-sqlite = "3500400"
+proj-sqlite-sha256 = "1d3049dd0f830a025a53105fc79fd2ab9431aea99e137809d064d8ee8356b032"
 libtiff = "4.7.2"
 libtiff-sha256 = "672bd7d10aee4606171afb864f3570b83340f6a33e2c186dc0512f7145ffdf6a"
 android-ndk = "27.0.12077973"
@@ -34,6 +38,8 @@ androidx-compose-test = "1.11.2"
 robolectric = "4.16.1"
 
 [libraries]
+proj-source = { module = "org.osgeo:proj", version.ref = "proj" }
+proj-sqlite-source = { module = "org.sqlite:sqlite-amalgamation", version.ref = "proj-sqlite" }
 libtiff-source = { module = "org.libtiff:tiff", version.ref = "libtiff" }
 androidx-work-runtime = { module = "androidx.work:work-runtime", version.ref = "workmanager" }
 kotlinx-coroutines-guava = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-guava", version.ref = "kotlinxCoroutines" }

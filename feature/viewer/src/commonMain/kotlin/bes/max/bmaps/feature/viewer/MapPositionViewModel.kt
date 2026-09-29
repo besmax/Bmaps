@@ -17,6 +17,9 @@ import org.jetbrains.compose.resources.StringResource
 
 data class MapPositionState(
     val coordinate: GeographicCoordinate? = null,
+    val displayCoordinate: ProjectedCoordinate? = null,
+    val coordinateOperation: CoordinateOperation? = null,
+    val coordinateError: StringResource? = null,
     val preferences: UserPreferences? = null,
     val preferenceError: Boolean = false,
     val elevation: PackageElevation = PackageElevation.Missing,
@@ -30,6 +33,7 @@ data class MapPositionState(
 class MapPositionViewModel(
     private val packages: PackageRepository,
     private val preferences: UserPreferencesRepository,
+    private val transformers: ProjTransformerFactory,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(MapPositionState())
     val state = mutableState.asStateFlow()
@@ -46,6 +50,7 @@ class MapPositionViewModel(
             previous?.join()
             ElevationDiagnostics.info("widget_start package=${id.value}")
             var session: OpenedPackage? = null
+            val coordinates = transformers.openSession()
             var lastSampleKind: String? = null
             try {
                 val settings = preferences.preferences.map<UserPreferences, UserPreferences?> { it }
@@ -58,11 +63,28 @@ class MapPositionViewModel(
                     .distinctUntilChanged(), settings) { point, prefs -> point to prefs }
                     .collectLatest { (point, prefs) ->
                         mutableState.value = MapPositionState(
-                            coordinate = point, preferences = prefs,
+                            coordinate = point, displayCoordinate = null,
+                            preferences = prefs,
                             preferenceError = prefs == null
                         )
                         if (point == null) return@collectLatest
                         try {
+                            if (point != null && prefs != null) {
+                                when (val transformed = coordinates.transform(
+                                    ProjectedCoordinate(point.longitude, point.latitude, CoordinateSystemId.Wgs84),
+                                    CoordinateSystemId(prefs.defaultCoordinateSystem),
+                                )) {
+                                    is TransformResult.Success -> mutableState.update { it.copy(
+                                        displayCoordinate = transformed.coordinate,
+                                        coordinateOperation = transformed.operation,
+                                        coordinateError = null,
+                                    ) }
+                                    TransformResult.UnsupportedCoordinateSystem -> coordinateFailure(Res.string.position_coordinates_unsupported)
+                                    TransformResult.OutsideCoverage -> coordinateFailure(Res.string.position_transform_outside)
+                                    TransformResult.MissingTransformationData -> coordinateFailure(Res.string.position_transform_resources_missing)
+                                    TransformResult.Failed -> coordinateFailure(Res.string.position_transform_failed)
+                                }
+                            }
                             if (session == null) {
                                 when (val result = packages.open(id)) {
                                     is PackageResult.Success -> {
@@ -108,6 +130,10 @@ class MapPositionViewModel(
                 }
             } finally {
                 withContext(NonCancellable) {
+                    try { coordinates.close() }
+                    catch (error: Exception) {
+                        ElevationDiagnostics.error("coordinate_session_close package=${id.value}", error)
+                    }
                     try {
                         session?.close()
                     } catch (error: Exception) {
@@ -118,5 +144,9 @@ class MapPositionViewModel(
                 }
             }
         }
+    }
+
+    private fun coordinateFailure(message: StringResource) {
+        mutableState.update { it.copy(coordinateError = message, displayCoordinate = null, coordinateOperation = null) }
     }
 }

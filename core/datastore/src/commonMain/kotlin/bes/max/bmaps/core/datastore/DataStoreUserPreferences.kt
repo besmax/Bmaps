@@ -35,11 +35,13 @@ class DataStoreUserPreferences(private val dataStore: DataStore<Preferences>) : 
         dataStore.edit { it[CoordinateSystemKey] = identifier }
     }
 
-    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean, coordinateFormat: CoordinateFormat) {
+    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean,
+        coordinateFormat: CoordinateFormat, defaultCoordinateSystem: String) {
         dataStore.edit {
             it[ThemeKey] = theme.name
             it[ClusterMapObjectsKey] = clusterMapObjects
             it[CoordinateFormatKey] = coordinateFormat.name
+            it[CoordinateSystemKey] = defaultCoordinateSystem
         }
     }
 

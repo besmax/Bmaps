@@ -1,6 +1,7 @@
 package bes.max.bmaps.feature.shell
 
 import bes.max.bmaps.core.datastore.CoordinateFormat
+import bes.max.bmaps.core.datastore.DisplayCoordinateSystem
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.datastore.ThemePreference
@@ -86,13 +87,20 @@ class PreferencesViewModel(private val preferencesRepository: UserPreferencesRep
         mutableState.update { it.copy(coordinateFormat = format, error = null) }
     }
 
+    fun selectCoordinateSystem(identifier: String) {
+        if (state.value.isLoading || state.value.isSaving || state.value.error == PreferencesError.LOAD) return
+        if (DisplayCoordinateSystem.fromIdentifier(identifier) == null) return
+        mutableState.update { it.copy(defaultCoordinateSystem = identifier, error = null) }
+    }
+
     fun save() {
         val current = state.value
         if (current.isLoading || current.isSaving || current.error == PreferencesError.LOAD) return
         mutableState.update { it.copy(isSaving = true, error = null) }
         viewModelScope.launch {
             try {
-                preferencesRepository.setDisplayPreferences(current.selectedTheme, current.clusterMapObjects, current.coordinateFormat)
+                preferencesRepository.setDisplayPreferences(current.selectedTheme, current.clusterMapObjects,
+                    current.coordinateFormat, current.defaultCoordinateSystem)
                 eventChannel.send(PreferencesEvent.Saved)
             } catch (exception: CancellationException) {
                 throw exception

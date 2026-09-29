@@ -19,6 +19,20 @@ pluginManagement {
 dependencyResolutionManagement {
     repositories {
         ivy {
+            name = "projSource"
+            url = uri("https://download.osgeo.org/proj/")
+            patternLayout { artifact("[artifact]-[revision].[ext]") }
+            metadataSources { artifact() }
+            content { includeModule("org.osgeo", "proj") }
+        }
+        ivy {
+            name = "sqliteSource"
+            url = uri("https://www.sqlite.org/2025/")
+            patternLayout { artifact("[artifact]-[revision].[ext]") }
+            metadataSources { artifact() }
+            content { includeModule("org.sqlite", "sqlite-amalgamation") }
+        }
+        ivy {
             name = "libtiffSource"
             url = uri("https://download.osgeo.org/libtiff/")
             patternLayout { artifact("[artifact]-[revision].[ext]") }
@@ -49,6 +63,7 @@ include(
     ":core:datastore",
     ":core:storage",
     ":core:tiff-native",
+    ":core:proj-native",
     ":core:map-engine",
     ":core:di",
 )

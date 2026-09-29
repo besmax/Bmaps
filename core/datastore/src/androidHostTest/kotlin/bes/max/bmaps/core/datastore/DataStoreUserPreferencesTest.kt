@@ -25,7 +25,7 @@ class DataStoreUserPreferencesTest {
             assertEquals(UserPreferences(), repository.preferences.first())
             repository.setTheme(ThemePreference.DARK)
             repository.setDefaultCoordinateSystem("EPSG:3857")
-            repository.setDisplayPreferences(ThemePreference.DARK, false)
+            repository.setDisplayPreferences(ThemePreference.DARK, false, CoordinateFormat.DECIMAL_DEGREES, "EPSG:3857")
             scope.cancel()
             scope.coroutineContext[Job]!!.join()
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

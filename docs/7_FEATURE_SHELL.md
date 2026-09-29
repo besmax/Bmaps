@@ -61,3 +61,5 @@ Native smoke checks should open each destination, save a theme, dismiss/reopen p
 `core:ui/theme/BmapsTheme.kt` owns the palette, bundled Inter font family, responsive typography, and shapes applied by AppShell. All destinations inherit the theme without feature-to-feature imports. Implementation details and mappings from the supplied Stitch design are recorded in `10_BMAPS_DESIGN.md`.
 
 Phase 9 (2026-09-29) adds a WGS 84 coordinate-format draft to Preferences: decimal degrees, degrees/minutes, or degrees/minutes/seconds. Save persists `coordinate_format` atomically with theme and clustering. The existing CRS identifier stays separate; EPSG:3857 display remains supported by the viewer, but selecting other coordinate systems is still pending.
+
+The Phase 9 selector exposes WGS 84 (EPSG:4326), SK-42 / Pulkovo 1942 (EPSG:4284), and PZ-90.11 (EPSG:9475). The coordinate-format preference applies independently to these geographic systems. The viewer transforms its WGS 84 map center into the selected display CRS; source implementation is present, while native build and runtime acceptance remain pending.

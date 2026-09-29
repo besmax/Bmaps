@@ -38,6 +38,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import bes.max.bmaps.core.datastore.CoordinateFormat
+import bes.max.bmaps.core.datastore.DisplayCoordinateSystem
 import bes.max.bmaps.core.datastore.ThemePreference
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
@@ -105,8 +106,24 @@ fun PreferencesContent(onDismiss: () -> Unit, viewModel: PreferencesViewModel = 
                     Switch(checked = state.clusterMapObjects, onCheckedChange = null, enabled = !state.isSaving)
                 }
                 Text(stringResource(Res.string.default_coordinate_system), style = MaterialTheme.typography.titleMedium)
-                Text(if (state.defaultCoordinateSystem == "EPSG:4326") stringResource(Res.string.wgs_84) else state.defaultCoordinateSystem)
-                if (state.defaultCoordinateSystem == "EPSG:4326") {
+                Column(Modifier.selectableGroup()) {
+                    DisplayCoordinateSystem.entries.forEach { system ->
+                        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(
+                            selected = state.defaultCoordinateSystem == system.identifier, enabled = !state.isSaving,
+                            role = Role.RadioButton, onClick = { viewModel.selectCoordinateSystem(system.identifier) },
+                        ), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            RadioButton(state.defaultCoordinateSystem == system.identifier, onClick = null,
+                                enabled = !state.isSaving)
+                            Text(stringResource(when (system) {
+                                DisplayCoordinateSystem.WGS_84 -> Res.string.wgs_84
+                                DisplayCoordinateSystem.PULKOVO_1942 -> Res.string.pulkovo_1942
+                                DisplayCoordinateSystem.PZ_90_11 -> Res.string.pz_90_11
+                            }))
+                        }
+                    }
+                }
+                if (DisplayCoordinateSystem.fromIdentifier(state.defaultCoordinateSystem) != null) {
                     Text(stringResource(Res.string.coordinate_format), style = MaterialTheme.typography.titleMedium)
                     Column(Modifier.selectableGroup()) {
                         CoordinateFormat.entries.forEach { format ->

@@ -1,7 +1,6 @@
 package bes.max.bmaps.feature.viewer
 
 import bes.max.bmaps.core.datastore.CoordinateFormat
-import bes.max.bmaps.core.datastore.UserPreferences
 import bes.max.bmaps.core.mapengine.*
 import kotlin.math.abs
 import kotlin.math.roundToLong
@@ -14,12 +13,11 @@ internal fun fixedDecimal(value: Double, decimals: Int): String {
     return "$sign${rounded / factor}.${(rounded % factor).toString().padStart(decimals, '0')}"
 }
 
-internal fun formatCoordinate(point: GeographicCoordinate, preferences: UserPreferences): String? =
-    when (preferences.defaultCoordinateSystem) {
-        "EPSG:4326" -> "${angle(point.latitude, preferences.coordinateFormat)}  ${angle(point.longitude, preferences.coordinateFormat)}"
-        "EPSG:3857" -> (WebMercator.transform(
-            ProjectedCoordinate(point.longitude, point.latitude, CoordinateSystemId.Wgs84), CoordinateSystemId.WebMercator,
-        ) as? TransformResult.Success)?.coordinate?.let { "X ${fixedDecimal(it.x, 1)} · Y ${fixedDecimal(it.y, 1)} m" }
+internal fun formatCoordinate(point: ProjectedCoordinate, format: CoordinateFormat): String? =
+    when (point.coordinateSystem.value) {
+        "EPSG:4326", "EPSG:4284", "EPSG:9475" ->
+            "${angle(point.y, format)}  ${angle(point.x, format)}"
+        "EPSG:3857" -> "X ${fixedDecimal(point.x, 1)} · Y ${fixedDecimal(point.y, 1)} m"
         else -> null
     }
 
