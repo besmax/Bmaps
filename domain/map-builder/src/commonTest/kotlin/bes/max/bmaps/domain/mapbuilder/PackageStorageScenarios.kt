@@ -17,7 +17,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
     suspend fun eachLayerHasItsOwnLimitAndElevationIsExcluded() = fixture { root ->
         var db = database(Path(root, "catalog.db").toString())
         val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
-        var repository = LocalPackageRepository(PackageCatalog(db), files)
+        var repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
         val (baseRequest, baseManifest) = fixtureRequest()
         val policy = PackageSizePolicy(maxLayerBytes = 262_144)
         val overlayId = LayerId("overlay")
@@ -48,7 +48,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             repository.finalize(id).success()
             db.close()
             db = database(Path(root, "catalog.db").toString())
-            repository = LocalPackageRepository(PackageCatalog(db), files)
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
             val opened = repository.open(id).success()
             assertTrue(opened.manifest.layers.all { it.tiles.sizeBytes <= policy.maxLayerBytes })
             assertTrue(opened.manifest.layers.sumOf { it.tiles.sizeBytes } > policy.maxLayerBytes)
@@ -63,7 +63,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
     suspend fun elevationIsRequiredAndSurvivesRestart() = fixture { root ->
         var db = database(Path(root, "catalog.db").toString())
         val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
-        var repository = LocalPackageRepository(PackageCatalog(db), files)
+        var repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
         val (baseRequest, baseManifest) = fixtureRequest(ZoomRange(0, 0))
         val request = baseRequest.copy(elevationDataset = ElevationDataset.COP30)
         val manifest = baseManifest.copy(elevationDataset = ElevationDataset.COP30)
@@ -82,7 +82,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             repository.appendElevation(id, tiff, tiff.size).success()
             db.close()
             db = database(Path(root, "catalog.db").toString())
-            repository = LocalPackageRepository(PackageCatalog(db), files)
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
             repository.reconcile().success()
             assertFalse(repository.elevationComplete(id).success())
             assertFalse(files.access { relativeFiles(id.value, true).any { it.endsWith(".part") } })
@@ -93,7 +93,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             repository.finalize(id).success()
             db.close()
             db = database(Path(root, "catalog.db").toString())
-            repository = LocalPackageRepository(PackageCatalog(db), files)
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
             val opened = repository.open(id).success()
             assertEquals(ElevationDataset.COP30, opened.manifest.elevationDataset)
             assertEquals(PackageAsset("elevation.geotiff", tiff.size.toLong()), opened.manifest.elevation)
@@ -106,7 +106,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
     suspend fun annotationsSurviveRestartAndStayIsolated() = fixture { root ->
         var db = database(Path(root, "catalog.db").toString())
         val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
-        var repository = LocalPackageRepository(PackageCatalog(db), files)
+        var repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
         val (request, manifest) = fixtureRequest(ZoomRange(0, 0))
         val second = PackageId("annotation-second")
         val tile = DownloadedTile(TileKey(0, 0, 0), ByteString(byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)))
@@ -140,7 +140,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             files.access { write(id.value, "config.json", Buffer().apply { write(before) }, 1_048_576, 300_000_000, staged = false) }
             db.close()
             db = database(Path(root, "catalog.db").toString())
-            repository = LocalPackageRepository(PackageCatalog(db), files)
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
             repository.reconcile().success()
             val session = repository.open(id).success()
             try { assertNotNull(session.manifest.annotations) } finally { session.close() }
@@ -168,7 +168,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
     suspend fun layerConfigurationSurvivesReopening() = fixture { root ->
         var db = database(Path(root, "catalog.db").toString())
         val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
-        var repository = LocalPackageRepository(PackageCatalog(db), files)
+        var repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
         val (baseRequest, baseManifest) = fixtureRequest(ZoomRange(0, 0))
         val overlayId = LayerId("satellite")
         val request = baseRequest.copy(layers = baseRequest.layers + baseRequest.layers.single().copy(id = overlayId))
@@ -184,7 +184,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
                 LayerPresentation(rootId, false, 0.25, 1), LayerPresentation(overlayId, true, 0.6, 0))).success()
             db.close()
             db = database(Path(root, "catalog.db").toString())
-            repository = LocalPackageRepository(PackageCatalog(db), files)
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
             // Simulate an interrupted subsequent manifest edit; the committed settings must survive.
             files.access {
                 val temporary = asset(request.packageId.value, false, "config.json.part")
@@ -208,7 +208,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
     suspend fun recoverAndReopen() = fixture { root ->
         var db = database(Path(root, "catalog.db").toString())
         val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
-        var repository = LocalPackageRepository(PackageCatalog(db), files)
+        var repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
         val (request, manifest) = fixtureRequest()
         val id = request.packageId
         val layer = manifest.layers.single().id
@@ -228,7 +228,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             repository.setState(id, BuildJobState.FAILED, PackageFailure.NetworkUnavailable).success()
             db.close()
             db = database(Path(root, "catalog.db").toString())
-            repository = LocalPackageRepository(PackageCatalog(db), files)
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
             val summary = repository.observe(PackageQuery()).first().success().items.single()
             assertEquals(PackageState.FAILED, summary.state)
             assertTrue(summary.favourite)
@@ -254,7 +254,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             assertTrue(config.contains("\"elevation\":null"))
             db.close()
             db = database(Path(root, "catalog.db").toString())
-            repository = LocalPackageRepository(PackageCatalog(db), files)
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
             val ready = repository.observe(PackageQuery(favouritesOnly = true)).first().success().items.single()
             assertTrue(ready.favourite)
             assertEquals(MapAvatar.MOUNTAIN.storageKey, ready.avatarKey)
@@ -272,7 +272,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
     suspend fun reconcilePromotionAndMissingAssets() = fixture { root ->
         val db = database(Path(root, "catalog.db").toString())
         val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
-        val repository = LocalPackageRepository(PackageCatalog(db), files)
+        val repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
         val (request, manifest) = fixtureRequest(ZoomRange(0, 0))
         val id = request.packageId
         try {

@@ -258,13 +258,16 @@ Acceptance: annotations survive restart and remain isolated between packages; vi
 
 Dependencies: Phases 3–4 and 6; resolve CRS/DEM decisions before implementation.
 
+Current status (2026-09-29): **In progress; acceptance is not complete.** Source implementation includes DEM downloads and bounded reading, package-owned sampling, the center crosshair and coordinate/altitude widget, three saved WGS 84 formats, diagnostics, and the Android JNI handle/status correction. The user confirmed that the JNI correction resolved the reported SRTM15Plus elevation error on Android. This confirms that scenario, not all-dataset accuracy or iOS acceptance. SK-91 definition/transformation/reference fixtures, additional CRS selection, and real-file/native acceptance on Android and iOS remain pending. The agent did not run builds or tests for the September 29 changes, at the user's request.
+
 - [ ] Run bounded feasibility spikes for SK-91 transformations and TIFF/GeoTIFF reading on both platforms using independently sourced reference fixtures.
+- [x] Implement the libtiff reader feasibility harness, Android/iOS bindings, explicit WGS 84 subset, bounded strip/tile reads, and host reference checks. See `17_ELEVATION_READER.md` (2026-09-27). Mobile execution, all-dataset validation and the separate SK-91 spike remain pending; this does not complete the combined feasibility gate above.
 - [ ] Document supported CRS definitions, transformation accuracy, DEM encodings, and rejected variants in the product specification.
-- [ ] Implement transformation interfaces in `core:map-engine`; keep storage coordinates distinct from user-selected display coordinates.
-- [ ] Add coordinate-system selection and formatted coordinate display through presentation and preferences.
-- [ ] Implement DEM asset ingestion and bounded-memory parsing/sampling in `core:storage`.
-- [ ] Implement geographic-to-raster lookup, no-data handling, interpolation policy, altitude units, and elevation display/overlays in the viewer.
-- [ ] Handle missing or unsupported DEM/CRS data explicitly without guessing transformations or showing misleading altitude.
+- [ ] Implement transformation interfaces in `core:map-engine`; keep storage coordinates distinct from user-selected display coordinates. Existing interfaces and WGS 84/Web Mercator transformations are available; viewer formatting leaves WGS 84 sampling unchanged. SK-91 remains pending.
+- [ ] Add coordinate-system selection and formatted coordinate display through presentation and preferences. WGS 84 format selection and viewer display are implemented (2026-09-29); additional CRS selection/SK-91 remain pending.
+- [x] Implement DEM asset ingestion and bounded-memory parsing/sampling in `core:storage`. Source implementation covers the documented GeoTIFF subset; all-dataset and mobile acceptance remain pending.
+- [ ] Implement geographic-to-raster lookup, no-data handling, interpolation policy, altitude units, and elevation display/overlays in the viewer. Center crosshair/readout, nearest-cell sampling and provider-based meter semantics are implemented (2026-09-29); real-file/native acceptance remains pending.
+- [x] Handle missing or unsupported DEM/CRS data explicitly without guessing transformations or showing misleading altitude. Source implementation only; verification remains with the user.
 
 Acceptance: independent reference points meet the documented transformation tolerance; known raster samples yield expected elevation; large fixtures do not require loading the entire DEM; supported files work fully offline on both platforms.
 
@@ -368,3 +371,9 @@ Manual API and device testing is reserved for the user. Automated verification p
 Supersedes the original total-package policy: every MBTiles layer has an independent 300,000,000-byte allowance including database overhead. Elevation, annotations, and metadata are excluded; only physical capacity constrains total package size. Submission/warnings use the largest estimated layer, while combined estimates remain the basis for free-space checks. The version-1 policy writes `maxLayerBytes` and accepts legacy `maxBytes` on read. DEM streaming has no configured 300 MB cap and uses 64-bit byte accounting. OpenTopography URLs now belong to provider configuration and reach Compose through credential ViewModel state.
 
 Verification: 60 automated tests passed (10 networking, 3 OpenTopography provider, 31 map-builder host, 9 focused constructor, and 7 native iOS storage tests). Shared Android and iOS simulator compilation passed. The native fixture now resolves its temporary path before opening SQLite, satisfying the existing no-symlink open policy. Tests cover independent layer limits, transactional rollback, combined size above one layer’s allowance, elevation/annotation exclusion, legacy policy decoding, estimate separation, and provider-owned account links. Manual testing remains with the user.
+
+Phase 9 viewer increment (2026-09-29): fixed black/white center crosshair, bottom coordinate and optional DEM altitude readout, three persistent WGS 84 formats, and package-owned reader cleanup. See `17_ELEVATION_READER.md` for units, vertical references and conservative metadata rejection. No builds or tests run per user request; this does not complete Phase 9 acceptance.
+
+Phase 9 diagnostics follow-up: preserve package/DEM exceptions and native libtiff diagnostics under `BmapsElevation`; log opening metadata and result-kind transitions; keep camera observation active after a per-lookup exception. The user-reported unreadable elevation remains awaiting runtime evidence; no builds/tests executed.
+
+Phase 9 Android JNI follow-up (2026-09-29): separate DEM open status from pointer bits to accept valid signed-negative tagged handles and avoid leaking readers rejected by the old sign check. Add explicit JNI status logging and retain native status in exceptions. The user subsequently confirmed that the SRTM15Plus error was resolved on Android. No agent-run builds/tests; remaining dataset and platform acceptance is pending.

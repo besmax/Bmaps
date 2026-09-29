@@ -44,3 +44,7 @@ Source checks completed: `git diff --check` and parsing of changed feature XML r
 ## Attribution dialog
 
 The offline map shows a bottom-right info icon when the package has attribution entries. Tapping it opens a scrollable dialog with distinct attribution text and URL entries from all package layers, a suggestion to visit the source links, and an Open link action for each entry. Done, outside tap, and Back dismiss the dialog. Visibility belongs to `ViewerState`; opening another package resets it. Opening a link dismisses the dialog and uses the existing URI handler and snackbar error event. Online-map attribution presentation is unchanged.
+
+## Phase 9 center readout
+
+The offline viewer overlays a fixed black cross with a white outline at the actual map viewport center. A bottom surface shows latitude/longitude in the saved format and optional elevation rounded to one decimal meter with the dataset vertical reference. The annotation controls and attribution action sit above the readout. The independent `MapPositionViewModel` observes camera snapshots and preferences and owns a package session for DEM access; it closes the session when cleared. Missing DEM omits altitude, while unavailable samples, coverage and unsupported data have explicit labels. See `17_ELEVATION_READER.md` for the supported subset and pending user acceptance.

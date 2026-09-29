@@ -1,4 +1,8 @@
 [versions]
+libtiff = "4.7.2"
+libtiff-sha256 = "672bd7d10aee4606171afb864f3570b83340f6a33e2c186dc0512f7145ffdf6a"
+android-ndk = "27.0.12077973"
+native-cmake = "3.22.1"
 agp = "9.1.0"
 android-compileSdk = "37"
 android-minSdk = "30"
@@ -30,6 +34,7 @@ androidx-compose-test = "1.11.2"
 robolectric = "4.16.1"
 
 [libraries]
+libtiff-source = { module = "org.libtiff:tiff", version.ref = "libtiff" }
 androidx-work-runtime = { module = "androidx.work:work-runtime", version.ref = "workmanager" }
 kotlinx-coroutines-guava = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-guava", version.ref = "kotlinxCoroutines" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version = "0.7.1" }
@@ -77,6 +82,7 @@ mapcompose-mp = { module = "ovh.plrapps:mapcompose-mp", version.ref = "mapcompos
 compose-core = ["compose-runtime", "compose-foundation", "compose-material3", "compose-ui", "compose-components-resources", "compose-uiToolingPreview", "androidx-lifecycle-viewmodelCompose", "androidx-lifecycle-runtimeCompose"]
 
 [plugins]
+androidNativeLibrary = { id = "com.android.library", version.ref = "agp" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 room = { id = "androidx.room", version.ref = "room" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

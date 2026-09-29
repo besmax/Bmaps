@@ -1,0 +1,4 @@
+headers = bmaps_dem.h
+package = bes.max.bmaps.core.storage.native
+staticLibraries = libbmaps_dem.a libtiff.a
+linkerOpts = -lz -lm
