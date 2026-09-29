@@ -2,6 +2,16 @@
 
 An offline-first map constructor and viewer for Android and iOS, built with Kotlin and Compose Multiplatform.
 
+## License and attribution
+
+Copyright © 2026 Maksim Bespalov. Canonical project: <https://github.com/besmax/Bmaps>.
+
+Original Bmaps material is available under [PolyForm Noncommercial 1.0.0](LICENSE). When distributing any part of the software, preserve the [required notices](NOTICE) and provide the license text or URL. Include the applicable notices when reusing source fragments. Third-party material retains its [own licenses](THIRD-PARTY-NOTICES.md).
+
+For uses outside the public license's permissions, contact **bespalov.m.9@gmail.com**. Additional permissions and fees are agreed individually in a separate written agreement; see [commercial licensing requests](COMMERCIAL-LICENSE.md). Uses already permitted by the public license require no separate agreement. This is source-available software with noncommercial restrictions.
+
+See [contribution requirements](CONTRIBUTING.md) and [provenance and release-signing guidance](docs/18_LICENSING_AND_PROVENANCE.md). Run `python3 scripts/license_headers.py` to check source notices and packaged license documents.
+
 The current implementation includes provider/package contracts, feature navigation, Metro dependency injection, persisted appearance preferences, provider tile networking, and encrypted credential storage. The constructor now displays an online OSM map with attribution, persistent HTTP caching, source selection, and recoverable errors. Thunderforest supports secure API-key entry; other providers remain gated by the prerequisites documented below. Downloads and package management are not implemented.
 
 ## Project structure

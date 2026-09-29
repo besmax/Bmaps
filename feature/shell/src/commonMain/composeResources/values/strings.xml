@@ -1,4 +1,8 @@
 <resources>
+    <string name="project_licensing">About Bmaps · Licensing</string>
+    <string name="project_copyright">Copyright © 2026 Maksim Bespalov</string>
+    <string name="project_license_summary">Bmaps original code: PolyForm Noncommercial 1.0.0. Third-party components retain their own licenses.</string>
+    <string name="project_commercial_contact">Additional permissions and commercial terms: bespalov.m.9@gmail.com</string>
     <string name="cluster_map_objects">Cluster map objects</string>
     <string name="cluster_map_objects_hint">Group nearby markers, small lines, and polygons into numbered circles.</string>
     <string name="appearance">Appearance</string>

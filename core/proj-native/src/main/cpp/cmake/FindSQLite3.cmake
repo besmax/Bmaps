@@ -1,3 +1,9 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Required Notice: Copyright (c) 2026 Maksim Bespalov.
+# Required Notice: Bmaps — https://github.com/besmax/Bmaps
+# License: https://polyformproject.org/licenses/noncommercial/1.0.0
+# Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+
 set(SQLite3_FOUND TRUE)
 file(STRINGS "${BMAPS_SQLITE_SOURCE}/sqlite3.h" SQLITE_VERSION_LINE REGEX "^#define SQLITE_VERSION +\"[0-9.]+\"")
 string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" SQLite3_VERSION "${SQLITE_VERSION_LINE}")

@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.feature.shell
 
 import bmaps.feature.shell.generated.resources.*
@@ -146,6 +154,7 @@ fun PreferencesContent(onDismiss: () -> Unit, viewModel: PreferencesViewModel = 
                     Text(stringResource(Res.string.changes_could_not_be_saved_please_try_again), color = MaterialTheme.colorScheme.error)
                 }
             }
+            ProjectLicensingContent()
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
                 Button(

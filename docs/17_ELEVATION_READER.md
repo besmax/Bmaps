@@ -1,6 +1,6 @@
 # Elevation reader feasibility increment
 
-Implemented 2026-09-27 as the elevation part of Phase 9's first feasibility step. Device/emulator execution and actual OpenTopography dataset acceptance remain with the user. The 2026-09-29 increment adds coordinate formatting, package-owned DEM sampling, viewer center altitude, selectable geographic CRSs, and source-level offline PROJ transformation. Native compilation, independent CRS reference-point verification, and device/provider-file acceptance remain pending. The combined Phase 9 feasibility checkbox is not complete.
+Implemented 2026-09-27 as the elevation part of Phase 9's first feasibility step. Device/emulator execution and actual OpenTopography dataset acceptance remain with the user. The 2026-09-29 increment adds coordinate formatting, package-owned DEM sampling, viewer center altitude, selectable geographic CRSs, and source-level offline PROJ transformation. Native compilation, independent CRS reference-point verification, and device/provider-file acceptance remain pending. The project owner closed Phase 9 on 2026-09-29; remaining verification is tracked in Phase 11 before release.
 
 ## Ownership and native dependency
 
