@@ -22,6 +22,7 @@ import kotlinx.io.files.FileNotFoundException
 class LocalPackageRepository(
     private val catalog: PackageCatalog,
     private val storage: PackageFileStorage,
+    private val demReaders: DemReaderFactory,
 ) : PackageRepository, PackageBuildStorage, AnnotationRepository {
     private val mutex = Mutex()
     private var reconciled = false
@@ -288,13 +289,14 @@ class LocalPackageRepository(
                 verify(manifest, false)
                 LocalOpenedPackage(manifest, manifest.layers.associate {
                     it.id to asset(id.value, false, it.tiles.relativePath).toString()
-                }).also {
+                }, manifest.elevation?.let { asset(id.value, false, it.relativePath).toString() }, demReaders).also {
                     val opened = sessions.getOrPut(id) { mutableListOf() }
                     opened.removeAll { it.closed }
                     opened.add(it)
                 }
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
+                ElevationDiagnostics.error("package_open package=${id.value} reason=${failureOf(error)}", error)
                 records.putPackage(record.copy(state = if (error is FileNotFoundException) PackageState.MISSING.name else PackageState.CORRUPT.name))
                 throw error
             }

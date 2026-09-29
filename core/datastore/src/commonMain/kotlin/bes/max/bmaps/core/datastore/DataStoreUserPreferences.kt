@@ -22,6 +22,8 @@ class DataStoreUserPreferences(private val dataStore: DataStore<Preferences>) : 
             theme = ThemePreference.entries.firstOrNull { it.name == stored[ThemeKey] } ?: ThemePreference.SYSTEM,
             defaultCoordinateSystem = stored[CoordinateSystemKey] ?: "EPSG:4326",
             clusterMapObjects = stored[ClusterMapObjectsKey] ?: true,
+            coordinateFormat = CoordinateFormat.entries.firstOrNull { it.name == stored[CoordinateFormatKey] }
+                ?: CoordinateFormat.DECIMAL_DEGREES,
         )
     }.distinctUntilChanged()
 
@@ -33,14 +35,16 @@ class DataStoreUserPreferences(private val dataStore: DataStore<Preferences>) : 
         dataStore.edit { it[CoordinateSystemKey] = identifier }
     }
 
-    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean) {
+    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean, coordinateFormat: CoordinateFormat) {
         dataStore.edit {
             it[ThemeKey] = theme.name
             it[ClusterMapObjectsKey] = clusterMapObjects
+            it[CoordinateFormatKey] = coordinateFormat.name
         }
     }
 
     private companion object {
+        val CoordinateFormatKey = stringPreferencesKey("coordinate_format")
         val ThemeKey = stringPreferencesKey("theme")
         val CoordinateSystemKey = stringPreferencesKey("default_coordinate_system")
         val ClusterMapObjectsKey = booleanPreferencesKey("cluster_map_objects")

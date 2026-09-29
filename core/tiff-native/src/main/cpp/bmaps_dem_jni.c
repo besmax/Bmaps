@@ -3,20 +3,31 @@
 #include <stdlib.h>
 #include <string.h>
 
-JNIEXPORT jlong JNICALL Java_bes_max_bmaps_core_tiff_NativeDem_open(JNIEnv *env, jclass type, jbyteArray path) {
+JNIEXPORT jint JNICALL Java_bes_max_bmaps_core_tiff_NativeDem_open(JNIEnv *env, jclass type,
+        jbyteArray path, jlongArray output) {
     (void)type;
-    if (!path) return -BMAPS_DEM_INVALID;
+    if (!path || !output || (*env)->GetArrayLength(env, output) != 1) return BMAPS_DEM_INVALID;
+    jlong handle = 0;
+    (*env)->SetLongArrayRegion(env, output, 0, 1, &handle);
+    if ((*env)->ExceptionCheck(env)) return BMAPS_DEM_INVALID;
     jsize size = (*env)->GetArrayLength(env, path);
-    if (size < 1 || size > 4096) return -BMAPS_DEM_INVALID;
+    if (size < 1 || size > 4096) return BMAPS_DEM_INVALID;
     char *name = malloc((size_t)size + 1);
-    if (!name) return -BMAPS_DEM_LIMIT;
+    if (!name) return BMAPS_DEM_LIMIT;
     (*env)->GetByteArrayRegion(env, path, 0, size, (jbyte *)name);
-    if ((*env)->ExceptionCheck(env) || memchr(name, 0, (size_t)size)) { free(name); return -BMAPS_DEM_INVALID; }
+    if ((*env)->ExceptionCheck(env) || memchr(name, 0, (size_t)size)) { free(name); return BMAPS_DEM_INVALID; }
     name[size] = 0;
     int status = BMAPS_DEM_INVALID;
     bmaps_dem *r = bmaps_dem_open(name, &status);
     free(name);
-    return r ? (jlong)(uintptr_t)r : -status;
+    if (!r) return status;
+    handle = (jlong)(uintptr_t)r;
+    (*env)->SetLongArrayRegion(env, output, 0, 1, &handle);
+    if ((*env)->ExceptionCheck(env)) {
+        bmaps_dem_close(r);
+        return BMAPS_DEM_INVALID;
+    }
+    return BMAPS_DEM_OK;
 }
 
 JNIEXPORT jdoubleArray JNICALL Java_bes_max_bmaps_core_tiff_NativeDem_metadata(JNIEnv *env, jclass type, jlong handle) {

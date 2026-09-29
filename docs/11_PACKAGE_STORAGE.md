@@ -49,7 +49,7 @@ Reconciliation does not silently delete user package data. Corrupt or missing as
 
 ## Manifest and elevation
 
-Version 1 serialization explicitly writes defaults. None retains `"elevation": null`; selected OpenTopography downloads persist `elevationDataset`, stream `elevation.geotiff` into staging, and record its `PackageAsset` and `hasElevationData = true` only after file commit. Requested elevation is required for finalization and checked on package opening. TIFF header screening is implemented; full GeoTIFF parsing and sampling remain future work. See `16_ELEVATION_DOWNLOADS.md` for interruption recovery, size limits, and verification.
+Version 1 serialization explicitly writes defaults. None retains `"elevation": null`; selected OpenTopography downloads persist `elevationDataset`, stream `elevation.geotiff` into staging, and record its `PackageAsset` and `hasElevationData = true` only after file commit. Requested elevation is required for finalization and checked on package opening. TIFF header screening remains the ingestion gate. Phase 9 now opens supported GeoTIFFs lazily through package-owned DEM readers and closes them before deletion; see `17_ELEVATION_READER.md` for the bounded sampling contract. See `16_ELEVATION_DOWNLOADS.md` for interruption recovery, size limits, and verification.
 
 Final layers carry `tileCount` as completeness evidence in addition to exact zoom selection. Drafts have a null count and cannot be opened. Phase 1 manifests remain serializable, but opening legacy/imported files without this evidence, arbitrary MBTiles layouts, checksums, and externally produced packages requires the Phase 10 importer. A supplied SHA-256 digest is currently rejected rather than accepted without verification.
 

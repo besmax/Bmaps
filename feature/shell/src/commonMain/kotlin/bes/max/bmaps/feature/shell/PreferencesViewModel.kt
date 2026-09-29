@@ -1,5 +1,6 @@
 package bes.max.bmaps.feature.shell
 
+import bes.max.bmaps.core.datastore.CoordinateFormat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.datastore.ThemePreference
@@ -25,6 +26,7 @@ data class PreferencesState(
     val selectedTheme: ThemePreference = ThemePreference.SYSTEM,
     val defaultCoordinateSystem: String = "EPSG:4326",
     val clusterMapObjects: Boolean = true,
+    val coordinateFormat: CoordinateFormat = CoordinateFormat.DECIMAL_DEGREES,
     val isSaving: Boolean = false,
     val error: PreferencesError? = null,
 )
@@ -59,6 +61,7 @@ class PreferencesViewModel(private val preferencesRepository: UserPreferencesRep
                     selectedTheme = preferences.theme,
                     defaultCoordinateSystem = preferences.defaultCoordinateSystem,
                     clusterMapObjects = preferences.clusterMapObjects,
+                    coordinateFormat = preferences.coordinateFormat,
                 )
             } catch (exception: CancellationException) {
                 throw exception
@@ -78,13 +81,18 @@ class PreferencesViewModel(private val preferencesRepository: UserPreferencesRep
         mutableState.update { it.copy(clusterMapObjects = enabled, error = null) }
     }
 
+    fun selectCoordinateFormat(format: CoordinateFormat) {
+        if (state.value.isLoading || state.value.isSaving || state.value.error == PreferencesError.LOAD) return
+        mutableState.update { it.copy(coordinateFormat = format, error = null) }
+    }
+
     fun save() {
         val current = state.value
         if (current.isLoading || current.isSaving || current.error == PreferencesError.LOAD) return
         mutableState.update { it.copy(isSaving = true, error = null) }
         viewModelScope.launch {
             try {
-                preferencesRepository.setDisplayPreferences(current.selectedTheme, current.clusterMapObjects)
+                preferencesRepository.setDisplayPreferences(current.selectedTheme, current.clusterMapObjects, current.coordinateFormat)
                 eventChannel.send(PreferencesEvent.Saved)
             } catch (exception: CancellationException) {
                 throw exception

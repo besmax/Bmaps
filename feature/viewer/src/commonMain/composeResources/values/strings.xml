@@ -92,4 +92,13 @@
     <string name="annotations_cluster_accessibility">%1$d map objects. Zoom in or show objects. Some may be outside the visible map.</string>
     <string name="annotations_cluster_too_many">Clustering is unavailable for maps with more than 1,000 objects. Showing objects in the visible area.</string>
     <string name="annotations_cluster_unavailable">Clustering is temporarily unavailable. Showing objects in the visible area.</string>
+    <string name="position_latitude_longitude">Lat / Lon: %1$s</string>
+    <string name="position_preferences_unavailable">Coordinate preferences unavailable</string>
+    <string name="position_coordinates_unsupported">Coordinate system unsupported</string>
+    <string name="position_elevation_value">Elevation: %1$s m · %2$s</string>
+    <string name="position_elevation_loading">Elevation: …</string>
+    <string name="position_elevation_no_data">Elevation: no data at this point</string>
+    <string name="position_elevation_outside">Elevation: outside coverage</string>
+    <string name="position_elevation_unsupported">Elevation: unsupported data</string>
+    <string name="position_elevation_unavailable">Elevation: could not read data</string>
 </resources>

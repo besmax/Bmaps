@@ -21,6 +21,7 @@ set_target_properties(tiff PROPERTIES FRAMEWORK FALSE ARCHIVE_OUTPUT_DIRECTORY "
 
 if(ANDROID)
     add_library(bmaps_dem SHARED bmaps_dem.c bmaps_dem_jni.c)
+    target_link_libraries(bmaps_dem PRIVATE log)
     target_link_options(bmaps_dem PRIVATE "-Wl,-z,max-page-size=16384")
 else()
     add_library(bmaps_dem STATIC bmaps_dem.c)

@@ -38,12 +38,19 @@ import org.jetbrains.compose.resources.getString
 fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
     val model = metroViewModel<ViewerViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
+    val position = metroViewModel<MapPositionViewModel>()
+    val positionState by position.state.collectAsStateWithLifecycle()
     val annotations = metroViewModel<AnnotationEditorViewModel>()
     val annotationState by annotations.state.collectAsStateWithLifecycle()
     val camera by model.renderer.camera.collectAsStateWithLifecycle()
     val density = LocalDensity.current.density
     val renderData = annotationState.renderData()
-    val fallback = remember(renderData, state.annotationPyramid) { annotationOverlays(annotationState, state.annotationPyramid) }
+    val fallback = remember(renderData, state.annotationPyramid) {
+        annotationOverlays(
+            annotationState,
+            state.annotationPyramid
+        )
+    }
     val overlays = annotationState.presentation?.takeIf {
         it.data == renderData && it.display.pyramid == state.annotationPyramid && it.display.camera?.session == camera?.session
     }?.overlays ?: fallback
@@ -52,19 +59,43 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     val attribution = state.manifest?.layers.orEmpty().flatMap { it.attribution }.distinct()
     val handleOverlayClick: (String, MapPoint) -> Unit = { id, position ->
-        overlays.targets[id]?.let { annotations.clickOverlay(it, position, model.renderer.controller) }
+        overlays.targets[id]?.let {
+            annotations.clickOverlay(
+                it,
+                position,
+                model.renderer.controller
+            )
+        }
     }
 
     LaunchedEffect(annotations, state.annotationPyramid, camera, density) {
         annotations.cameraChanged(state.annotationPyramid, camera, density)
     }
-    LaunchedEffect(annotations, model) { model.renderer.controller.results.collect(annotations::cameraResult) }
+    LaunchedEffect(
+        annotations,
+        model
+    ) { model.renderer.controller.results.collect(annotations::cameraResult) }
     DisposableEffect(annotations, model) {
         onDispose { annotations.cancelExpansion(); model.renderer.controller.cancelMove() }
     }
 
-    LaunchedEffect(packageId, model, annotations) { annotations.open(packageId); model.open(packageId) }
-    LaunchedEffect(model, annotations) { model.annotationEvents.collect { (pyramid, event) -> annotations.mapEvent(pyramid, event) } }
+    LaunchedEffect(packageId, position, model) { position.open(packageId, model.renderer.camera) }
+    LaunchedEffect(packageId, model, annotations) {
+        annotations.open(packageId); model.open(
+        packageId
+    )
+    }
+    LaunchedEffect(
+        model,
+        annotations
+    ) {
+        model.annotationEvents.collect { (pyramid, event) ->
+            annotations.mapEvent(
+                pyramid,
+                event
+            )
+        }
+    }
     LaunchedEffect(annotations, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             annotations.events.collect { snackbar.showSnackbar(getString(it)) }
@@ -77,11 +108,22 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
         }
     }
     Box(Modifier.fillMaxSize()) {
-        RasterMap(model.renderer, Modifier.fillMaxSize(), overlays.markers, overlays.paths, handleOverlayClick,
-            onGestureStart = annotations::cancelExpansion) { marker ->
+        RasterMap(
+            model.renderer,
+            Modifier.fillMaxSize(),
+            overlays.markers,
+            overlays.paths,
+            handleOverlayClick,
+            onGestureStart = annotations::cancelExpansion
+        ) { marker ->
             val cluster = overlays.targets[marker.id] as? AnnotationHit.Cluster
             if (cluster != null) {
-                AnnotationClusterBadge(cluster.ids.size) { handleOverlayClick(marker.id, marker.position) }
+                AnnotationClusterBadge(cluster.ids.size) {
+                    handleOverlayClick(
+                        marker.id,
+                        marker.position
+                    )
+                }
             } else {
                 val label = marker.label.ifBlank { stringResource(Res.string.annotations_place) }
                 Box(Modifier.size(48.dp).clearAndSetSemantics {
@@ -89,17 +131,46 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
                     contentDescription = label
                     onClick { handleOverlayClick(marker.id, marker.position); true }
                 }, contentAlignment = Alignment.BottomCenter) {
-                    MarkerIcon(marker.icon, marker.color, marker.label.ifBlank { stringResource(Res.string.annotations_place) }, Modifier.size(36.dp))
+                    MarkerIcon(
+                        marker.icon,
+                        marker.color,
+                        marker.label.ifBlank { stringResource(Res.string.annotations_place) },
+                        Modifier.size(36.dp)
+                    )
                 }
             }
         }
-        if (annotationState.draft == null) FilledTonalButton(
-            onClick = { annotations.panel(true) },
-            enabled = state.manifest != null && state.error == null && !annotationState.busy,
-            modifier = Modifier.align(Alignment.BottomStart).safeDrawingPadding().padding(16.dp),
-        ) { Text(stringResource(Res.string.annotations_title)) }
-        AnnotationEditorContent(annotations, annotationState,
-            Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp))
+        if (positionState.coordinate != null && state.error == null) {
+            MapCrosshair(Modifier.align(Alignment.Center))
+        }
+
+        Column(
+            Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (annotationState.draft == null) {
+                    FilledTonalButton(
+                        onClick = { annotations.panel(true) },
+                        enabled = state.manifest != null && state.error == null && !annotationState.busy,
+                        modifier = Modifier.weight(1f, fill = false),
+                    ) { Text(stringResource(Res.string.annotations_title)) }
+                }
+                Spacer(Modifier.weight(1f))
+                if (attribution.isNotEmpty()) {
+                    MapIconButton(
+                        onClick = { model.showAttribution(true) },
+                        iconResId = Res.drawable.ic_info,
+                        contentDescription = stringResource(Res.string.viewer_attribution),
+                    )
+                }
+            }
+            AnnotationEditorContent(annotations, annotationState, Modifier.fillMaxWidth())
+            if (state.error == null) MapPositionOverlay(positionState)
+        }
 
         MapIconButton(
             onClick = onBack,
@@ -110,9 +181,9 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
 
         Column(
             Modifier
-            .align(Alignment.CenterEnd)
-            .safeDrawingPadding()
-            .padding(16.dp),
+                .align(Alignment.CenterEnd)
+                .safeDrawingPadding()
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             MapIconButton(
@@ -127,36 +198,53 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
                 contentDescription = stringResource(Res.string.viewer_zoom_out),
             )
         }
-        MapIconButton(onClick = model::showLayers,
+        MapIconButton(
+            onClick = model::showLayers,
             iconResId = MapIcons.layers,
             contentDescription = stringResource(Res.string.layers_title),
             enabled = state.manifest != null && state.error == null,
-            modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(16.dp))
+            modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(16.dp)
+        )
         state.error?.let { error ->
-            Surface(Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp), shape = MaterialTheme.shapes.medium) {
+            Surface(
+                Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(16.dp),
+                shape = MaterialTheme.shapes.medium
+            ) {
                 Column(Modifier.padding(16.dp)) {
                     Text(stringResource(error))
-                    TextButton(onClick = model::retry) { Text(stringResource(Res.string.viewer_retry)) }
+                    TextButton(onClick = {
+                        model.retry(); position.open(
+                        packageId,
+                        model.renderer.camera,
+                        retry = true
+                    )
+                    }) { Text(stringResource(Res.string.viewer_retry)) }
                 }
             }
         }
-        if (attribution.isNotEmpty()) MapIconButton(
-            onClick = { model.showAttribution(true) },
-            iconResId = Res.drawable.ic_info,
-            contentDescription = stringResource(Res.string.viewer_attribution),
-            modifier = Modifier.align(Alignment.BottomEnd).safeDrawingPadding().padding(16.dp),
-        )
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
     if (annotationState.clusterMembers.isNotEmpty()) AlertDialog(
         onDismissRequest = annotations::dismissSelection,
-        title = { Text(stringResource(Res.string.annotations_cluster_title, annotationState.clusterMembers.size)) },
+        title = {
+            Text(
+                stringResource(
+                    Res.string.annotations_cluster_title,
+                    annotationState.clusterMembers.size
+                )
+            )
+        },
         text = {
             LazyColumn(Modifier.heightIn(max = 440.dp)) {
                 item { Text(stringResource(Res.string.annotations_cluster_hint)) }
                 items(annotationState.clusterMembers, key = { it.id }) { item ->
                     TextButton({ annotations.select(item.id) }) {
-                        Text(listOf(item.name, stringResource(item.kind.label())).filter { it.isNotBlank() }.joinToString(" · "))
+                        Text(
+                            listOf(
+                                item.name,
+                                stringResource(item.kind.label())
+                            ).filter { it.isNotBlank() }.joinToString(" · ")
+                        )
                     }
                 }
             }
@@ -166,41 +254,93 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
     if (state.layersVisible) AlertDialog(
         onDismissRequest = model::dismissLayers,
         title = { Text(stringResource(Res.string.layers_title)) },
-        text = { Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(Res.string.layers_hint))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.automaticAvailable) FilterChip(selected = state.selectedLevel == null,
-                    onClick = { model.selectLevel(null) }, enabled = !state.busy, label = { Text(stringResource(Res.string.layers_automatic_zoom)) })
-                state.levels.forEach { level ->
-                    FilterChip(selected = state.selectedLevel == level, onClick = { model.selectLevel(level) }, enabled = !state.busy,
-                        label = { Text(stringResource(Res.string.viewer_level, level)) })
+        text = {
+            Column(
+                Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(stringResource(Res.string.layers_hint))
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (state.automaticAvailable) FilterChip(
+                        selected = state.selectedLevel == null,
+                        onClick = { model.selectLevel(null) },
+                        enabled = !state.busy,
+                        label = { Text(stringResource(Res.string.layers_automatic_zoom)) })
+                    state.levels.forEach { level ->
+                        FilterChip(
+                            selected = state.selectedLevel == level,
+                            onClick = { model.selectLevel(level) },
+                            enabled = !state.busy,
+                            label = { Text(stringResource(Res.string.viewer_level, level)) })
+                    }
                 }
-            }
-            if (state.regionCount > 1) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                repeat(state.regionCount) { region ->
-                    FilterChip(selected = state.region == region, onClick = { model.selectRegion(region) }, enabled = !state.busy,
-                        label = { Text(stringResource(Res.string.layers_region, region + 1)) })
+                if (state.regionCount > 1) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    repeat(state.regionCount) { region ->
+                        FilterChip(
+                            selected = state.region == region,
+                            onClick = { model.selectRegion(region) },
+                            enabled = !state.busy,
+                            label = { Text(stringResource(Res.string.layers_region, region + 1)) })
+                    }
                 }
-            }
-            state.layerDraft.forEachIndexed { index, layer ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(layer.name, Modifier.weight(1f))
-                    Checkbox(layer.visible, { model.layerAppearance(layer.id, it, layer.opacity); model.previewLayers() }, enabled = !state.busy,
+                state.layerDraft.forEachIndexed { index, layer ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(layer.name, Modifier.weight(1f))
+                        Checkbox(
+                            layer.visible,
+                            {
+                                model.layerAppearance(
+                                    layer.id,
+                                    it,
+                                    layer.opacity
+                                ); model.previewLayers()
+                            },
+                            enabled = !state.busy,
+                            modifier = Modifier.semantics { contentDescription = layer.name })
+                    }
+                    Text(stringResource(Res.string.layer_opacity, (layer.opacity * 100).toInt()))
+                    Slider(
+                        layer.opacity.toFloat(),
+                        { model.layerAppearance(layer.id, layer.visible, it.toDouble()) },
+                        onValueChangeFinished = model::previewLayers,
+                        enabled = !state.busy,
                         modifier = Modifier.semantics { contentDescription = layer.name })
+                    Row {
+                        TextButton(
+                            onClick = { model.moveLayer(layer.id, -1) },
+                            enabled = !state.busy && index > 0
+                        ) { Text(stringResource(Res.string.layer_down)) }
+                        TextButton(
+                            onClick = { model.moveLayer(layer.id, 1) },
+                            enabled = !state.busy && index < state.layerDraft.lastIndex
+                        ) { Text(stringResource(Res.string.layer_up)) }
+                    }
+                    layer.attribution.forEach {
+                        Text(
+                            it.text,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
-                Text(stringResource(Res.string.layer_opacity, (layer.opacity * 100).toInt()))
-                Slider(layer.opacity.toFloat(), { model.layerAppearance(layer.id, layer.visible, it.toDouble()) },
-                    onValueChangeFinished = model::previewLayers, enabled = !state.busy,
-                    modifier = Modifier.semantics { contentDescription = layer.name })
-                Row {
-                    TextButton(onClick = { model.moveLayer(layer.id, -1) }, enabled = !state.busy && index > 0) { Text(stringResource(Res.string.layer_down)) }
-                    TextButton(onClick = { model.moveLayer(layer.id, 1) }, enabled = !state.busy && index < state.layerDraft.lastIndex) { Text(stringResource(Res.string.layer_up)) }
-                }
-                layer.attribution.forEach { Text(it.text, style = MaterialTheme.typography.bodySmall) }
             }
-        } },
-        confirmButton = { TextButton(onClick = model::saveLayers, enabled = !state.busy) { Text(stringResource(Res.string.layers_save)) } },
-        dismissButton = { TextButton(onClick = model::dismissLayers, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) } },
+        },
+        confirmButton = {
+            TextButton(onClick = model::saveLayers, enabled = !state.busy) {
+                Text(
+                    stringResource(Res.string.layers_save)
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = model::dismissLayers, enabled = !state.busy) {
+                Text(
+                    stringResource(Res.string.layers_cancel)
+                )
+            }
+        },
     )
     if (state.attributionVisible) AlertDialog(
         onDismissRequest = { model.showAttribution(false) },
@@ -235,27 +375,57 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
         onDismissRequest = { model.showDetails(false) },
         title = { Text(state.summary?.name ?: stringResource(Res.string.viewer_details)) },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 state.manifest?.let { manifest ->
-                    Text(stringResource(Res.string.viewer_bounds, manifest.bounds.south.toString(), manifest.bounds.west.toString(),
-                        manifest.bounds.north.toString(), manifest.bounds.east.toString()))
+                    Text(
+                        stringResource(
+                            Res.string.viewer_bounds,
+                            manifest.bounds.south.toString(),
+                            manifest.bounds.west.toString(),
+                            manifest.bounds.north.toString(),
+                            manifest.bounds.east.toString()
+                        )
+                    )
                     Text(stringResource(Res.string.viewer_levels, state.levels.joinToString()))
                     Text(stringResource(if (manifest.elevation == null) Res.string.viewer_no_elevation else Res.string.viewer_elevation))
                 }
                 state.summary?.let { Text(stringResource(Res.string.viewer_size, it.sizeBytes)) }
-                Text(stringResource(Res.string.viewer_avatar), style = MaterialTheme.typography.titleSmall)
+                Text(
+                    stringResource(Res.string.viewer_avatar),
+                    style = MaterialTheme.typography.titleSmall
+                )
                 MapAvatar.entries.chunked(2).forEach { avatars ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         avatars.forEach { avatar ->
-                            FilterChip(selected = state.summary?.avatarKey == avatar.storageKey, enabled = !state.busy,
+                            FilterChip(
+                                selected = state.summary?.avatarKey == avatar.storageKey,
+                                enabled = !state.busy,
                                 onClick = { model.avatar(avatar) },
-                                leadingIcon = { Icon(painterResource(avatarIcon(avatar)), null, Modifier.size(20.dp)) }, label = { Text(stringResource(avatarLabel(avatar))) })
+                                leadingIcon = {
+                                    Icon(
+                                        painterResource(avatarIcon(avatar)),
+                                        null,
+                                        Modifier.size(20.dp)
+                                    )
+                                },
+                                label = { Text(stringResource(avatarLabel(avatar))) })
                         }
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { model.showDetails(false) }) { Text(stringResource(Res.string.viewer_done)) } },
+        confirmButton = {
+            TextButton(onClick = { model.showDetails(false) }) {
+                Text(
+                    stringResource(
+                        Res.string.viewer_done
+                    )
+                )
+            }
+        },
     )
 }
 

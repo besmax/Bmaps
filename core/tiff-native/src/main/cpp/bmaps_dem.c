@@ -9,6 +9,11 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
 
 #define BLOCK_LIMIT (8 * 1024 * 1024)
 #define LIBRARY_LIMIT (32 * 1024 * 1024)
@@ -18,6 +23,7 @@
 #define GEO_KEYS 34735
 #define GEO_DOUBLES 34736
 #define GDAL_NODATA 42113
+#define GDAL_METADATA 42112
 
 struct bmaps_dem {
     TIFF *tiff;
@@ -27,6 +33,7 @@ struct bmaps_dem {
     double x, y, dx, dy, nodata;
     uint64_t block_bytes;
     unsigned char *buffer;
+    unsigned int logged_errors, logged_warnings;
 };
 
 static int custom_field(TIFF *tiff, uint32_t tag, TIFFDataType type, uint32_t *count, void **data) {
@@ -36,65 +43,98 @@ static int custom_field(TIFF *tiff, uint32_t tag, TIFFDataType type, uint32_t *c
     return TIFFGetField(tiff, tag, count, data);
 }
 
+static void diagnostic(bmaps_dem *r, int error, const char *message) {
+    if (r) {
+        unsigned int *count = error ? &r->logged_errors : &r->logged_warnings;
+        if (*count > 16) return;
+        if ((*count)++ == 16) message = "Further native diagnostics of this severity suppressed for this reader";
+    }
+#ifdef __ANDROID__
+    __android_log_write(error ? ANDROID_LOG_ERROR : ANDROID_LOG_WARN, "BmapsElevation", message);
+#else
+    fprintf(stderr, "[BmapsElevation] %s %s\n", error ? "ERROR" : "WARN", message);
+#endif
+}
+
+static int native_failure(bmaps_dem *r, int status, const char *stage, int line) {
+    char message[512];
+    snprintf(message, sizeof(message),
+        "native_failure stage=%s line=%d status=%d width=%u height=%u bits=%u format=%u compression=%u blockBytes=%llu",
+        stage, line, status, r->width, r->height, r->bits, r->format, r->compression,
+        (unsigned long long)r->block_bytes);
+    diagnostic(r, 1, message);
+    return status;
+}
+
+static void tiff_diagnostic(bmaps_dem *r, int error, const char *module, const char *format, va_list args) {
+    char detail[1024], message[1200];
+    vsnprintf(detail, sizeof(detail), format, args);
+    snprintf(message, sizeof(message), "libtiff module=%s: %s", module ? module : "unknown", detail);
+    diagnostic(r, error, message);
+}
+
 static int error_handler(TIFF *tiff, void *user, const char *module, const char *format, va_list args) {
-    (void)tiff; (void)module; (void)format; (void)args;
-    ((bmaps_dem *)user)->decode_error = 1;
+    (void)tiff;
+    bmaps_dem *r = user;
+    r->decode_error = 1;
+    tiff_diagnostic(r, 1, module, format, args);
     return 1;
 }
 
 static int warning_handler(TIFF *tiff, void *user, const char *module, const char *format, va_list args) {
-    (void)tiff; (void)user; (void)module; (void)format; (void)args;
+    (void)tiff;
+    tiff_diagnostic(user, 0, module, format, args);
     return 1;
 }
 
 static int read_geography(bmaps_dem *r) {
     uint32_t count = 0;
     void *key_data = NULL;
-    if (!custom_field(r->tiff, GEO_KEYS, TIFF_SHORT, &count, &key_data)) return BMAPS_DEM_UNSUPPORTED;
+    if (!custom_field(r->tiff, GEO_KEYS, TIFF_SHORT, &count, &key_data)) return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
     const uint16_t *keys = key_data;
     if (count < 4 ||
         keys[0] != 1 || keys[1] != 1 || keys[2] > 1 || count != 4 + 4u * keys[3])
-        return BMAPS_DEM_UNSUPPORTED;
+        return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
     int model = 0, crs = 0, raster = 0;
     uint16_t previous = 0;
     for (uint32_t i = 4; i < count; i += 4) {
         uint16_t key = keys[i], location = keys[i + 1], length = keys[i + 2], value = keys[i + 3];
-        if (key <= previous) return BMAPS_DEM_INVALID;
+        if (key <= previous) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
         previous = key;
         if (key == 1024 || key == 1025 || key == 2048 || key == 2054) {
-            if (location != 0 || length != 1) return BMAPS_DEM_UNSUPPORTED;
+            if (location != 0 || length != 1) return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
             if (key == 1024) model = value;
             if (key == 1025) raster = value;
             if (key == 2048) crs = value;
-            if (key == 2054 && value != 9102) return BMAPS_DEM_UNSUPPORTED;
+            if (key == 2054 && value != 9102) return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
         } else if (key == 2057 || key == 2059) {
             uint32_t double_count = 0;
             void *parameter_data = NULL;
             if (location != GEO_DOUBLES || length != 1 ||
                 !custom_field(r->tiff, GEO_DOUBLES, TIFF_DOUBLE, &double_count, &parameter_data) || value >= double_count)
-                return BMAPS_DEM_UNSUPPORTED;
+                return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
             const double *parameters = parameter_data;
             double expected = key == 2057 ? 6378137.0 : 298.257223563;
             if (!isfinite(parameters[value]) || fabs(parameters[value] - expected) > 1e-9)
-                return BMAPS_DEM_UNSUPPORTED;
+                return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
         } else if (key != 1026 && key != 2049) {
             /* Do not silently ignore custom datum, projection or vertical definitions. */
-            return BMAPS_DEM_UNSUPPORTED;
+            return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
         }
     }
-    if (model != 2 || crs != 4326 || (raster != 1 && raster != 2)) return BMAPS_DEM_UNSUPPORTED;
+    if (model != 2 || crs != 4326 || (raster != 1 && raster != 2)) return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
     r->point = raster == 2;
     void *scale_data = NULL, *tie_data = NULL;
     uint32_t scale_count = 0, tie_count = 0;
     if (TIFFFindField(r->tiff, MODEL_TRANSFORM, TIFF_ANY) ||
         !custom_field(r->tiff, MODEL_SCALE, TIFF_DOUBLE, &scale_count, &scale_data) || scale_count != 3 ||
         !custom_field(r->tiff, MODEL_TIEPOINT, TIFF_DOUBLE, &tie_count, &tie_data) || tie_count != 6)
-        return BMAPS_DEM_UNSUPPORTED;
+        return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
     const double *scale = scale_data, *tie = tie_data;
-    for (int i = 0; i < 3; i++) if (!isfinite(scale[i])) return BMAPS_DEM_INVALID;
-    for (int i = 0; i < 6; i++) if (!isfinite(tie[i])) return BMAPS_DEM_INVALID;
+    for (int i = 0; i < 3; i++) if (!isfinite(scale[i])) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
+    for (int i = 0; i < 6; i++) if (!isfinite(tie[i])) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
     if (scale[0] <= 0 || scale[1] <= 0 || scale[2] != 0 || tie[2] != 0 || tie[5] != 0)
-        return BMAPS_DEM_UNSUPPORTED;
+        return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
     r->dx = scale[0];
     r->dy = -scale[1];
     r->x = tie[3] - tie[0] * r->dx;
@@ -104,7 +144,7 @@ static int read_geography(bmaps_dem *r) {
     double east = west + r->width * r->dx;
     double south = north + r->height * r->dy;
     if (!isfinite(west) || !isfinite(north) || !isfinite(east) || !isfinite(south) ||
-        west < -180 || east > 180 || south < -90 || north > 90) return BMAPS_DEM_UNSUPPORTED;
+        west < -180 || east > 180 || south < -90 || north > 90) return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
     return BMAPS_DEM_OK;
 }
 
@@ -115,7 +155,7 @@ static int read_metadata(bmaps_dem *r) {
     if (!TIFFGetField(r->tiff, TIFFTAG_IMAGEWIDTH, &r->width) ||
         !TIFFGetField(r->tiff, TIFFTAG_IMAGELENGTH, &r->height) ||
         r->width == 0 || r->height == 0 || r->width > INT_MAX || r->height > INT_MAX)
-        return BMAPS_DEM_INVALID;
+        return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
     TIFFGetFieldDefaulted(r->tiff, TIFFTAG_SAMPLESPERPIXEL, &samples);
     TIFFGetFieldDefaulted(r->tiff, TIFFTAG_BITSPERSAMPLE, &r->bits);
     TIFFGetFieldDefaulted(r->tiff, TIFFTAG_SAMPLEFORMAT, &r->format);
@@ -127,30 +167,30 @@ static int read_metadata(bmaps_dem *r) {
     if (!TIFFGetField(r->tiff, TIFFTAG_PHOTOMETRIC, &photometric) ||
         samples != 1 || extras != 0 || orientation != ORIENTATION_TOPLEFT ||
         planar != PLANARCONFIG_CONTIG || photometric != PHOTOMETRIC_MINISBLACK || depth != 1)
-        return BMAPS_DEM_UNSUPPORTED;
+        return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
     if (!((r->format == SAMPLEFORMAT_INT || r->format == SAMPLEFORMAT_UINT) &&
           (r->bits == 8 || r->bits == 16 || r->bits == 32)) &&
         !(r->format == SAMPLEFORMAT_IEEEFP && (r->bits == 32 || r->bits == 64)))
-        return BMAPS_DEM_UNSUPPORTED;
+        return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
     if (r->compression != COMPRESSION_NONE && r->compression != COMPRESSION_LZW &&
         r->compression != COMPRESSION_ADOBE_DEFLATE && r->compression != COMPRESSION_DEFLATE &&
-        r->compression != COMPRESSION_PACKBITS) return BMAPS_DEM_UNSUPPORTED;
-    if (!TIFFIsCODECConfigured(r->compression)) return BMAPS_DEM_UNSUPPORTED;
+        r->compression != COMPRESSION_PACKBITS) return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
+    if (!TIFFIsCODECConfigured(r->compression)) return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
     if (TIFFFindField(r->tiff, GDAL_NODATA, TIFF_ANY)) {
         uint32_t count = 0;
         void *data = NULL;
         if (!custom_field(r->tiff, GDAL_NODATA, TIFF_ASCII, &count, &data) || count < 2)
-            return BMAPS_DEM_INVALID;
+            return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
         const char *nodata = data;
-        if (memchr(nodata, 0, count) != nodata + count - 1) return BMAPS_DEM_INVALID;
+        if (memchr(nodata, 0, count) != nodata + count - 1) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
         char *end = NULL;
         locale_t locale = newlocale(LC_NUMERIC_MASK, "C", NULL);
-        if (!locale) return BMAPS_DEM_INVALID;
+        if (!locale) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
         errno = 0;
         r->nodata = strtod_l(nodata, &end, locale);
         int range_error = errno == ERANGE;
         freelocale(locale);
-        if (end == nodata || *end != '\0' || range_error || isinf(r->nodata)) return BMAPS_DEM_INVALID;
+        if (end == nodata || *end != '\0' || range_error || isinf(r->nodata)) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
         if (r->format == SAMPLEFORMAT_IEEEFP && r->bits == 32) r->nodata = (float)r->nodata;
         r->has_nodata = 1;
     }
@@ -160,7 +200,7 @@ static int read_metadata(bmaps_dem *r) {
     if (r->tiled) {
         depth = 1;
         TIFFGetField(r->tiff, TIFFTAG_TILEDEPTH, &depth);
-        if (depth != 1) return BMAPS_DEM_UNSUPPORTED;
+        if (depth != 1) return native_failure(r, BMAPS_DEM_UNSUPPORTED, __func__, __LINE__);
         TIFFGetField(r->tiff, TIFFTAG_TILEWIDTH, &r->block_width);
         TIFFGetField(r->tiff, TIFFTAG_TILELENGTH, &r->block_height);
         r->block_bytes = TIFFTileSize64(r->tiff);
@@ -170,20 +210,20 @@ static int read_metadata(bmaps_dem *r) {
         if (r->block_height > r->height) r->block_height = r->height;
         r->block_bytes = TIFFStripSize64(r->tiff);
     }
-    if (!r->block_width || !r->block_height || !r->block_bytes) return BMAPS_DEM_INVALID;
-    if ((uint64_t)r->block_width * r->block_height > BLOCK_LIMIT / (r->bits / 8)) return BMAPS_DEM_LIMIT;
-    if (r->block_bytes > BLOCK_LIMIT) return BMAPS_DEM_LIMIT;
+    if (!r->block_width || !r->block_height || !r->block_bytes) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
+    if ((uint64_t)r->block_width * r->block_height > BLOCK_LIMIT / (r->bits / 8)) return native_failure(r, BMAPS_DEM_LIMIT, __func__, __LINE__);
+    if (r->block_bytes > BLOCK_LIMIT) return native_failure(r, BMAPS_DEM_LIMIT, __func__, __LINE__);
     if (r->block_bytes != (uint64_t)r->block_width * r->block_height * (r->bits / 8))
-        return BMAPS_DEM_INVALID;
+        return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
     return BMAPS_DEM_OK;
 }
 
 bmaps_dem *bmaps_dem_open(const char *path, int *status) {
     *status = BMAPS_DEM_INVALID;
     bmaps_dem *r = calloc(1, sizeof(*r));
-    if (!r) { *status = BMAPS_DEM_LIMIT; return NULL; }
+    if (!r) { *status = BMAPS_DEM_LIMIT; diagnostic(NULL, 1, "dem_open: reader allocation failed"); return NULL; }
     TIFFOpenOptions *options = TIFFOpenOptionsAlloc();
-    if (!options) { free(r); *status = BMAPS_DEM_LIMIT; return NULL; }
+    if (!options) { diagnostic(r, 1, "dem_open: options allocation failed"); free(r); *status = BMAPS_DEM_LIMIT; return NULL; }
     TIFFOpenOptionsSetMaxSingleMemAlloc(options, BLOCK_LIMIT);
     TIFFOpenOptionsSetMaxCumulatedMemAlloc(options, LIBRARY_LIMIT);
     TIFFOpenOptionsSetErrorHandlerExtR(options, error_handler, r);
@@ -192,7 +232,11 @@ bmaps_dem *bmaps_dem_open(const char *path, int *status) {
        Disable mmap and strip chopping to enforce the actual block limit. */
     r->tiff = TIFFOpenExt(path, "rmc", options);
     TIFFOpenOptionsFree(options);
-    if (!r->tiff || r->decode_error) { bmaps_dem_close(r); return NULL; }
+    if (!r->tiff || r->decode_error) {
+        native_failure(r, *status, "TIFFOpenExt", __LINE__);
+        bmaps_dem_close(r);
+        return NULL;
+    }
     *status = read_metadata(r);
     if (*status != BMAPS_DEM_OK || r->decode_error) {
         if (*status == BMAPS_DEM_OK) *status = BMAPS_DEM_INVALID;
@@ -200,7 +244,11 @@ bmaps_dem *bmaps_dem_open(const char *path, int *status) {
         return NULL;
     }
     r->buffer = malloc((size_t)r->block_bytes);
-    if (!r->buffer) { *status = BMAPS_DEM_LIMIT; bmaps_dem_close(r); return NULL; }
+    if (!r->buffer) {
+        *status = native_failure(r, BMAPS_DEM_LIMIT, "block_allocation", __LINE__);
+        bmaps_dem_close(r);
+        return NULL;
+    }
     return r;
 }
 
@@ -209,6 +257,7 @@ void bmaps_dem_metadata(const bmaps_dem *r, double *v) {
     v[4] = r->dx; v[5] = r->dy; v[6] = r->point;
     v[7] = r->bits; v[8] = r->format; v[9] = r->compression;
     v[10] = r->tiled; v[11] = (double)r->block_bytes;
+    v[12] = TIFFFindField(r->tiff, GDAL_METADATA, TIFF_ANY) != NULL;
 }
 
 #define READ_VALUE(type) do { type sample; memcpy(&sample, p, sizeof(sample)); *value = sample; } while (0)
@@ -217,14 +266,14 @@ int bmaps_dem_sample(bmaps_dem *r, uint32_t column, uint32_t row, double *value)
     if (!r || column >= r->width || row >= r->height) return BMAPS_DEM_OUTSIDE;
     uint32_t block = r->tiled ? TIFFComputeTile(r->tiff, column, row, 0, 0) : TIFFComputeStrip(r->tiff, row, 0);
     uint32_t blocks = r->tiled ? TIFFNumberOfTiles(r->tiff) : TIFFNumberOfStrips(r->tiff);
-    if (block >= blocks) return BMAPS_DEM_INVALID;
+    if (block >= blocks) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
     if (!r->cached || r->cached_block != block) {
         uint64_t *byte_counts = NULL;
         r->cached = 0;
         r->decode_error = 0;
         if (!TIFFGetField(r->tiff, r->tiled ? TIFFTAG_TILEBYTECOUNTS : TIFFTAG_STRIPBYTECOUNTS, &byte_counts) ||
-            !byte_counts || !byte_counts[block]) return BMAPS_DEM_INVALID;
-        if (byte_counts[block] > BLOCK_LIMIT) return BMAPS_DEM_LIMIT;
+            !byte_counts || !byte_counts[block]) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
+        if (byte_counts[block] > BLOCK_LIMIT) return native_failure(r, BMAPS_DEM_LIMIT, __func__, __LINE__);
         uint64_t expected = r->block_bytes;
         if (!r->tiled) {
             uint32_t remaining = r->height - (row / r->block_height) * r->block_height;
@@ -232,7 +281,7 @@ int bmaps_dem_sample(bmaps_dem *r, uint32_t column, uint32_t row, double *value)
         }
         tmsize_t read = r->tiled ? TIFFReadEncodedTile(r->tiff, block, r->buffer, (tmsize_t)expected) :
             TIFFReadEncodedStrip(r->tiff, block, r->buffer, (tmsize_t)expected);
-        if (read < 0 || (uint64_t)read != expected || r->decode_error) return BMAPS_DEM_INVALID;
+        if (read < 0 || (uint64_t)read != expected || r->decode_error) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
         r->cached = 1;
         r->cached_block = block;
     }

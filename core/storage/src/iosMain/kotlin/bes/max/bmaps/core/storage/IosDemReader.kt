@@ -10,9 +10,9 @@ internal actual fun openNativeDem(path: String): NativeDemHandle = memScoped {
     val pointer = bmaps_dem_open(path, status.ptr) ?: demFailure(status.value)
     object : NativeDemHandle {
         override fun metadata(): DemMetadata = memScoped {
-            val values = allocArray<DoubleVar>(12)
+            val values = allocArray<DoubleVar>(BMAPS_DEM_METADATA_COUNT)
             bmaps_dem_metadata(pointer, values)
-            demMetadata(DoubleArray(12) { values[it] })
+            demMetadata(DoubleArray(BMAPS_DEM_METADATA_COUNT) { values[it] })
         }
 
         override fun sample(column: Int, row: Int): DemSample = memScoped {

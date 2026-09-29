@@ -189,11 +189,11 @@ private class FakePreferences : UserPreferencesRepository {
     override suspend fun setTheme(theme: ThemePreference) {
         setDisplayPreferences(theme, current.value.clusterMapObjects)
     }
-    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean) {
+    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean, coordinateFormat: bes.max.bmaps.core.datastore.CoordinateFormat) {
         beforeSave()
         if (failSave) error("Write failed")
         writes++
-        current.value = current.value.copy(theme = theme, clusterMapObjects = clusterMapObjects)
+        current.value = current.value.copy(theme = theme, clusterMapObjects = clusterMapObjects, coordinateFormat = coordinateFormat)
     }
     override suspend fun setDefaultCoordinateSystem(identifier: String) {
         current.value = current.value.copy(defaultCoordinateSystem = identifier)

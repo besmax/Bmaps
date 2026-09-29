@@ -3,8 +3,13 @@ package bes.max.bmaps.core.storage
 import bes.max.bmaps.core.tiff.NativeDem
 
 internal actual fun openNativeDem(path: String): NativeDemHandle {
-    val pointer = NativeDem.open(path.encodeToByteArray())
-    if (pointer <= 0) demFailure((-pointer).toInt())
+    val output = LongArray(1)
+    val status = NativeDem.open(path.encodeToByteArray(), output)
+    val pointer = output[0]
+    println("[BmapsElevation] ${if (status == 0 && pointer != 0L) "INFO" else "ERROR"} " +
+        "jni_dem_open status=$status handlePresent=${pointer != 0L}")
+    if (status != 0) demFailure(status)
+    if (pointer == 0L) demFailure(4)
     return object : NativeDemHandle {
         override fun metadata(): DemMetadata = demMetadata(NativeDem.metadata(pointer))
 

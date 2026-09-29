@@ -37,6 +37,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import bes.max.bmaps.core.datastore.CoordinateFormat
 import bes.max.bmaps.core.datastore.ThemePreference
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
@@ -105,6 +106,25 @@ fun PreferencesContent(onDismiss: () -> Unit, viewModel: PreferencesViewModel = 
                 }
                 Text(stringResource(Res.string.default_coordinate_system), style = MaterialTheme.typography.titleMedium)
                 Text(if (state.defaultCoordinateSystem == "EPSG:4326") stringResource(Res.string.wgs_84) else state.defaultCoordinateSystem)
+                if (state.defaultCoordinateSystem == "EPSG:4326") {
+                    Text(stringResource(Res.string.coordinate_format), style = MaterialTheme.typography.titleMedium)
+                    Column(Modifier.selectableGroup()) {
+                        CoordinateFormat.entries.forEach { format ->
+                            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(
+                                selected = state.coordinateFormat == format, enabled = !state.isSaving,
+                                role = Role.RadioButton, onClick = { viewModel.selectCoordinateFormat(format) },
+                            ), verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                RadioButton(state.coordinateFormat == format, onClick = null, enabled = !state.isSaving)
+                                Text(stringResource(when (format) {
+                                    CoordinateFormat.DECIMAL_DEGREES -> Res.string.coordinate_decimal
+                                    CoordinateFormat.DEGREES_MINUTES -> Res.string.coordinate_minutes
+                                    CoordinateFormat.DEGREES_MINUTES_SECONDS -> Res.string.coordinate_seconds
+                                }))
+                            }
+                        }
+                    }
+                }
                 if (state.error == PreferencesError.SAVE) {
                     Text(stringResource(Res.string.changes_could_not_be_saved_please_try_again), color = MaterialTheme.colorScheme.error)
                 }

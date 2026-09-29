@@ -28,5 +28,7 @@ interface PackageRepository {
 interface OpenedPackage {
     val manifest: PackageManifest
     suspend fun openTiles(layerId: LayerId): PackageResult<TileSource>
+    suspend fun elevation(latitude: Double, longitude: Double): PackageElevation =
+        if (manifest.elevation == null) PackageElevation.Missing else PackageElevation.Unsupported
     suspend fun close()
 }

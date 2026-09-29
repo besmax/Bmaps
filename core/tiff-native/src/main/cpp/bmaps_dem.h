@@ -15,8 +15,8 @@ enum bmaps_dem_status {
 };
 
 /* Metadata ABI: width, height, originX, originY, stepX, stepY,
-   pixelIsPoint, bits, sampleFormat, compression, tiled, decodedBlockBytes. */
-#define BMAPS_DEM_METADATA_COUNT 12
+   pixelIsPoint, bits, sampleFormat, compression, tiled, decodedBlockBytes, hasGdalMetadata. */
+#define BMAPS_DEM_METADATA_COUNT 13
 bmaps_dem *bmaps_dem_open(const char *path, int *status);
 void bmaps_dem_metadata(const bmaps_dem *reader, double *values);
 int bmaps_dem_sample(bmaps_dem *reader, uint32_t column, uint32_t row, double *value);

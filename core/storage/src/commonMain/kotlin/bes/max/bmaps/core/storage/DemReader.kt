@@ -14,7 +14,8 @@ import kotlin.math.floor
 
 enum class DemFailure { UNSUPPORTED, INVALID_OR_UNREADABLE, MEMORY_LIMIT, CLOSED }
 
-class DemReadException(val reason: DemFailure) : IOException("DEM read failed: $reason")
+class DemReadException(val reason: DemFailure, val nativeStatus: Int? = null) :
+    IOException("DEM read failed: $reason${nativeStatus?.let { " (nativeStatus=$it)" }.orEmpty()}")
 
 sealed interface DemSample {
     data class Value(val rawValue: Double) : DemSample
@@ -35,6 +36,7 @@ data class DemMetadata(
     val compression: Int,
     val tiled: Boolean,
     val decodedBlockBytes: Long,
+    val hasGdalMetadata: Boolean = false,
 ) {
     val crs: String get() = "EPSG:4326"
 
@@ -116,7 +118,7 @@ internal fun demFailure(status: Int): Nothing = throw DemReadException(when (sta
     3 -> DemFailure.UNSUPPORTED
     5 -> DemFailure.MEMORY_LIMIT
     else -> DemFailure.INVALID_OR_UNREADABLE
-})
+}, nativeStatus = status)
 
 internal fun demSample(status: Int, value: Double): DemSample = when (status) {
     0 -> DemSample.Value(value)
@@ -126,8 +128,8 @@ internal fun demSample(status: Int, value: Double): DemSample = when (status) {
 }
 
 internal fun demMetadata(values: DoubleArray): DemMetadata {
-    check(values.size == 12)
+    check(values.size == 13)
     return DemMetadata(values[0].toInt(), values[1].toInt(), values[2], values[3], values[4], values[5],
         values[6] != 0.0, values[7].toInt(), values[8].toInt(), values[9].toInt(), values[10] != 0.0,
-        values[11].toLong())
+        values[11].toLong(), values[12] != 0.0)
 }
