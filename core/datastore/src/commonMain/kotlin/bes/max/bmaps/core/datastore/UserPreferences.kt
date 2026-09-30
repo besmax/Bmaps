@@ -32,6 +32,8 @@ data class UserPreferences(
 interface UserPreferencesRepository {
     val preferences: Flow<UserPreferences>
     suspend fun setTheme(theme: ThemePreference)
+    suspend fun setClusterMapObjects(enabled: Boolean)
+    suspend fun setCoordinateFormat(format: CoordinateFormat)
     suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean,
         coordinateFormat: CoordinateFormat, defaultCoordinateSystem: String)
     suspend fun setDefaultCoordinateSystem(identifier: String)

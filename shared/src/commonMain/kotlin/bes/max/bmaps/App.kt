@@ -26,7 +26,7 @@ import bes.max.bmaps.feature.constructor.ConstructorScreen
 import bes.max.bmaps.feature.constructor.ProviderCredentialsContent
 import bes.max.bmaps.feature.library.LibraryScreen
 import bes.max.bmaps.feature.shell.AppShell
-import bes.max.bmaps.feature.shell.PreferencesContent
+import bes.max.bmaps.feature.shell.SettingsScreen
 import bes.max.bmaps.feature.shell.ShellDestination
 import bes.max.bmaps.feature.viewer.ViewerScreen
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
@@ -37,17 +37,17 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
         val navigation = rememberNavController()
         val startDestination = if (previewMap || onlineMap) ShellDestination.CONSTRUCTOR else ShellDestination.LIBRARY
         val entry by navigation.currentBackStackEntryAsState()
-        val route = if (entry?.destination?.route == PreferencesRoute || entry?.destination?.route == "provider-credentials/{identifier}") {
+        val route = if (entry?.destination?.route == "provider-credentials/{identifier}") {
             navigation.previousBackStackEntry?.destination?.route
         } else {
             entry?.destination?.route
         }
         AppShell(
             destination = ShellDestination.entries.firstOrNull { it.route == route || (it == ShellDestination.VIEWER && route == ViewerRoute) } ?: ShellDestination.LIBRARY,
-            fullScreen = route == MapRoute || route == MapSettingsRoute || route == ViewerRoute,
+            fullScreen = route == MapRoute || route == MapSettingsRoute || route == ViewerRoute || route == SettingsRoute,
             onBack = { navigation.popBackStack() },
             onNavigate = navigation::openDestination,
-            onPreferences = { navigation.navigate(PreferencesRoute) { launchSingleTop = true } },
+            onPreferences = { navigation.navigate(SettingsRoute) { launchSingleTop = true } },
         ) { navigate ->
             NavHost(navController = navigation, startDestination = startDestination.route) {
                 composable(ShellDestination.LIBRARY.route) {
@@ -86,8 +86,8 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
                     val identifier = entry.arguments?.read { getString("identifier") }
                     if (identifier != null) ProviderCredentialsContent(identifier) { navigation.popBackStack() }
                 }
-                dialog(PreferencesRoute) {
-                    PreferencesContent(onDismiss = { navigation.popBackStack() })
+                composable(SettingsRoute) {
+                    SettingsScreen(onBack = { navigation.popBackStack() })
                 }
             }
         }
@@ -101,7 +101,7 @@ private fun NavHostController.openDestination(destination: ShellDestination) {
     }
 }
 
-private const val PreferencesRoute = "preferences"
+private const val SettingsRoute = "settings"
 
 private const val MapRoute = "map/{provider}/{style}"
 private const val MapSettingsRoute = "map-settings"

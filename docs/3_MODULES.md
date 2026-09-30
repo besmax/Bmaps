@@ -16,7 +16,7 @@ This document serves as the single source of truth for the project's module topo
 ## 2. Feature Layer (Presentation & UI)
 Modules containing Compose Multiplatform screens, ViewModels, and presentation-layer validation logic.
 * **`feature:shell`**
-    * **Responsibility:** Application chrome, theme selection/application, and preferences dialog with its own ViewModel. Accepts content/navigation callbacks from `:shared`; never imports other features. Visual theme definitions come from `core:ui`. Theme preferences use `core:datastore` and ViewModel injection uses `core:di`.
+    * **Responsibility:** Application chrome, theme selection/application, and a responsive Settings screen with its own ViewModel and independent immediate persistence. Platform presentation adapters read the installed app version code for the About/licensing card. Accepts content/navigation callbacks from `:shared`; never imports other features. Visual theme definitions come from `core:ui`. Theme preferences use `core:datastore` and ViewModel injection uses `core:di`.
 * **`feature:constructor`**
     * **Phase 3C:** Online map presentation, source/style selection, presentation validation, loading/error/retry state, attribution, and a separate dialog-scoped credentials ViewModel. Uses `core:ui`, `domain:providers`, `core:map-engine`, `core:datastore`, and `core:di`.
     * **Responsibility:** UI for the map builder. Handles user interaction for bounding box selection, continuous zoom range selection, layer ordering and visibility, and initiating the download process.

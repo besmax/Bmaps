@@ -93,7 +93,7 @@ fun AppShell(
                     navigationIcon = { if (destination != ShellDestination.LIBRARY) IconButton(onClick = onBack) { Icon(painterResource(Res.drawable.ic_back), stringResource(Res.string.back)) } },
                     title = { Text(stringResource(Res.string.bmaps), style = MaterialTheme.typography.titleLarge) },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    actions = { IconButton(onClick = viewModel::openPreferences) { Icon(painterResource(Res.drawable.ic_settings), stringResource(Res.string.preferences)) } },
+                    actions = { IconButton(onClick = viewModel::openPreferences) { Icon(painterResource(Res.drawable.ic_settings), stringResource(Res.string.settings)) } },
                 )
             },
         ) { padding ->

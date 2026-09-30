@@ -39,6 +39,14 @@ class DataStoreUserPreferences(private val dataStore: DataStore<Preferences>) : 
         dataStore.edit { it[ThemeKey] = theme.name }
     }
 
+    override suspend fun setClusterMapObjects(enabled: Boolean) {
+        dataStore.edit { it[ClusterMapObjectsKey] = enabled }
+    }
+
+    override suspend fun setCoordinateFormat(format: CoordinateFormat) {
+        dataStore.edit { it[CoordinateFormatKey] = format.name }
+    }
+
     override suspend fun setDefaultCoordinateSystem(identifier: String) {
         dataStore.edit { it[CoordinateSystemKey] = identifier }
     }

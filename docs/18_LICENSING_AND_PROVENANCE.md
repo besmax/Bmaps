@@ -14,7 +14,7 @@ Original Kotlin/Kotlin DSL, Java, Swift, C headers/sources, Python, shell, CMake
 
 `scripts/license_headers.py` checks tracked and untracked non-ignored original sources and synchronizes the root license documents with the copies packaged by `feature:shell`. Generated build outputs, downloaded native sources, Gradle wrapper scripts, binary fixtures, and externally licensed assets are outside the header writer's scope. GitHub Actions runs the check on pushes and pull requests. Review ownership before using `--write`; the script is not a copyright audit.
 
-Preferences includes a selectable Bmaps licensing section with the owner, canonical URL, public-license URL, and commercial contact, available offline. Full license, notice, and commercial request policy texts are bundled as Compose resources on both platforms. This section identifies Bmaps licensing; it does not claim to be a complete third-party license browser.
+Settings includes a selectable About Bmaps/licensing card, including the installed app version code, the owner, canonical URL, public-license URL, and commercial contact, available offline. Full license, notice, and commercial request policy texts are bundled as Compose resources on both platforms. This section identifies Bmaps licensing; it does not claim to be a complete third-party license browser.
 
 ## Signed release procedure
 

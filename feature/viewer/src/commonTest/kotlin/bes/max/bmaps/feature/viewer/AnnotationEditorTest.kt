@@ -139,6 +139,8 @@ private class MemoryAnnotations : AnnotationRepository {
 
 private class MemoryPreferences : UserPreferencesRepository {
     override val preferences = MutableStateFlow(UserPreferences())
+    override suspend fun setClusterMapObjects(enabled: Boolean) { preferences.value = preferences.value.copy(clusterMapObjects = enabled) }
+    override suspend fun setCoordinateFormat(format: bes.max.bmaps.core.datastore.CoordinateFormat) { preferences.value = preferences.value.copy(coordinateFormat = format) }
     override suspend fun setTheme(theme: ThemePreference) { preferences.value = preferences.value.copy(theme = theme) }
     override suspend fun setDefaultCoordinateSystem(identifier: String) { preferences.value = preferences.value.copy(defaultCoordinateSystem = identifier) }
     override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean, coordinateFormat: bes.max.bmaps.core.datastore.CoordinateFormat, defaultCoordinateSystem: String) {

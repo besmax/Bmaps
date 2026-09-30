@@ -30,4 +30,9 @@
     <string name="coordinate_decimal">Decimal degrees · 55.755800°</string>
     <string name="coordinate_minutes">Degrees, minutes · 55° 45.348′</string>
     <string name="coordinate_seconds">Degrees, minutes, seconds · 55° 45′ 20.9″</string>
+    <string name="settings">Settings</string>
+    <string name="system">System</string>
+    <string name="app_version_code">Version code: %1$s</string>
+    <string name="app_version_unavailable">Version code unavailable</string>
+    <string name="setting_save_failed">Could not apply this setting. Your previous value was restored. Select it again to retry.</string>
 </resources>
