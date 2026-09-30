@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ovh.plrapps.mapcompose.ui.MapUI
+import kotlinx.coroutines.withTimeoutOrNull
 
 @Composable
 fun RasterMap(
@@ -36,12 +37,14 @@ fun RasterMap(
     paths: List<MapPath> = emptyList(),
     onOverlayClick: (String, MapPoint) -> Unit = { _, _ -> },
     onGestureStart: () -> Unit = {},
+    onLongPress: () -> Unit = {},
     markerContent: @Composable (MapMarker) -> Unit = {},
 ) {
     val state by renderer.state.collectAsStateWithLifecycle()
     val clicked by rememberUpdatedState(onOverlayClick)
     val marker by rememberUpdatedState(markerContent)
     val gesture by rememberUpdatedState(onGestureStart)
+    val longPress by rememberUpdatedState(onLongPress)
     val engine = state.engine
     val markerRegistry = remember(engine) {
         OverlayRegistry<MapMarker>(MapMarker::id, { item ->
@@ -76,9 +79,24 @@ fun RasterMap(
     }
     Box(modifier.onSizeChanged(renderer::resize).pointerInput(renderer) {
         awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             renderer.controller.cancelMove()
             gesture()
+            val recognizedLongPress = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                var cancelled = false
+                while (!cancelled) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id }
+                    if (change == null || !change.pressed) {
+                        cancelled = true
+                    } else {
+                        val delta = change.position - down.position
+                        cancelled = delta.x * delta.x + delta.y * delta.y > viewConfiguration.touchSlop * viewConfiguration.touchSlop
+                    }
+                }
+                !cancelled
+            } ?: true
+            if (recognizedLongPress) longPress()
             do { val event = awaitPointerEvent(PointerEventPass.Initial) } while (event.changes.any { it.pressed })
         }
     }) {

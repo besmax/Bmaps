@@ -122,7 +122,12 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
             overlays.markers,
             overlays.paths,
             handleOverlayClick,
-            onGestureStart = annotations::cancelExpansion
+            onGestureStart = annotations::cancelExpansion,
+            onLongPress = {
+                if (state.manifest != null && state.error == null && !annotationState.busy && annotationState.draft == null) {
+                    annotations.panel(true)
+                }
+            }
         ) { marker ->
             val cluster = overlays.targets[marker.id] as? AnnotationHit.Cluster
             if (cluster != null) {
@@ -160,13 +165,6 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
                 Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (annotationState.draft == null) {
-                    FilledTonalButton(
-                        onClick = { annotations.panel(true) },
-                        enabled = state.manifest != null && state.error == null && !annotationState.busy,
-                        modifier = Modifier.weight(1f, fill = false),
-                    ) { Text(stringResource(Res.string.annotations_title)) }
-                }
                 Spacer(Modifier.weight(1f))
                 if (attribution.isNotEmpty()) {
                     MapIconButton(
@@ -220,13 +218,16 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Text(stringResource(error))
-                    TextButton(onClick = {
-                        model.retry(); position.open(
-                        packageId,
-                        model.renderer.camera,
-                        retry = true
-                    )
-                    }) { Text(stringResource(Res.string.viewer_retry)) }
+                    TextButton(
+                        onClick = {
+                            model.retry();
+                            position.open(
+                                packageId,
+                                model.renderer.camera,
+                                retry = true
+                            )
+                        }
+                    ) { Text(stringResource(Res.string.viewer_retry)) }
                 }
             }
         }
