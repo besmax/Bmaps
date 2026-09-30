@@ -14,7 +14,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import bes.max.bmaps.core.sharing.rememberNativeDocuments
+import dev.zacsweers.metrox.viewmodel.metroViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,6 +31,20 @@ import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun AnnotationEditorContent(model: AnnotationEditorViewModel, state: AnnotationEditorState, modifier: Modifier = Modifier) {
+    val fileModel = metroViewModel<AnnotationFileViewModel>()
+    val fileState by fileModel.state.collectAsStateWithLifecycle()
+    val documents = rememberNativeDocuments(fileModel::pick, fileModel::nativeFailure)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(fileModel, model, documents, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            fileModel.events.collect { event ->
+                when (event) {
+                    is AnnotationFileEvent.Loaded -> { model.geoJson(true); model.geoJsonText(event.text) }
+                    is AnnotationFileEvent.Share -> documents.share(event.document)
+                }
+            }
+        }
+    }
     if (state.draft != null && !state.propertiesOpen) Surface(modifier, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.padding(8.dp)) {
             Text(stringResource(if (state.replacingVertex == null) Res.string.annotations_drawing_hint else Res.string.annotations_replace_hint))
@@ -61,6 +81,12 @@ internal fun AnnotationEditorContent(model: AnnotationEditorViewModel, state: An
                 Text(stringResource(it), color = MaterialTheme.colorScheme.error)
                 TextButton(model::retry) { Text(stringResource(Res.string.viewer_retry)) }
             }
+            TextButton(documents::pick, enabled = !state.busy && !fileState.busy) { Text(stringResource(Res.string.annotations_pick_file)) }
+            if (fileState.busy) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+                TextButton(fileModel::cancel) { Text(stringResource(Res.string.layers_cancel)) }
+            }
+            fileState.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
             TextButton({ model.geoJson(true) }, enabled = !state.busy) { Text(stringResource(Res.string.annotations_import)) }
             TextButton(model::exportGeoJson, enabled = !state.busy) { Text(stringResource(Res.string.annotations_export)) }
         } },
@@ -128,7 +154,11 @@ internal fun AnnotationEditorContent(model: AnnotationEditorViewModel, state: An
         title = { Text(stringResource(if (state.geoJsonExport) Res.string.annotations_export else Res.string.annotations_import)) },
         text = { Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
             Text(stringResource(if (state.geoJsonExport) Res.string.annotations_export_hint else Res.string.annotations_import_hint))
-            if (state.geoJsonExport) SelectionContainer { Text(state.geoJson) }
+            if (state.geoJsonExport) {
+                TextButton({ fileModel.share(state.geoJson) }, enabled = !fileState.busy) { Text(stringResource(Res.string.annotations_share_file)) }
+                fileState.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+                SelectionContainer { Text(state.geoJson) }
+            }
             else OutlinedTextField(state.geoJson, model::geoJsonText, enabled = !state.busy, label = { Text(stringResource(Res.string.annotations_geojson)) })
             state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
         } },

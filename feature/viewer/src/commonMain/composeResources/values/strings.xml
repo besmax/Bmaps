@@ -106,4 +106,7 @@
     <string name="position_transform_resources_missing">Required offline transformation data is unavailable</string>
     <string name="position_transform_failed">Coordinate transformation failed</string>
     <string name="position_coordinate_epoch">Coordinate epoch: %1$s</string>
+    <string name="annotations_pick_file">Import GeoJSON file</string>
+    <string name="annotations_share_file">Share GeoJSON file</string>
+    <string name="annotations_file_error">Could not read or share this file. Import a GeoJSON Feature or FeatureCollection, up to 4 MB, with supported point, line, or polygon geometry.</string>
 </resources>

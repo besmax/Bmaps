@@ -17,6 +17,7 @@ kotlin {
         implementation(project(":domain:map-builder"))
         implementation(project(":core:database"))
         implementation(project(":core:storage"))
+        implementation(project(":core:sharing"))
         implementation(project(":core:map-engine"))
         implementation(project(":core:network"))
         implementation(project(":core:datastore"))

@@ -12,7 +12,9 @@ For uses outside the public license's permissions, contact **bespalov.m.9@gmail.
 
 See [contribution requirements](CONTRIBUTING.md) and [provenance and release-signing guidance](docs/18_LICENSING_AND_PROVENANCE.md). Run `python3 scripts/license_headers.py` to check source notices and packaged license documents.
 
-The current implementation includes provider/package contracts, feature navigation, Metro dependency injection, persisted appearance preferences, provider tile networking, and encrypted credential storage. The constructor now displays an online OSM map with attribution, persistent HTTP caching, source selection, and recoverable errors. Thunderforest supports secure API-key entry; other providers remain gated by the prerequisites documented below. Downloads and package management are not implemented.
+The implementation includes provider networking and credentials, durable offline downloads, the local map library/viewer, raster layer composition, annotations/GeoJSON, and elevation/coordinate support. Phase 10 adds native `.bmaps` package import/sharing and bounded standalone MBTiles/GeoJSON file flows. Mobile build and runtime acceptance remain pending where recorded in the [implementation plan](docs/5_IMPLEMENTATION_PLAN.md).
+
+See [package transfer](docs/19_PACKAGE_TRANSFER.md) for supported file formats, import-as-copy behavior, limits, and Android/iOS verification steps.
 
 ## Project structure
 

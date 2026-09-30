@@ -48,3 +48,7 @@ The offline map shows a bottom-right info icon when the package has attribution 
 ## Phase 9 center readout
 
 The offline viewer overlays a fixed black cross with a white outline at the actual map viewport center. A bottom surface shows latitude/longitude in the saved format and optional elevation rounded to one decimal meter with the dataset vertical reference. The annotation controls and attribution action sit above the readout. The independent `MapPositionViewModel` observes camera snapshots and preferences and owns a package session for DEM access; it closes the session when cleared. Missing DEM omits altitude, while unavailable samples, coverage and unsupported data have explicit labels. See `17_ELEVATION_READER.md` for the supported subset and pending user acceptance.
+
+## Phase 10 native files
+
+The library now offers native `.bmaps`/standalone MBTiles import and ready-package sharing through a separate `PackageTransferViewModel`. The viewer adds GeoJSON file import/share controls. Import creates a new map identity; existing favourites/avatar preferences remain device-local. See `19_PACKAGE_TRANSFER.md` for supported files and pending native acceptance.

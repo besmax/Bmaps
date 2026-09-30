@@ -19,6 +19,24 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 
 class ManifestContractsTest {
+    @Test fun transferPathsAndDigestAreValidatedBeforeExtraction() {
+        val manifest = Json.decodeFromString<PackageManifest>(manifestFixture)
+        for (path in listOf("../outside", "/absolute", "assets/../../escape", "CONFIG.JSON", "assets//empty", "data-wal", "map_data.mbtiles-WAL", "config.json/child")) {
+            assertFailsWith<Exception> {
+                PackageManifestCodec.validate(manifest.copy(auxiliaryAssets = listOf(PackageAsset(path, 1))))
+            }
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PackageManifestCodec.validate(manifest.copy(auxiliaryAssets = listOf(PackageAsset("MAP_DATA.MBTILES", 1))))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PackageManifestCodec.validate(manifest.copy(auxiliaryAssets = listOf(PackageAsset("extra", 1, "bad"))))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            requireTransferLimits(listOf(PackageAsset("extra", Long.MAX_VALUE)))
+        }
+    }
+
     @Test fun legacySizePolicyReadsAsLayerLimitAndWritesExplicitField() {
         val oldPolicy = Json.decodeFromString<PackageSizePolicy>("""{"maxBytes":123456}""")
         assertEquals(123456L, oldPolicy.maxLayerBytes)

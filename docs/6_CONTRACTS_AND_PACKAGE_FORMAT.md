@@ -51,7 +51,7 @@ Sources checked for catalog design:
 
 ## Version 1 package manifest
 
-`PackageManifest` is the serializable domain format for `config.json`. A mandatory `schemaVersion` prevents an unversioned file from silently becoming version 1. `compatibility()` checks format version and raster support only; it is not complete import validation. Structural/file-integrity checks remain the responsibility of the future storage boundary.
+`PackageManifest` is the serializable domain format for `config.json`. A mandatory `schemaVersion` prevents an unversioned file from silently becoming version 1. `compatibility()` checks format version and raster support only; it is not complete import validation. Structural/file-integrity checks run at the storage and transfer boundaries.
 
 The manifest contains stable package identity, display name, WGS-84 bounds, inclusive overall zoom range, UTC epoch-millisecond timestamps, ordered layers, optional annotations/elevation, auxiliary assets, and the package size policy. Layers carry independent source identity (nullable for imported sources), bounds, zoom range, tile content/CRS/matrix metadata, visibility, opacity, and attribution. List order identifies the root asset and download sequence. Optional `renderOrder` (default 0) controls bottom-to-top composition; ties retain list order for older manifests. Reordering never changes asset paths. The overall zoom range spans layer ranges; Phase 7 composition requires matching exact selected levels, bounds, CRS, and tile dimensions rather than resampling narrower sources.
 
@@ -68,7 +68,7 @@ Storage layout:
 
 Only required/present assets are created. Additional layers and optional annotation/elevation files are not required for a single-layer package. All layers initially share identical geographic bounds and compatible tile matrices; offsets and reprojection of raster layers are not implemented.
 
-Package IDs and layer IDs are generated stable opaque storage identifiers, restricted by the future boundary validation to safe filename components. Display names are never filesystem paths. Asset references are package-relative paths; reject absolute paths, traversal, symlink escape, duplicated asset paths, and missing files when importing/opening. Do not trust an imported size or manifest-supplied size limit.
+Package IDs and layer IDs are generated stable opaque storage identifiers, restricted by boundary validation to safe filename components. Display names are never filesystem paths. Asset references are package-relative paths; reject absolute paths, traversal, symlink escape, duplicated asset paths, and missing files when importing/opening. Do not trust an imported size or manifest-supplied size limit.
 
 Each asset records its byte size and optional SHA-256 digest. A manifest does not list itself as an asset or checksum itself. Annotation edits invalidate previous sizes/digests; update metadata after changes and generate a consistent snapshot at export. The central database holds the actual total package size; compute it from all files, including `config.json`, rather than merely summing listed assets.
 
@@ -131,3 +131,7 @@ Both commands passed, with 10 host tests and no test failures. Apps were not lau
 The optional manifest annotation asset is fixed to `annotations.db`. SQLite schema version 1 is independent of manifest version 1 and Room schema version 2. Committed annotation rows are authoritative; package recovery reconciles their size and timestamp into the manifest and catalog. The GeoJSON subset, limits, property mapping, viewport query semantics, SVG catalog extension, and recovery protocol are specified in `15_ANNOTATIONS_AND_GEOJSON.md`.
 
 Phase 9 viewer sampling uses the existing `elevationDataset` identity as the provider meter/vertical-reference contract and does not change manifest version 1. Unknown (`NONE`) dataset identities with an elevation asset return unsupported altitude. `OpenedPackage.elevation` owns no caller-visible native handle and distinguishes missing, NoData, outside coverage, unsupported and unavailable results. See `17_ELEVATION_READER.md`.
+
+## Phase 10 package transfer
+
+`PackageTransfer` defines export/import over caller-owned raw streams and standalone MBTiles import independently of native document UI. The package manifest remains schema 1. A separate version 1 `.bmaps` frame contains a checksummed manifest and exact-length, SHA-256-verified assets. SQLite snapshots include committed WAL data; imports rebind identities into new staged copies before promotion and registration. See `19_PACKAGE_TRANSFER.md` for the byte-level format, resource limits, supported standalone subset, native access lifetime, cleanup, and pending acceptance.

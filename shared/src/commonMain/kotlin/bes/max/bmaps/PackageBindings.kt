@@ -12,6 +12,7 @@ import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.domain.mapbuilder.AnnotationRepository
 import bes.max.bmaps.domain.mapbuilder.LocalPackageRepository
 import bes.max.bmaps.domain.mapbuilder.PackageBuildStorage
+import bes.max.bmaps.domain.mapbuilder.PackageTransfer
 import bes.max.bmaps.domain.mapbuilder.PackageRepository
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
@@ -20,6 +21,9 @@ import dev.zacsweers.metro.Provides
 @BindingContainer
 @ContributesTo(AppScope::class)
 object PackageBindings {
+    @Provides
+    fun transfer(repository: LocalPackageRepository): PackageTransfer = repository
+
     @Provides
     fun repository(repository: LocalPackageRepository): PackageRepository = repository
 

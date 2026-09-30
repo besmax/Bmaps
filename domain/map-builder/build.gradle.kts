@@ -17,6 +17,7 @@ kotlin {
         api(project(":domain:providers"))
         api(project(":core:map-engine"))
         api(libs.kotlinx.coroutines.core)
+        api(libs.kotlinx.io.core)
         implementation(project(":core:di"))
         implementation(project(":core:storage"))
         implementation(project(":core:mbtiles"))

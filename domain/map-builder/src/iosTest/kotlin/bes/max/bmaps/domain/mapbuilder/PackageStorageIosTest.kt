@@ -19,6 +19,7 @@ class PackageStorageIosTest {
         packageDatabase(Room.databaseBuilder<PackageDatabase>(name = path))
     }
 
+    @Test fun transferRoundTripAndInterruptedImport() = runBlocking { scenarios.transferRoundTripAndInterruptedImport() }
     @Test fun eachLayerHasItsOwnLimitAndElevationIsExcluded() = runBlocking { scenarios.eachLayerHasItsOwnLimitAndElevationIsExcluded() }
     @Test fun elevationIsRequiredAndSurvivesRestart() = runBlocking { scenarios.elevationIsRequiredAndSurvivesRestart() }
     @Test fun annotationsSurviveRestartAndStayIsolated() = runBlocking { scenarios.annotationsSurviveRestartAndStayIsolated() }

@@ -24,6 +24,7 @@ kotlin {
     }
     sourceSets.commonMain.dependencies {
         api(libs.kotlinx.io.core)
+        implementation(libs.okio)
         implementation(libs.kotlinx.coroutines.core)
         implementation(libs.androidx.sqlite.bundled)
         implementation(project(":core:di"))

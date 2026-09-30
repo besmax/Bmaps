@@ -17,7 +17,7 @@ Planning baseline: 2026-09-08. Last updated: 2026-09-29. Phases 1, 2, and 3A are
 | Phase 9 | Completed: DEM reading, center readout, and PROJ display-CRS implementation | Coordinate-accuracy checks and outstanding mobile/DEM acceptance transferred to Phase 11 |
 | Phases 10–11 | Contracts and plans | Sharing and release hardening |
 
-Current work: Phase 9 is completed by the project owner’s decision; Phase 10 is the next implementation phase. Outstanding mobile/DEM verification and independent coordinate-accuracy checks are tracked in Phase 11 before release. The PROJ SQLite archive path and build dependency were corrected after the reported Android Ninja failure; the host CMake native target build passed. Details are in `9_MAP_ENGINE.md` and `17_ELEVATION_READER.md`. Phase 8 handoff remains in `15_ANNOTATIONS_AND_GEOJSON.md`. Phase 7 handoff remains in `14_RASTER_LAYER_COMPOSITION.md`. Phase 6 handoff remains in `13_LIBRARY_AND_OFFLINE_VIEWER.md`. Phase 5 download verification remains in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Mobile app builds and all test execution remain assigned to the user; the focused host CMake build used to validate the PROJ dependency fix is recorded below.
+Current work: Phase 9 is completed by the project owner’s decision. Phase 10 source implementation is present; builds, tests, and Android ↔ iOS transfer acceptance remain pending. See `19_PACKAGE_TRANSFER.md`. Outstanding mobile/DEM verification and independent coordinate-accuracy checks are tracked in Phase 11 before release. The PROJ SQLite archive path and build dependency were corrected after the reported Android Ninja failure; the host CMake native target build passed. Details are in `9_MAP_ENGINE.md` and `17_ELEVATION_READER.md`. Phase 8 handoff remains in `15_ANNOTATIONS_AND_GEOJSON.md`. Phase 7 handoff remains in `14_RASTER_LAYER_COMPOSITION.md`. Phase 6 handoff remains in `13_LIBRARY_AND_OFFLINE_VIEWER.md`. Phase 5 download verification remains in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Mobile app builds and all test execution remain assigned to the user; the focused host CMake build used to validate the PROJ dependency fix is recorded below.
 
 This plan follows `AGENTS.md` and documents 1–4. Checked boxes represent completed deliverables. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats. The table below preserves the original source-inspection baseline; current Phase 1 decisions are recorded in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 
@@ -68,7 +68,7 @@ Record decisions in the relevant existing architecture/product document. These a
 | Download lifecycle | Durable Phase 4 checkpoints; Phase 5 Android WorkManager with foreground progress, plus iOS BGProcessingTask opportunities and foreground lifetime extension. Preserve missing tiles and expose user restore, top-of-library progress, and platform progress/completion surfaces. See document 11. | Phase 5 |
 | CRS support | Use WGS 84 (EPSG:4326), Pulkovo 1942 (EPSG:4284), and PZ-90.11 (EPSG:9475). Plan PROJ integration; select area-valid operations, offline resources, reference fixtures and accuracy targets before enabling the new systems. SK-91 is superseded. | Phase 9 |
 | DEM support | Define accepted TIFF/GeoTIFF encodings, compression, CRS, no-data rules, and size limits after a bounded reader spike on both platforms. | Phase 9 |
-| Transfer format | Proposed versioned archive of a consistent package snapshot, with a manifest and integrity metadata. Define standalone MBTiles and GeoJSON import behavior separately. | Phase 10 |
+| Transfer format | Version 1 framed `.bmaps` snapshot with SHA-256 metadata; bounded standalone raster MBTiles and GeoJSON flows. See document 19. | Phase 10 |
 
 Presentation owns user-input validation, invoked separately before structural use cases. Storage and network boundaries must still reject corrupt files, unsupported formats, and failed IO operations; those checks are not form validation.
 
@@ -278,15 +278,17 @@ Release verification transferred to Phase 11: independent reference points meet 
 
 Dependencies: Phases 7–9 for complete-package support; transport contracts can be drafted in Phase 1.
 
-- [ ] Define domain package-transfer contracts independent of native share sheets and future transport implementations.
-- [ ] Implement versioned streaming export of a consistent package snapshot, including all layers, annotations, configuration, elevation, and auxiliary assets.
-- [ ] Ensure database snapshots include committed data even when the package was recently edited; avoid copying an inconsistent live database.
-- [ ] Implement import into a staging directory with manifest/version checks, asset integrity checks, safe path handling, capacity limits, and collision handling.
-- [ ] Finalize imports and register metadata only after successful verification; recover interrupted import/export and clean temporary files.
-- [ ] Add native picker/share adapters for Android and iOS, including temporary access grants and cleanup appropriate to each platform.
-- [ ] Implement the agreed standalone MBTiles/GeoJSON import flows and unsupported-format messages.
+- [x] Define domain package-transfer contracts independent of native share sheets and future transport implementations.
+- [x] Implement versioned streaming export of a consistent package snapshot, including all layers, annotations, configuration, elevation, and auxiliary assets.
+- [x] Ensure database snapshots include committed data even when the package was recently edited; avoid copying an inconsistent live database.
+- [x] Implement import into a staging directory with manifest/version checks, asset integrity checks, safe path handling, capacity limits, and collision handling.
+- [x] Finalize imports and register metadata only after successful verification; recover interrupted import/export and clean temporary files.
+- [x] Add native picker/share adapters for Android and iOS, including temporary access grants and cleanup appropriate to each platform.
+- [x] Implement the agreed standalone MBTiles/GeoJSON import flows and unsupported-format messages.
 
-Acceptance: export on Android and import on iOS, and vice versa; verify tiles, layer settings, annotations, and DEM results. Cancellation or malformed archives leave no apparently complete package behind.
+Implementation handoff: `19_PACKAGE_TRANSFER.md` specifies the framed archive, import-as-copy policy, standalone format subset, native adapters, cleanup, and unrun verification fixtures. Checkmarks describe source deliverables, not acceptance evidence.
+
+Acceptance pending: export on Android and import on iOS, and vice versa; verify tiles, layer settings, annotations, and DEM results. Cancellation or malformed archives leave no apparently complete package behind.
 
 ### Phase 11 — Harden and prepare a release candidate
 

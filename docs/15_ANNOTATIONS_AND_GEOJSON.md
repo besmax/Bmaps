@@ -39,7 +39,7 @@ The supported interchange subset follows [RFC 7946](https://www.rfc-editor.org/r
 
 Feature string IDs map to annotation IDs. Missing IDs are generated. Duplicate IDs within an import are rejected. The UI imports copies with new IDs to avoid overwriting existing objects; a failed import retry reuses its pending IDs. Export preserves saved IDs. Reserved properties are `name`, `description`, `marker-color`, and `marker-symbol`; all other JSON properties are retained, including nested values. Unknown icon keys are valid. Colors are RGB hex strings. Input is limited to 4 MB, 1,000 features, and 1,000 vertices per feature; SQLite also caps each serialized feature at 256 KB. Invalid input aborts the complete import.
 
-The Map objects panel provides pasted-GeoJSON import and selectable/copyable GeoJSON export. Export reads all package annotations, independently of viewport and visibility; exceeding the 1,000-feature/4 MB export limit produces an error rather than truncating. Native file picking, sharing, and complete-package transfer remain Phase 10.
+The Map objects panel provides pasted-GeoJSON import and selectable/copyable GeoJSON export. Export reads all package annotations, independently of viewport and visibility; exceeding the 1,000-feature/4 MB export limit produces an error rather than truncating. Phase 10 adds native file picking into the existing import dialog, GeoJSON file sharing from the export dialog, and complete-package transfer. A separate `AnnotationFileViewModel` owns bounded document reads and outbound file creation; the editor retains validation and transactional saves. See `19_PACKAGE_TRANSFER.md`.
 
 ## Verification handoff
 

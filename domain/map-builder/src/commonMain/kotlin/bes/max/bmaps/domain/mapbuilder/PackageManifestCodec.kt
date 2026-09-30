@@ -44,15 +44,18 @@ internal object PackageManifestCodec {
             require(layer.tileCount == null || layer.tileCount == coverage.count)
         }
         require(manifest.annotations == null || manifest.annotations.relativePath == "annotations.db")
+        require(manifest.name.isNotBlank() && manifest.name.length <= 120)
         val assets = assets(manifest)
-        require(assets.map { it.relativePath }.toSet().size == assets.size)
+        require(assets.size <= 1024)
+        require(assets.map { it.relativePath.lowercase() }.toSet().size == assets.size)
         assets.forEach {
-            require(it.sizeBytes >= 0 && it.relativePath !in setOf("config.json", "draft.json"))
-            require(!it.relativePath.endsWith(".part") && !it.relativePath.endsWith("-journal") &&
-                !it.relativePath.endsWith("-wal") && !it.relativePath.endsWith("-shm"))
+            val path = it.relativePath.lowercase()
+            require(it.sizeBytes >= 0 && path.substringBefore('/') !in setOf("config.json", "draft.json"))
+            require(!path.endsWith(".part") && !path.endsWith("-journal") &&
+                !path.endsWith("-wal") && !path.endsWith("-shm"))
+            require(it.relativePath.split('/').size <= 8)
             it.relativePath.split('/').forEach(::checkComponent)
-            // Checksummed imports require the Phase 10 integrity reader; never accept an unchecked digest.
-            if (it.sha256 != null) throw PackageStorageException(PackageFailure.UnsupportedContent)
+            require(it.sha256 == null || (it.sha256.length == 64 && it.sha256.all { character -> character in '0'..'9' || character in 'a'..'f' }))
         }
     }
 

@@ -11,6 +11,7 @@ Existing third-party notices include:
 | GDAL reference DEM | `core/tiff-native/src/test/fixtures/GDAL-LICENSE.txt` and the adjacent `README.md` |
 | Gradle wrapper scripts and distribution | Existing wrapper headers and the upstream Gradle distribution |
 | PROJ, its database, and SQLite | Upstream notices in the catalog-pinned source archives; the Bmaps C/JNI wrappers are separate original code |
+| Okio SHA-256 primitive | Catalog-pinned Okio artifact, Apache-2.0; upstream artifact notices retained. Transfer file IO uses kotlinx-io. |
 | Kotlin, Compose, MapComposeMP, and other dependencies | Their upstream licenses and artifact notices; versions are in `gradle/libs.versions.toml` |
 
 This is an ownership boundary and a navigation aid, not an exhaustive release dependency-license inventory. Review and bundle all required upstream notices for the actual artifacts shipped before release. Map/provider attribution remains separately required and is displayed by the map features.

@@ -65,6 +65,7 @@ include(":feature:shell", ":feature:constructor", ":feature:library", ":feature:
 
 include(
     ":core:ui",
+    ":core:sharing",
     ":core:network",
     ":core:database",
     ":core:mbtiles",

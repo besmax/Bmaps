@@ -23,6 +23,7 @@ class PackageStorageDeviceTest {
         packageDatabase(Room.databaseBuilder<PackageDatabase>(InstrumentationRegistry.getInstrumentation().targetContext, path))
     }
 
+    @Test fun transferRoundTripAndInterruptedImport() = runBlocking { scenarios.transferRoundTripAndInterruptedImport() }
     @Test fun eachLayerHasItsOwnLimitAndElevationIsExcluded() = runBlocking { scenarios.eachLayerHasItsOwnLimitAndElevationIsExcluded() }
     @Test fun elevationIsRequiredAndSurvivesRestart() = runBlocking { scenarios.elevationIsRequiredAndSurvivesRestart() }
     @Test fun annotationsSurviveRestartAndStayIsolated() = runBlocking { scenarios.annotationsSurviveRestartAndStayIsolated() }
