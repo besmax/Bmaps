@@ -95,6 +95,7 @@
     <string name="position_latitude_longitude">Lat / Lon: %1$s</string>
     <string name="position_preferences_unavailable">Coordinate preferences unavailable</string>
     <string name="position_coordinates_unsupported">Coordinate system unsupported</string>
+    <string name="position_coordinates_calculating">Calculating coordinates…</string>
     <string name="position_elevation_value">Elevation: %1$s m · %2$s</string>
     <string name="position_elevation_loading">Elevation: …</string>
     <string name="position_elevation_no_data">Elevation: no data at this point</string>

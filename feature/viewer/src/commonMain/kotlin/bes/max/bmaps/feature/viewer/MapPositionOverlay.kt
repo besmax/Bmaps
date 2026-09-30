@@ -64,6 +64,7 @@ internal fun MapPositionOverlay(state: MapPositionState, modifier: Modifier = Mo
                 when {
                     state.coordinateError != null -> stringResource(state.coordinateError)
                     state.preferenceError -> stringResource(Res.string.position_preferences_unavailable)
+                    displayCoordinate == null -> stringResource(Res.string.position_coordinates_calculating)
                     coordinates == null -> stringResource(Res.string.position_coordinates_unsupported)
                     else -> stringResource(Res.string.position_latitude_longitude, coordinates)
                 }, style = MaterialTheme.typography.labelMedium

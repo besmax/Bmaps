@@ -85,6 +85,8 @@ The unit policy is unscaled meters for these provider products. Vertical referen
 
 Coordinate formats are signed latitude then longitude: decimal degrees (six decimal places), degrees/minutes (three minute decimals), and degrees/minutes/seconds (one second decimal). Rounding carries across minute/degree boundaries. Preferences select WGS 84 (EPSG:4326), Pulkovo 1942 (EPSG:4284), or PZ-90.11 (EPSG:9475); the map center is transformed from WGS 84 before formatting. Persisted EPSG:3857 remains supported as labeled X/Y meters; unknown systems are explicitly unavailable. PROJ rejects out-of-area, ballpark, and grid-dependent operations; time-dependent PZ-90.11 conversions use epoch 2010.0 and expose that epoch. Native build and independent reference-point acceptance remain pending.
 
+While a new camera position is awaiting coordinate transformation, the readout displays **Calculating coordinates…**. A temporarily absent transformed coordinate is not an unsupported-system error. Explicit transformation/preference failures and unsupported formatting still display their corresponding messages; coordinate lookup timing is unchanged.
+
 Source changes only in this increment: no builds, automated tests, device runs or live provider calls were performed, at the user's request. Suggested manual acceptance: all three formats across negative coordinates and rounding boundaries; changing zoom/region; rapid pan and navigation; tile-only packages; known DEM reference points including zero/negative values; NoData and coverage edges; unsupported/corrupt DEM; deletion/session closure; annotation tools and large text without overlapping the bottom readout.
 
 ## Elevation diagnostics and delivery to the widget
