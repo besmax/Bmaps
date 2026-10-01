@@ -43,7 +43,7 @@ Feature-specific labels, accessibility descriptions, and error messages belong i
 
 Map renderer state, tile events, and zoom controls belong to the ViewModel-owned `RasterMapRenderer`, not composable `remember` blocks. Source menu visibility and link failures belong to `OnlineMapState`. The ViewModel runs the renderer in its own scope; observing UI lifecycle changes must not destroy the engine or decoded tiles. Compose retains only framework UI mechanisms such as scroll position and updated effect callbacks.
 
-`AreaSelectionViewModel` owns a normalized selection rectangle and computes bounds from that rectangle and the visible world window. Dragging inside the rectangle moves it; dragging a corner resizes it. Movement stays within the viewport and resizing enforces a minimum extent. Areas outside the frame pass gestures to the map. Each corner has a 48 dp touch target and directional accessibility actions. Accepted bounds are a snapshot, independent of subsequent drags and map movement.
+`AreaSelectionViewModel` owns the freehand trace and its normalized bounding rectangle. In selection mode, a single-finger stroke captures all sampled positions and shows the trace; releasing the finger produces an axis-aligned rectangle from the extrema. A new stroke replaces the selection. Cancelled strokes and zero-area selections cannot be accepted. The drawing overlay consumes map gestures, and zoom controls are hidden during selection. Geographic bounds are computed from the rectangle and visible world window. Accepted bounds are a snapshot, independent of subsequent drawing and map movement.
 
 ## 7. Shared visual components
 
