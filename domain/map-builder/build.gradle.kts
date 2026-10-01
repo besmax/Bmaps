@@ -14,6 +14,7 @@ plugins {
 
 kotlin {
     sourceSets.commonMain.dependencies {
+        implementation(libs.xmlutil.core)
         api(project(":domain:providers"))
         api(project(":core:map-engine"))
         api(libs.kotlinx.coroutines.core)

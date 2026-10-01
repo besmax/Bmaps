@@ -107,11 +107,36 @@ class AnnotationEditorTest {
             model.save(); runCurrent()
             val original = repository.values.single()
             model.geoJson(true); model.geoJsonText(AnnotationGeoJson.encode(listOf(original)))
-            model.importGeoJson(); model.state.first { !it.busy }; runCurrent()
+            model.importAnnotations(); model.state.first { !it.busy }; runCurrent()
             assertEquals(2, repository.values.size)
             assertEquals(2, repository.values.map { it.id }.distinct().size)
             model.open(PackageId("two")); runCurrent()
             assertNull(model.state.value.draft)
+        } finally { owner.clear(); runCurrent(); Dispatchers.resetMain() }
+    }
+
+    @Test fun gpxImportWaitsForConfirmationAndInvalidBatchWritesNothing() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val owner = ViewModelStore()
+        try {
+            val repository = MemoryAnnotations()
+            val model = AnnotationEditorViewModel(repository, MemoryPreferences())
+            owner.put("editor", model)
+            model.open(PackageId("one")); runCurrent()
+            val text = """<gpx version="1.1"><wpt lat="1" lon="2"><name>Camp</name></wpt></gpx>"""
+            model.geoJson(true); model.geoJsonText(text)
+            assertTrue(repository.values.isEmpty())
+            model.importAnnotations(); model.state.first { !it.busy }; runCurrent()
+            assertEquals("Camp", repository.values.single().name)
+            model.geoJson(true); model.geoJsonText(text)
+            model.importAnnotations(); model.state.first { !it.busy }; runCurrent()
+            assertEquals(2, repository.values.map { it.id }.distinct().size)
+            val before = repository.values
+            model.geoJson(true)
+            model.geoJsonText(text.replace("</gpx>", """<wpt lat="99" lon="0"/></gpx>"""))
+            model.importAnnotations(); model.state.first { !it.busy }; runCurrent()
+            assertEquals(before, repository.values)
+            assertNotNull(model.state.value.error)
         } finally { owner.clear(); runCurrent(); Dispatchers.resetMain() }
     }
 

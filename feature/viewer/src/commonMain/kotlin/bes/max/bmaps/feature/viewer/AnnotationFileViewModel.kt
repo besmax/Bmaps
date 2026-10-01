@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.sharing.*
 import bes.max.bmaps.domain.mapbuilder.AnnotationGeoJson
+import bes.max.bmaps.domain.mapbuilder.AnnotationImport
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -61,7 +62,7 @@ class AnnotationFileViewModel(private val files: SharedDocumentStore) : ViewMode
                 buffer.readByteArray().decodeToString(throwOnInvalidSequence = true)
             } } finally { document.dispose() }
         }
-        withContext(Dispatchers.Default) { AnnotationGeoJson.decode(text) }
+        withContext(Dispatchers.Default) { AnnotationImport.decode(text) }
         channel.send(AnnotationFileEvent.Loaded(text))
     }
 

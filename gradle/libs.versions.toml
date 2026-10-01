@@ -1,4 +1,5 @@
 [versions]
+xmlutil = "1.0.1"
 proj = "9.6.2"
 proj-sha256 = "53d0cafaee3bb2390264a38668ed31d90787de05e71378ad7a8f35bb34c575d1"
 proj-sqlite = "3500400"
@@ -38,6 +39,7 @@ androidx-compose-test = "1.11.2"
 robolectric = "4.16.1"
 
 [libraries]
+xmlutil-core = { module = "io.github.pdvrieze.xmlutil:core", version.ref = "xmlutil" }
 proj-source = { module = "org.osgeo:proj", version.ref = "proj" }
 proj-sqlite-source = { module = "org.sqlite:sqlite-amalgamation", version.ref = "proj-sqlite" }
 libtiff-source = { module = "org.libtiff:tiff", version.ref = "libtiff" }

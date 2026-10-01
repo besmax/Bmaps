@@ -8,7 +8,7 @@ Phase 10 source implementation, 2026-09-30. Android/iOS builds, automated test e
 
 The library offers **Import map file** and **Share map** for ready packages. A separate `PackageTransferViewModel` owns busy/cancel state and Channel-backed share/error events. Sharing first creates a private `.bmaps` file, then presents the platform share sheet. Import always creates a new copy; it never replaces an existing package. Names, original creation/modification timestamps, source identities, attribution, layer order/opacity/visibility, annotations, elevation identity, and auxiliary assets are preserved. Device-local favourites/avatar preferences and credentials are not exported.
 
-In an open map, **Map objects → Import GeoJSON file** reads and validates a bounded file, then opens the existing import dialog. **Import** commits a batch using new annotation IDs; cancelling the dialog leaves the package unchanged. **Export GeoJSON → Share GeoJSON file** shares the existing complete export snapshot. Existing pasted/copied GeoJSON controls remain available. The supported geometry, property, feature-count, and 4 MB limits are unchanged from document 15.
+In an open map, **Map objects → Import GeoJSON or GPX file** reads and validates a bounded file, then opens the existing import dialog. **Import** commits a batch using new annotation IDs; cancelling the dialog leaves the package unchanged. **Export GeoJSON → Share GeoJSON file** shares the existing complete export snapshot. Pasted GeoJSON/GPX import and copied GeoJSON export remain available. GPX mapping and its supported subset are documented in document 15. The supported geometry, property, feature-count, and 4 MB limits are unchanged from document 15.
 
 ## Version 1 `.bmaps` wire format
 

@@ -416,7 +416,7 @@ private fun GeoJsonDialog(
         },
         confirmButton = {
             TextButton(
-                if (state.geoJsonExport) ({ model.geoJson(false) }) else model::importGeoJson,
+                if (state.geoJsonExport) ({ model.geoJson(false) }) else model::importAnnotations,
                 enabled = !state.busy
             ) {
                 Text(stringResource(if (state.geoJsonExport) Res.string.viewer_done else Res.string.annotations_import))

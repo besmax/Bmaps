@@ -588,14 +588,14 @@ class AnnotationEditorViewModel(
         }
     }
 
-    fun importGeoJson() {
+    fun importAnnotations() {
         val text = state.value.geoJson
         if (state.value.busy) return
         mutate { id ->
             val values = try {
                 pendingImport?.takeIf { it.first == text }?.second
                     ?: withContext(Dispatchers.Default) {
-                        AnnotationGeoJson.decode(text).also {
+                        AnnotationImport.decode(text).also {
                             require(it.isNotEmpty()); require(it.all { value ->
                             AnnotationValidation.error(value) == null
                         })

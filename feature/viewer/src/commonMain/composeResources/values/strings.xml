@@ -83,12 +83,12 @@
     <string name="annotations_load_error">Could not load map objects. Try again.</string>
     <string name="annotations_save_error">Could not save map objects. Your edits are still available. Check available storage and retry.</string>
     <string name="annotations_vertex_limit">An object can contain up to 1,000 vertices.</string>
-    <string name="annotations_import">Import GeoJSON</string>
+    <string name="annotations_import">Import objects</string>
     <string name="annotations_export">Export GeoJSON</string>
-    <string name="annotations_geojson">GeoJSON</string>
-    <string name="annotations_import_hint">Paste a Feature or FeatureCollection with Point, LineString, or single-ring Polygon geometry. Coordinates use longitude, latitude. Import adds copies with new IDs. Up to 1,000 objects and 4 MB are supported.</string>
+    <string name="annotations_geojson">GeoJSON or GPX</string>
+    <string name="annotations_import_hint">Paste GeoJSON or GPX 1.0/1.1 XML. GPX waypoints become markers; routes and track segments become lines. Names and descriptions are kept; elevation, timestamps, and extensions are ignored. Import adds copies with new IDs. Limits: 4 MB, 1,000 objects, and 1,000 points per object.</string>
     <string name="annotations_export_hint">Select and copy the GeoJSON below. It includes all objects in this map.</string>
-    <string name="annotations_geojson_error">Unsupported or invalid GeoJSON. Check geometry, coordinates, properties, and size limits.</string>
+    <string name="annotations_geojson_error">Unsupported or invalid GeoJSON or GPX. Check coordinates, names, descriptions, and limits: 4 MB, 1,000 objects, 1,000 points per object. Routes and track segments need two distinct points.</string>
     <string name="annotations_export_error">Could not export GeoJSON. Export supports up to 1,000 objects and 4 MB.</string>
     <string name="annotations_cluster_title">%1$d map objects</string>
     <string name="annotations_cluster_hint">These objects cannot be separated further at the available zoom. Choose an object to view its details. Some may be outside the visible map.</string>
@@ -110,7 +110,7 @@
     <string name="position_transform_resources_missing">Required offline transformation data is unavailable</string>
     <string name="position_transform_failed">Coordinate transformation failed</string>
     <string name="position_coordinate_epoch">Coordinate epoch: %1$s</string>
-    <string name="annotations_pick_file">Import GeoJSON file</string>
+    <string name="annotations_pick_file">Import GeoJSON or GPX file</string>
     <string name="annotations_share_file">Share GeoJSON file</string>
-    <string name="annotations_file_error">Could not read or share this file. Import a GeoJSON Feature or FeatureCollection, up to 4 MB, with supported point, line, or polygon geometry.</string>
+    <string name="annotations_file_error">Could not read or share this file. Import UTF-8 GeoJSON or GPX 1.0/1.1, up to 4 MB, 1,000 objects, and 1,000 points per object.</string>
 </resources>
