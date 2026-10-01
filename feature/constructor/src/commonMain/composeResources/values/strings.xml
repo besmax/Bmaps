@@ -69,7 +69,7 @@
     <string name="zoom_levels">Zoom levels</string>
     <string name="zoom_out">Zoom out</string>
     <string name="zoom_out_symbol">−</string>
-    <string name="selection_instructions">Drag the area to move it, or drag a corner to resize. Pan the map outside the frame.</string>
+    <string name="selection_instructions">Trace an area with your finger, then lift it to create a bounding rectangle. Draw again to replace the selection.</string>
     <string name="move_selected_area">Move selected area</string>
     <string name="resize_top_left">Resize top left corner</string>
     <string name="resize_top_right">Resize top right corner</string>

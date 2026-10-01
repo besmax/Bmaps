@@ -68,7 +68,7 @@ fun FullScreenMap(
                 Modifier.fillMaxSize().testTag(if (showFixture) "sample-map" else "online-map")
             )
         }
-        if (selection.selecting) SelectionFrame(selection.frame, area::drag)
+        if (selection.selecting) SelectionFrame(selection, area::startDrawing, area::draw, area::finishDrawing, area::cancelDrawing)
         Row(
             Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(margin),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -83,7 +83,7 @@ fun FullScreenMap(
                 area::cancel
             )
         }
-        Column(
+        if (!selection.selecting) Column(
             Modifier.align(Alignment.CenterEnd).safeDrawingPadding().padding(margin),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
