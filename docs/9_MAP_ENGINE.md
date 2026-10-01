@@ -65,6 +65,10 @@ Native smoke evidence and final test results are recorded in the implementation 
 
 The renderer also exposes a latest `MapCameraSnapshot` flow containing the active pyramid, fit-relative viewport, measured layout, fit scale, effective maximum scale, and visible window. Consumers use this for screen-distance calculations without depending on MapComposeMP types. Camera snapshots are cleared when an engine session is retired.
 
+`RasterMapCallout` attaches composable content with MapComposeMP 1.1.3's `addCallout`, updates its coordinate with `moveCallout`, and calls `removeCallout` when the attachment leaves composition. MapComposeMP types remain private to the adapter. The feature controls local screen offsets and visibility animations. Native `autoDismiss` is disabled so removal can wait for the exit animation; the viewer's `autoDismiss` flag controls logical dismissal on map gestures. Card touch bounds are retained only while attached and excluded from the map's gesture-start/long-press observer, so callout controls and content scrolling stay interactive. Multiple attachments with distinct IDs are supported by the core API.
+
+`RasterMap` observes gesture starts on the initial pointer down outside callout cards without consuming map input. Its long-press observer waits for further pointer events only while pointers remain pressed; an already observed release completes that gesture instead of absorbing the next one. This lets the viewer dismiss a selected-object callout as soon as a following pan starts. Device acceptance remains with the user.
+
 ## Phase 9 PROJ integration — 2026-09-29
 
 The selectable geographic systems are WGS 84 (EPSG:4326), SK-42 / Pulkovo 1942 (EPSG:4284) and PZ-90.11 (EPSG:9475). Their geographic 2D definitions are present in [PROJ's EPSG-derived database](https://github.com/OSGeo/PROJ/blob/master/data/sql/geodetic_crs.sql). SK-91 is superseded. EPSG:4284 is not a zoned Gauss–Krüger projected CRS. Web Mercator remains the renderer's projection and existing compatibility path, while these three systems define the new display selector.

@@ -53,7 +53,9 @@ internal fun AnnotationEditorContent(
 
     state.draft?.takeIf { !state.propertiesOpen }?.let { DraftToolbar(model, state, modifier) }
     if (state.panel) AnnotationManagerDialog(model, state, fileModel, fileState, documents::pick)
-    state.selected?.let { selected -> SelectionDialogs(model, state, selected) }
+    state.activeObject?.takeIf { state.objectUi(it.id)?.deleteConfirmation == true }?.let {
+        SelectionDeleteDialog(model, state, it)
+    }
     state.draft?.takeIf { state.propertiesOpen }?.let { DraftPropertiesDialog(model, state, it) }
     if (state.geoJsonOpen) GeoJsonDialog(model, state, fileModel, fileState)
 }
@@ -134,26 +136,13 @@ private fun AnnotationObjectList(model: AnnotationEditorViewModel, state: Annota
 }
 
 @Composable
-private fun SelectionDialogs(model: AnnotationEditorViewModel, state: AnnotationEditorState, selected: bes.max.bmaps.domain.mapbuilder.Annotation) {
+private fun SelectionDeleteDialog(model: AnnotationEditorViewModel, state: AnnotationEditorState, annotation: Annotation) {
     AlertDialog(
-        onDismissRequest = model::dismissSelection,
-        title = { Text(selected.name.ifBlank { stringResource(selected.kind.label()) }) },
-        text = { Column {
-            Text(selected.description)
-            Text(stringResource(Res.string.annotations_vertex_count, selected.coordinates.size))
-        } },
-        confirmButton = { TextButton(model::edit, enabled = !state.busy) { Text(stringResource(Res.string.annotations_edit)) } },
-        dismissButton = { Row {
-            TextButton({ model.confirmDelete(true) }, enabled = !state.busy) { Text(stringResource(Res.string.annotations_delete)) }
-            TextButton(model::dismissSelection, enabled = !state.busy) { Text(stringResource(Res.string.viewer_done)) }
-        } },
-    )
-    if (state.deleteConfirmation) AlertDialog(
-        onDismissRequest = { model.confirmDelete(false) },
+        onDismissRequest = { model.confirmDelete(annotation.id, false) },
         title = { Text(stringResource(Res.string.annotations_delete)) },
-        text = { Text(stringResource(Res.string.annotations_delete_confirm, selected.name.ifBlank { stringResource(selected.kind.label()) })) },
-        confirmButton = { TextButton(model::delete, enabled = !state.busy) { Text(stringResource(Res.string.annotations_delete)) } },
-        dismissButton = { TextButton({ model.confirmDelete(false) }, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) } },
+        text = { Text(stringResource(Res.string.annotations_delete_confirm, annotation.name.ifBlank { stringResource(annotation.kind.label()) })) },
+        confirmButton = { TextButton({ model.delete(annotation.id) }, enabled = !state.busy) { Text(stringResource(Res.string.annotations_delete)) } },
+        dismissButton = { TextButton({ model.confirmDelete(annotation.id, false) }, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) } },
     )
 }
 

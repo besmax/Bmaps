@@ -21,8 +21,8 @@ internal data class AnnotationRenderData(
 )
 
 internal fun AnnotationEditorState.renderData() = AnnotationRenderData(
-    if (catalogReady) catalog else items, layers.filter { it.visible }.map { it.kind }.toSet(),
-    selected?.id, draft, catalogReady && clusteringEnabled && draft == null,
+    source, layers.filter { it.visible }.map { it.kind }.toSet(),
+    activeObjectId, draft, catalogReady && clusteringEnabled && draft == null,
 )
 
 internal data class AnnotationDisplay(val pyramid: TilePyramid? = null, val camera: MapCameraSnapshot? = null, val density: Float = 1f)

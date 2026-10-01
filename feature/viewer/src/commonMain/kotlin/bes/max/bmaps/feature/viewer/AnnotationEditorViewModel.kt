@@ -40,17 +40,24 @@ internal data class AnnotationEditorState(
     val draft: Annotation? = null,
     val history: List<Annotation> = emptyList(),
     val propertiesOpen: Boolean = false,
-    val selected: Annotation? = null,
     val clusterMembers: List<Annotation> = emptyList(),
     val replacingVertex: Int? = null,
-    val deleteConfirmation: Boolean = false,
     val busy: Boolean = false,
     val truncated: Boolean = false,
     val error: StringResource? = null,
     val geoJsonOpen: Boolean = false,
     val geoJson: String = "",
     val geoJsonExport: Boolean = false,
-)
+) {
+    val source: List<Annotation> get() = if (catalogReady) catalog else items
+    val activeObjectId: String? get() = layers.firstNotNullOfOrNull { layer ->
+        layer.objectStates.entries.firstOrNull { it.value.calloutOpen }?.key
+    }
+    val activeObject: Annotation? get() = activeObjectId?.let { id -> source.firstOrNull { it.id == id } }
+    val activeObjectUi: AnnotationObjectUiState? get() = activeObjectId?.let(::objectUi)
+    val hasMovingObject: Boolean get() = activeObject != null && activeObjectUi?.moving == true
+    fun objectUi(id: String): AnnotationObjectUiState? = layers.firstNotNullOfOrNull { it.objectStates[id] }
+}
 
 @Inject
 @ViewModelKey
@@ -111,7 +118,7 @@ class AnnotationEditorViewModel(
                         } else {
                             annotationOverlays(AnnotationEditorState(items = data.values,
                                 layers = AnnotationKind.entries.map { AnnotationLayerState(it, it in data.visible) },
-                                selected = data.values.firstOrNull { it.id == data.selectedId }, draft = data.draft), pyramid)
+                                draft = data.draft), pyramid, data.selectedId)
                         }
                     }
                     if (state.value.renderData() == data && display.value.camera?.session == camera?.session && display.value.pyramid == pyramid) {
@@ -196,7 +203,7 @@ class AnnotationEditorViewModel(
         pendingImport = null
         bounds = null
         mapPyramid = null
-        managers.forEach { it.visibility(true); it.select(null) }
+        managers.forEach { it.visibility(true); it.clearInteractions() }
         mutableState.value = AnnotationEditorState(clusteringEnabled = state.value.clusteringEnabled)
         refresh()
         loadCatalog()
@@ -205,7 +212,11 @@ class AnnotationEditorViewModel(
     fun mapEvent(pyramid: TilePyramid, event: MapEvent) {
         mapPyramid = pyramid
         when (event) {
-            is MapEvent.Tap -> pyramid.coordinateAt(event.position)?.let(::addPoint)
+            is MapEvent.Tap -> {
+                val movingId = state.value.activeObject?.id?.takeIf { state.value.objectUi(it)?.moving == true }
+                if (movingId != null) moveObjectTo(movingId, event.position)
+                else pyramid.coordinateAt(event.position)?.let(::addPoint)
+            }
             is MapEvent.ViewportChanged -> {
                 val window = event.visibleWindow ?: return
                 val world = pyramid.worldWindow(window)
@@ -249,9 +260,11 @@ class AnnotationEditorViewModel(
                         }
                     }
                 } while (cursor != null && items.size < AnnotationGeoJson.MAX_FEATURES)
+                if (!state.value.catalogReady) managers.forEach { it.retainObjects(items) }
                 mutableState.update {
                     it.copy(
                         items = items,
+                        layers = managers.map { layer -> layer.state },
                         truncated = cursor != null,
                         error = null
                     )
@@ -295,7 +308,9 @@ class AnnotationEditorViewModel(
                     currentCoroutineContext().ensureActive()
                     if (packageId != id) return@launch
                 } while (cursor != null)
-                mutableState.update { it.copy(catalog = values, catalogReady = true, catalogTooMany = false, catalogFailed = false) }
+                managers.forEach { it.retainObjects(values) }
+                mutableState.update { it.copy(catalog = values, catalogReady = true, catalogTooMany = false, catalogFailed = false,
+                    layers = managers.map { layer -> layer.state }) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) {
                 mutableState.update { it.copy(catalog = emptyList(), catalogReady = false, catalogTooMany = false, catalogFailed = true) }
@@ -314,8 +329,7 @@ class AnnotationEditorViewModel(
         mutableState.update {
             it.copy(
                 layers = managers.map { layer -> layer.state },
-                clusterMembers = emptyList(),
-                selected = it.selected?.takeUnless { item -> item.kind == kind && !visible })
+                clusterMembers = emptyList())
         }
     }
 
@@ -326,26 +340,27 @@ class AnnotationEditorViewModel(
             return
         }
         cancelExpansion()
-        val source = if (state.value.catalogReady) state.value.catalog else state.value.items
-        val value = source.firstOrNull { it.id == id } ?: return
-        managers.forEach { it.select(value) }
+        val value = state.value.source.firstOrNull { it.id == id } ?: return
+        val manager = managers.first { it.kind == value.kind }
+        if (!manager.state.visible) return
+        val coordinate = position?.let { mapPyramid?.coordinateAt(it) } ?: value.coordinates.firstOrNull() ?: return
+        managers.forEach { it.clearInteractions() }
+        manager.openCallout(id, coordinate)
         mutableState.update {
             it.copy(
-                selected = value,
                 clusterMembers = emptyList(),
                 layers = managers.map { layer -> layer.state },
-                panel = false
+                panel = false,
+                error = null,
             )
         }
     }
 
     fun dismissSelection() {
-        managers.forEach { it.select(null) }
+        managers.forEach { it.clearInteractions() }
         mutableState.update {
             it.copy(
-                selected = null,
                 clusterMembers = emptyList(),
-                deleteConfirmation = false,
                 layers = managers.map { layer -> layer.state })
         }
     }
@@ -353,14 +368,13 @@ class AnnotationEditorViewModel(
     fun start(kind: AnnotationKind) {
         if (state.value.busy) return
         cancelExpansion()
-        managers.forEach { it.select(null) }
+        managers.forEach { it.clearInteractions() }
         mutableState.update {
             it.copy(
                 layers = managers.map { layer -> layer.state },
                 draft = Annotation(kind = kind, coordinates = emptyList()),
                 history = emptyList(),
                 panel = false,
-                selected = null,
                 clusterMembers = emptyList(),
                 propertiesOpen = false,
                 replacingVertex = null,
@@ -369,18 +383,43 @@ class AnnotationEditorViewModel(
         }
     }
 
-    fun edit() {
-        val value = state.value.selected ?: return
+    fun edit(id: String? = state.value.activeObjectId) {
+        if (id == null || state.value.busy || state.value.objectUi(id) == null) return
+        val value = state.value.source.firstOrNull { it.id == id } ?: return
         cancelExpansion()
+        managers.forEach { it.clearInteractions() }
         mutableState.update {
             it.copy(
                 draft = value,
-                selected = null,
+                layers = managers.map { layer -> layer.state },
                 history = emptyList(),
                 propertiesOpen = true,
                 replacingVertex = null
             )
         }
+    }
+
+    fun moveObject(id: String) {
+        if (state.value.busy || state.value.objectUi(id) == null) return
+        val value = state.value.source.firstOrNull { it.id == id } ?: return
+        if (value.kind != AnnotationKind.MARKER) return
+        managers.first { it.kind == value.kind }.beginMove(id)
+        mutableState.update { it.copy(layers = managers.map { layer -> layer.state }, error = null) }
+    }
+
+    private fun moveObjectTo(id: String, point: MapPoint) {
+        val value = state.value.source.firstOrNull { it.id == id } ?: return
+        if (state.value.busy || state.value.objectUi(id)?.moving != true || value.kind != AnnotationKind.MARKER) return
+        val pyramid = mapPyramid ?: return
+        val destination = pyramid.coordinateAt(point) ?: return
+        val moved = value.copy(coordinates = listOf(destination))
+        managers.first { it.kind == value.kind }.endMove(id)
+        if (AnnotationValidation.error(moved) != null) {
+            mutableState.update { it.copy(layers = managers.map { layer -> layer.state }, error = Res.string.annotations_invalid) }
+            return
+        }
+        mutableState.update { it.copy(layers = managers.map { layer -> layer.state }) }
+        mutate { packageId -> repository.saveAnnotations(packageId, listOf(moved)) }
     }
 
     fun addPoint(point: GeographicCoordinate) {
@@ -474,12 +513,17 @@ class AnnotationEditorViewModel(
         mutate { id -> repository.saveAnnotations(id, listOf(draft)) }
     }
 
-    fun confirmDelete(show: Boolean) {
-        if (!state.value.busy) mutableState.update { it.copy(deleteConfirmation = show) }
+    fun confirmDelete(id: String, show: Boolean) {
+        if (state.value.busy || state.value.objectUi(id) == null) return
+        val value = state.value.source.firstOrNull { it.id == id } ?: return
+        managers.first { it.kind == value.kind }.confirmDelete(id, show)
+        mutableState.update { it.copy(layers = managers.map { layer -> layer.state }) }
     }
 
-    fun delete() {
-        val value = state.value.selected ?: return; mutate {
+    fun delete(id: String) {
+        if (state.value.objectUi(id)?.deleteConfirmation != true) return
+        val value = state.value.source.firstOrNull { it.id == id } ?: return
+        mutate {
             repository.deleteAnnotation(
                 it,
                 value.id
@@ -496,15 +540,13 @@ class AnnotationEditorViewModel(
                 when (action(id)) {
                     is PackageResult.Success -> {
                         pendingImport = null
-                        managers.forEach { it.select(null) }
+                        managers.forEach { it.clearInteractions() }
                         mutableState.update {
                             it.copy(
                                 draft = null,
                                 history = emptyList(),
-                                selected = null,
                                 clusterMembers = emptyList(),
                                 propertiesOpen = false,
-                                deleteConfirmation = false,
                                 geoJsonOpen = false,
                                 geoJson = "",
                                 replacingVertex = null,

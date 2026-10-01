@@ -34,6 +34,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bes.max.bmaps.core.mapengine.RasterMap
 import bes.max.bmaps.core.mapengine.MapPoint
+import bes.max.bmaps.core.mapengine.positionOf
 import bes.max.bmaps.core.ui.components.MapIconButton
 import bes.max.bmaps.core.ui.components.MapIcons
 import bes.max.bmaps.domain.mapbuilder.*
@@ -43,13 +44,15 @@ import org.jetbrains.compose.resources.stringResource
 import org.jetbrains.compose.resources.getString
 
 @Composable
-fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
+fun ViewerScreen(packageId: PackageId, onBack: () -> Unit, calloutAnimated: Boolean = true, autoDismiss: Boolean = true) {
     val model = metroViewModel<ViewerViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
     val position = metroViewModel<MapPositionViewModel>()
     val positionState by position.state.collectAsStateWithLifecycle()
     val annotations = metroViewModel<AnnotationEditorViewModel>()
     val annotationState by annotations.state.collectAsStateWithLifecycle()
+    val activeObject = annotationState.activeObject
+    val activeObjectUi = annotationState.activeObjectUi
     val camera by model.renderer.camera.collectAsStateWithLifecycle()
     val density = LocalDensity.current.density
     val renderData = annotationState.renderData()
@@ -122,7 +125,10 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
             overlays.markers,
             overlays.paths,
             handleOverlayClick,
-            onGestureStart = annotations::cancelExpansion,
+            onGestureStart = {
+                annotations.cancelExpansion()
+                if (autoDismiss && !annotationState.hasMovingObject) annotations.dismissSelection()
+            },
             onLongPress = {
                 if (state.manifest != null && state.error == null && !annotationState.busy && annotationState.draft == null) {
                     annotations.panel(true)
@@ -153,6 +159,19 @@ fun ViewerScreen(packageId: PackageId, onBack: () -> Unit) {
                 }
             }
         }
+        MapObjectCallout(
+            renderer = model.renderer,
+            annotation = activeObject,
+            position = activeObjectUi?.calloutCoordinate?.let { state.annotationPyramid?.positionOf(it) },
+            camera = camera,
+            animated = calloutAnimated,
+            busy = annotationState.busy,
+            moving = activeObjectUi?.moving == true,
+            error = annotationState.error,
+            onEdit = { activeObject?.let { annotations.edit(it.id) } },
+            onMove = { activeObject?.let { annotations.moveObject(it.id) } },
+            onDelete = { activeObject?.let { annotations.confirmDelete(it.id, true) } },
+        )
         if (positionState.coordinate != null && state.error == null) {
             MapCrosshair(Modifier.align(Alignment.Center))
         }

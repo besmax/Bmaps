@@ -23,8 +23,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Offset
 import ovh.plrapps.mapcompose.api.*
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ovh.plrapps.mapcompose.ui.MapUI
 import kotlinx.coroutines.withTimeoutOrNull
@@ -46,6 +50,7 @@ fun RasterMap(
     val gesture by rememberUpdatedState(onGestureStart)
     val longPress by rememberUpdatedState(onLongPress)
     val engine = state.engine
+    var mapOrigin by remember { mutableStateOf(Offset.Zero) }
     val markerRegistry = remember(engine) {
         OverlayRegistry<MapMarker>(MapMarker::id, { item ->
                 engine?.addMarker(
@@ -77,9 +82,15 @@ fun RasterMap(
             engine?.onPathClick { _, _, _ -> }
         }
     }
-    Box(modifier.onSizeChanged(renderer::resize).pointerInput(renderer) {
+    Box(modifier.onSizeChanged(renderer::resize).onGloballyPositioned {
+        mapOrigin = it.positionInRoot()
+    }.pointerInput(renderer) {
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (renderer.calloutTouchBounds.values.any { it.contains(down.position + mapOrigin) }) {
+                while (currentEvent.changes.any { it.pressed }) awaitPointerEvent(PointerEventPass.Initial)
+                return@awaitEachGesture
+            }
             renderer.controller.cancelMove()
             gesture()
             val recognizedLongPress = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
@@ -97,7 +108,9 @@ fun RasterMap(
                 !cancelled
             } ?: true
             if (recognizedLongPress) longPress()
-            do { val event = awaitPointerEvent(PointerEventPass.Initial) } while (event.changes.any { it.pressed })
+            while (currentEvent.changes.any { it.pressed }) {
+                awaitPointerEvent(PointerEventPass.Initial)
+            }
         }
     }) {
         state.engine?.let { MapUI(Modifier.fillMaxSize(), it) }
