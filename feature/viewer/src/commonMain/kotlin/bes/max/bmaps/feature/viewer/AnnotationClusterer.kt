@@ -45,7 +45,7 @@ internal fun projectAnnotation(value: Annotation, pyramid: TilePyramid, selected
     if (value.kind == AnnotationKind.MARKER) {
         val point = pyramid.positionOf(value.coordinates.first()) ?: return null
         return ProjectedAnnotation(value, point, MapWindow(point.x, point.y, point.x, point.y),
-            marker = MapMarker(id, point, value.icon, color, value.name, zIndex = z))
+            marker = MapMarker(id, point, value.icon, color, value.name, anchor = MapMarkerAnchor.CENTER, zIndex = z))
     }
     val side = (1L shl pyramid.levels.min).toDouble()
     val points = value.coordinates.map { point ->

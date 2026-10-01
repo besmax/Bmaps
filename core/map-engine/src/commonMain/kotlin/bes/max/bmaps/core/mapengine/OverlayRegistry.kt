@@ -12,13 +12,20 @@ internal class OverlayRegistry<T>(
     private val id: (T) -> String,
     private val add: (T) -> Unit,
     private val remove: (String) -> Unit,
+    private val update: ((T, T) -> Unit)? = null,
 ) {
     private var current = emptyMap<String, T>()
 
     fun sync(values: List<T>) {
         val next = values.associateBy(id)
-        current.forEach { (key, value) -> if (next[key] != value) remove(key) }
-        next.forEach { (key, value) -> if (current[key] != value) add(value) }
+        current.forEach { (key, value) ->
+            if (key !in next || (next[key] != value && update == null)) remove(key)
+        }
+        next.forEach { (key, value) ->
+            val previous = current[key]
+            if (previous == null || (previous != value && update == null)) add(value)
+            else if (previous != value) update?.invoke(previous, value)
+        }
         current = next
     }
 

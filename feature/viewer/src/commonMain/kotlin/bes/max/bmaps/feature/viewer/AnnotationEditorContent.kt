@@ -44,7 +44,10 @@ internal fun AnnotationEditorContent(
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             fileModel.events.collect { event ->
                 when (event) {
-                    is AnnotationFileEvent.Loaded -> { model.geoJson(true); model.geoJsonText(event.text) }
+                    is AnnotationFileEvent.Loaded -> {
+                        model.geoJson(true); model.geoJsonText(event.text)
+                    }
+
                     is AnnotationFileEvent.Share -> documents.share(event.document)
                 }
             }
@@ -61,15 +64,37 @@ internal fun AnnotationEditorContent(
 }
 
 @Composable
-private fun DraftToolbar(model: AnnotationEditorViewModel, state: AnnotationEditorState, modifier: Modifier) {
+private fun DraftToolbar(
+    model: AnnotationEditorViewModel,
+    state: AnnotationEditorState,
+    modifier: Modifier
+) {
     Surface(modifier, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.padding(8.dp)) {
             Text(stringResource(if (state.replacingVertex == null) Res.string.annotations_drawing_hint else Res.string.annotations_replace_hint))
-            Text(stringResource(Res.string.annotations_vertex_count, state.draft!!.coordinates.size))
+            Text(
+                stringResource(
+                    Res.string.annotations_vertex_count,
+                    state.draft!!.coordinates.size
+                )
+            )
             Row {
-                TextButton(model::undo, enabled = state.history.isNotEmpty() && !state.busy) { Text(stringResource(Res.string.annotations_undo)) }
-                TextButton({ model.properties(true) }, enabled = !state.busy) { Text(stringResource(Res.string.annotations_finish)) }
-                TextButton(model::cancel, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) }
+                TextButton(model::undo, enabled = state.history.isNotEmpty() && !state.busy) {
+                    Text(
+                        stringResource(Res.string.annotations_undo)
+                    )
+                }
+                TextButton({ model.properties(true) }, enabled = !state.busy) {
+                    Text(
+                        stringResource(
+                            Res.string.annotations_finish
+                        )
+                    )
+                }
+                TextButton(
+                    model::cancel,
+                    enabled = !state.busy
+                ) { Text(stringResource(Res.string.layers_cancel)) }
             }
             state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
         }
@@ -96,14 +121,29 @@ private fun AnnotationManagerDialog(
                     Text(stringResource(it), color = MaterialTheme.colorScheme.error)
                     TextButton(model::retry) { Text(stringResource(Res.string.viewer_retry)) }
                 }
-                TextButton(pickDocument, enabled = !state.busy && !documentsBusy) { Text(stringResource(Res.string.annotations_pick_file)) }
+                TextButton(pickDocument, enabled = !state.busy && !documentsBusy) {
+                    Text(
+                        stringResource(Res.string.annotations_pick_file)
+                    )
+                }
                 if (documentsBusy) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                     TextButton(fileModel::cancel) { Text(stringResource(Res.string.layers_cancel)) }
                 }
-                fileState.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
-                TextButton({ model.geoJson(true) }, enabled = !state.busy) { Text(stringResource(Res.string.annotations_import)) }
-                TextButton(model::exportGeoJson, enabled = !state.busy) { Text(stringResource(Res.string.annotations_export)) }
+                fileState.error?.let {
+                    Text(
+                        stringResource(it),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                TextButton(
+                    { model.geoJson(true) },
+                    enabled = !state.busy
+                ) { Text(stringResource(Res.string.annotations_import)) }
+                TextButton(
+                    model::exportGeoJson,
+                    enabled = !state.busy
+                ) { Text(stringResource(Res.string.annotations_export)) }
             }
         },
         confirmButton = { TextButton({ model.panel(false) }) { Text(stringResource(Res.string.viewer_done)) } },
@@ -111,21 +151,36 @@ private fun AnnotationManagerDialog(
 }
 
 @Composable
-private fun AnnotationLayerControls(model: AnnotationEditorViewModel, state: AnnotationEditorState) {
+private fun AnnotationLayerControls(
+    model: AnnotationEditorViewModel,
+    state: AnnotationEditorState
+) {
     AnnotationKind.entries.forEach { kind ->
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(kind.label()), Modifier.weight(1f))
             Checkbox(state.layers.first { it.kind == kind }.visible, { model.visibility(kind, it) })
-            TextButton({ model.start(kind) }, enabled = !state.busy) { Text(stringResource(Res.string.annotations_add)) }
+            TextButton(
+                { model.start(kind) },
+                enabled = !state.busy
+            ) { Text(stringResource(Res.string.annotations_add)) }
         }
     }
 }
 
 @Composable
 private fun AnnotationObjectList(model: AnnotationEditorViewModel, state: AnnotationEditorState) {
-    Text(stringResource(Res.string.annotations_viewport_list), style = MaterialTheme.typography.labelMedium)
-    if (state.catalogTooMany) Text(stringResource(Res.string.annotations_cluster_too_many), color = MaterialTheme.colorScheme.error)
-    if (state.catalogFailed) Text(stringResource(Res.string.annotations_cluster_unavailable), color = MaterialTheme.colorScheme.error)
+    Text(
+        stringResource(Res.string.annotations_viewport_list),
+        style = MaterialTheme.typography.labelMedium
+    )
+    if (state.catalogTooMany) Text(
+        stringResource(Res.string.annotations_cluster_too_many),
+        color = MaterialTheme.colorScheme.error
+    )
+    if (state.catalogFailed) Text(
+        stringResource(Res.string.annotations_cluster_unavailable),
+        color = MaterialTheme.colorScheme.error
+    )
     if (state.items.isEmpty()) Text(stringResource(Res.string.annotations_empty))
     state.items.forEach { item ->
         TextButton({ model.select(item.id) }, enabled = !state.busy) {
@@ -136,88 +191,243 @@ private fun AnnotationObjectList(model: AnnotationEditorViewModel, state: Annota
 }
 
 @Composable
-private fun SelectionDeleteDialog(model: AnnotationEditorViewModel, state: AnnotationEditorState, annotation: Annotation) {
+private fun SelectionDeleteDialog(
+    model: AnnotationEditorViewModel,
+    state: AnnotationEditorState,
+    annotation: Annotation
+) {
     AlertDialog(
         onDismissRequest = { model.confirmDelete(annotation.id, false) },
         title = { Text(stringResource(Res.string.annotations_delete)) },
-        text = { Text(stringResource(Res.string.annotations_delete_confirm, annotation.name.ifBlank { stringResource(annotation.kind.label()) })) },
-        confirmButton = { TextButton({ model.delete(annotation.id) }, enabled = !state.busy) { Text(stringResource(Res.string.annotations_delete)) } },
-        dismissButton = { TextButton({ model.confirmDelete(annotation.id, false) }, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) } },
+        text = {
+            Text(
+                stringResource(
+                    Res.string.annotations_delete_confirm,
+                    annotation.name.ifBlank { stringResource(annotation.kind.label()) })
+            )
+        },
+        confirmButton = {
+            TextButton({ model.delete(annotation.id) }, enabled = !state.busy) {
+                Text(
+                    stringResource(Res.string.annotations_delete)
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                { model.confirmDelete(annotation.id, false) },
+                enabled = !state.busy
+            ) { Text(stringResource(Res.string.layers_cancel)) }
+        },
     )
 }
 
 @Composable
-private fun DraftPropertiesDialog(model: AnnotationEditorViewModel, state: AnnotationEditorState, draft: Annotation) {
+private fun DraftPropertiesDialog(
+    model: AnnotationEditorViewModel,
+    state: AnnotationEditorState,
+    draft: Annotation
+) {
     AlertDialog(
         onDismissRequest = { if (!state.busy) model.properties(false) },
         title = { Text(stringResource(draft.kind.label())) },
-        text = { Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(draft.name, model::name, label = { Text(stringResource(Res.string.annotations_name)) }, enabled = !state.busy, singleLine = true)
-            OutlinedTextField(draft.description, model::description, label = { Text(stringResource(Res.string.annotations_description)) }, enabled = !state.busy)
-            AnnotationColorPicker(model, state, draft)
-            if (draft.kind == AnnotationKind.MARKER) AnnotationIconPicker(model, state, draft)
-            TextButton({ model.properties(false) }, enabled = !state.busy) { Text(stringResource(Res.string.annotations_draw)) }
-            AnnotationVertexList(model, state, draft)
-            TextButton(model::undo, enabled = state.history.isNotEmpty() && !state.busy) { Text(stringResource(Res.string.annotations_undo)) }
-            state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
-        } },
-        confirmButton = { TextButton(model::save, enabled = !state.busy) { Text(stringResource(Res.string.layers_save)) } },
-        dismissButton = { TextButton(model::cancel, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) } },
+        text = {
+            Column(
+                Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    draft.name,
+                    model::name,
+                    label = { Text(stringResource(Res.string.annotations_name)) },
+                    enabled = !state.busy,
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    draft.description,
+                    model::description,
+                    label = { Text(stringResource(Res.string.annotations_description)) },
+                    enabled = !state.busy
+                )
+                AnnotationColorPicker(model, state, draft)
+                if (draft.kind == AnnotationKind.MARKER) AnnotationIconPicker(model, state, draft)
+                TextButton(
+                    { model.properties(false) },
+                    enabled = !state.busy
+                ) { Text(stringResource(Res.string.annotations_draw)) }
+                AnnotationVertexList(model, state, draft)
+                TextButton(model::undo, enabled = state.history.isNotEmpty() && !state.busy) {
+                    Text(
+                        stringResource(Res.string.annotations_undo)
+                    )
+                }
+                state.error?.let {
+                    Text(
+                        stringResource(it),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                model::save,
+                enabled = !state.busy
+            ) { Text(stringResource(Res.string.layers_save)) }
+        },
+        dismissButton = {
+            TextButton(
+                model::cancel,
+                enabled = !state.busy
+            ) { Text(stringResource(Res.string.layers_cancel)) }
+        },
     )
 }
 
 @Composable
-private fun AnnotationColorPicker(model: AnnotationEditorViewModel, state: AnnotationEditorState, draft: Annotation) {
+private fun AnnotationColorPicker(
+    model: AnnotationEditorViewModel,
+    state: AnnotationEditorState,
+    draft: Annotation
+) {
     Text(stringResource(Res.string.annotations_color))
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        listOf("#E53935", "#FB8C00", "#FDD835", "#43A047", "#1E88E5", "#8E24AA", "#212121", "#FFFFFF").forEach { color ->
-            FilterChip(draft.color.equals(color, ignoreCase = true), { model.color(color) }, enabled = !state.busy,
-                label = { Text(color, color = if (color == "#FFFFFF") MaterialTheme.colorScheme.onSurface else Color((0xFF000000L or color.drop(1).toLong(16)).toInt())) })
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        listOf(
+            "#E53935",
+            "#FB8C00",
+            "#FDD835",
+            "#43A047",
+            "#1E88E5",
+            "#8E24AA",
+            "#212121",
+            "#FFFFFF"
+        ).forEach { color ->
+            FilterChip(
+                draft.color.equals(color, ignoreCase = true),
+                { model.color(color) },
+                enabled = !state.busy,
+                label = {
+                    Text(
+                        color,
+                        color = if (color == "#FFFFFF") MaterialTheme.colorScheme.onSurface else Color(
+                            (0xFF000000L or color.drop(1).toLong(16)).toInt()
+                        )
+                    )
+                })
         }
     }
 }
 
 @Composable
-private fun AnnotationIconPicker(model: AnnotationEditorViewModel, state: AnnotationEditorState, draft: Annotation) {
+private fun AnnotationIconPicker(
+    model: AnnotationEditorViewModel,
+    state: AnnotationEditorState,
+    draft: Annotation
+) {
     Text(stringResource(Res.string.annotations_icon))
     Row(Modifier.horizontalScroll(rememberScrollState())) {
         MarkerIcons.entries.forEach { icon ->
-            FilterChip(draft.icon == icon.id, { model.icon(icon.id) }, enabled = !state.busy,
+            FilterChip(
+                draft.icon == icon.id, { model.icon(icon.id) }, enabled = !state.busy,
                 label = { Text(stringResource(icon.label)) },
-                leadingIcon = { MarkerIcon(icon.id, MaterialTheme.colorScheme.primary, stringResource(icon.label), Modifier.size(24.dp)) })
+                leadingIcon = {
+                    MarkerIcon(
+                        icon.id,
+                        MaterialTheme.colorScheme.primary,
+                        stringResource(icon.label),
+                        Modifier.size(24.dp)
+                    )
+                })
         }
     }
 }
 
 @Composable
-private fun AnnotationVertexList(model: AnnotationEditorViewModel, state: AnnotationEditorState, draft: Annotation) {
+private fun AnnotationVertexList(
+    model: AnnotationEditorViewModel,
+    state: AnnotationEditorState,
+    draft: Annotation
+) {
     draft.coordinates.forEachIndexed { index, coordinate ->
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("${index + 1}: ${coordinate.latitude}, ${coordinate.longitude}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-            TextButton({ model.replaceVertex(index) }, enabled = !state.busy) { Text(stringResource(Res.string.annotations_move)) }
-            TextButton({ model.removeVertex(index) }, enabled = !state.busy) { Text(stringResource(Res.string.annotations_remove)) }
+            Text(
+                "${index + 1}: ${coordinate.latitude}, ${coordinate.longitude}",
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall
+            )
+            TextButton({ model.replaceVertex(index) }, enabled = !state.busy) {
+                Text(
+                    stringResource(
+                        Res.string.annotations_move
+                    )
+                )
+            }
+            TextButton({ model.removeVertex(index) }, enabled = !state.busy) {
+                Text(
+                    stringResource(
+                        Res.string.annotations_remove
+                    )
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun GeoJsonDialog(model: AnnotationEditorViewModel, state: AnnotationEditorState, fileModel: AnnotationFileViewModel, fileState: AnnotationFileState) {
+private fun GeoJsonDialog(
+    model: AnnotationEditorViewModel,
+    state: AnnotationEditorState,
+    fileModel: AnnotationFileViewModel,
+    fileState: AnnotationFileState
+) {
     AlertDialog(
         onDismissRequest = { model.geoJson(false) },
         title = { Text(stringResource(if (state.geoJsonExport) Res.string.annotations_export else Res.string.annotations_import)) },
-        text = { Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
-            Text(stringResource(if (state.geoJsonExport) Res.string.annotations_export_hint else Res.string.annotations_import_hint))
-            if (state.geoJsonExport) {
-                TextButton({ fileModel.share(state.geoJson) }, enabled = !fileState.busy) { Text(stringResource(Res.string.annotations_share_file)) }
-                fileState.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
-                SelectionContainer { Text(state.geoJson) }
-            } else OutlinedTextField(state.geoJson, model::geoJsonText, enabled = !state.busy, label = { Text(stringResource(Res.string.annotations_geojson)) })
-            state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
-        } },
-        confirmButton = { TextButton(if (state.geoJsonExport) ({ model.geoJson(false) }) else model::importGeoJson, enabled = !state.busy) {
-            Text(stringResource(if (state.geoJsonExport) Res.string.viewer_done else Res.string.annotations_import))
-        } },
-        dismissButton = { if (!state.geoJsonExport) TextButton({ model.geoJson(false) }, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) } },
+        text = {
+            Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
+                Text(stringResource(if (state.geoJsonExport) Res.string.annotations_export_hint else Res.string.annotations_import_hint))
+                if (state.geoJsonExport) {
+                    TextButton(
+                        { fileModel.share(state.geoJson) },
+                        enabled = !fileState.busy
+                    ) { Text(stringResource(Res.string.annotations_share_file)) }
+                    fileState.error?.let {
+                        Text(
+                            stringResource(it),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    SelectionContainer { Text(state.geoJson) }
+                } else OutlinedTextField(
+                    state.geoJson,
+                    model::geoJsonText,
+                    enabled = !state.busy,
+                    label = { Text(stringResource(Res.string.annotations_geojson)) })
+                state.error?.let {
+                    Text(
+                        stringResource(it),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                if (state.geoJsonExport) ({ model.geoJson(false) }) else model::importGeoJson,
+                enabled = !state.busy
+            ) {
+                Text(stringResource(if (state.geoJsonExport) Res.string.viewer_done else Res.string.annotations_import))
+            }
+        },
+        dismissButton = {
+            if (!state.geoJsonExport) TextButton(
+                { model.geoJson(false) },
+                enabled = !state.busy
+            ) { Text(stringResource(Res.string.layers_cancel)) }
+        },
     )
 }
 
