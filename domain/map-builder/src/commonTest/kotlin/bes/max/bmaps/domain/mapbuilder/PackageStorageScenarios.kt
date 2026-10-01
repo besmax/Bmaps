@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.domain.mapbuilder
 
 import bes.max.bmaps.core.database.*
@@ -336,6 +344,85 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
                 assertTrue(relativeFiles("bounded", true).isEmpty())
                 assertFailsWith<UnsafePackagePath> { asset("bounded", true, "../outside") }
             }
+        } finally { db.close() }
+    }
+
+
+    suspend fun transferRoundTripAndInterruptedImport() = fixture { root ->
+        var db = database(Path(root, "catalog.db").toString())
+        val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
+        var repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
+        val (baseRequest, baseManifest) = fixtureRequest(ZoomRange(0, 0))
+        val request = baseRequest.copy(elevationDataset = ElevationDataset.COP30,
+            layers = baseRequest.layers + baseRequest.layers.single().copy(id = LayerId("overlay")))
+        val baseLayer = baseManifest.layers.single().copy(content = TileContentDescriptor(rasterFormats = setOf(RasterTileFormat.PNG)))
+        val manifest = baseManifest.copy(elevationDataset = ElevationDataset.COP30,
+            layers = listOf(baseLayer, baseLayer.copy(id = LayerId("overlay"), tiles = PackageAsset("layers/overlay.mbtiles", 0))))
+        val dem = byteArrayOf(73, 73, 42, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        val png = kotlin.io.encoding.Base64.decode("iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAIAAADTED8xAAACvklEQVR4nO3TMQ0AMAzAsJIsp8EejB6xZAB5MvsWsua8AA4ZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpBiDNAKQZgDQDkGYA0gxAmgFIMwBpH4wuEe+QCDRfAAAAAElFTkSuQmCC")
+        try {
+            repository.prepare(request, manifest).success()
+            for (layer in manifest.layers) repository.write(request.packageId, layer.id,
+                listOf(DownloadedTile(TileKey(0, 0, 0), ByteString(png))), emptyList(), png.size.toLong()).success()
+            repository.beginElevation(request.packageId).success()
+            repository.appendElevation(request.packageId, dem, dem.size).success()
+            repository.finishElevation(request.packageId).success()
+            repository.finalize(request.packageId).success()
+            files.access {
+                val current = PackageManifestCodec.decode(read(request.packageId.value, false, "config.json", 1_048_576).decodeToString())
+                write(request.packageId.value, "assets/info.txt", Buffer().apply { write("fixture".encodeToByteArray()) }, 7, Long.MAX_VALUE, staged = false)
+                val updated = current.copy(auxiliaryAssets = listOf(PackageAsset("assets/info.txt", 7)))
+                write(request.packageId.value, "config.json", Buffer().apply { write(PackageManifestCodec.encode(updated).encodeToByteArray()) }, 1_048_576, Long.MAX_VALUE, staged = false)
+            }
+            val marker = Annotation("fresh", AnnotationKind.MARKER, listOf(GeographicCoordinate(1.0, 2.0)), name = "Recent edit")
+            repository.saveAnnotations(request.packageId, listOf(marker)).success()
+            repository.setLayerPresentation(request.packageId, manifest.layers.mapIndexed { index, layer -> LayerPresentation(layer.id, index != 0, 0.4, 1 - index) }).success()
+            val archive = Buffer()
+            repository.exportPackage(request.packageId, archive).success()
+            val bytes = archive.readByteArray()
+            val first = repository.importPackage(Buffer().apply { write(bytes) }).success()
+            val second = repository.importPackage(Buffer().apply { write(bytes) }).success()
+            assertNotEquals(first, second)
+            assertNotEquals(request.packageId, first)
+            assertEquals(listOf(marker), repository.annotations(first).success().items)
+            val opened = repository.open(first).success()
+            assertEquals(2, opened.manifest.layers.size)
+            assertEquals(1, opened.manifest.layers.first().renderOrder)
+            assertContentEquals(dem, files.access { read(first.value, false, "elevation.geotiff", 100) })
+            assertEquals("fixture", files.access { read(first.value, false, "assets/info.txt", 100).decodeToString() })
+            assertEquals(0.4, opened.manifest.layers.first().opacity)
+            assertFalse(opened.manifest.layers.first().visible)
+            val tiles = opened.openTiles(opened.manifest.layers.first().id).success()
+            assertContentEquals(png, assertIs<TileReadResult.Available>(tiles.read(TileKey(0, 0, 0))).bytes.toByteArray())
+            opened.close()
+            val before = repository.observe(PackageQuery()).first().success().items.map { it.id }.toSet()
+            assertIs<PackageResult.Failure>(repository.importPackage(Buffer().apply { write(bytes.copyOf(bytes.size - 1)) }))
+            val tampered = bytes.copyOf().apply { this[lastIndex] = (this[lastIndex].toInt() xor 1).toByte() }
+            assertIs<PackageResult.Failure>(repository.importPackage(Buffer().apply { write(tampered) }))
+            assertIs<PackageResult.Failure>(repository.importPackage(Buffer().apply { write(bytes); writeByte(1) }))
+            val input = Buffer().apply { write(bytes) }
+            var reads = 0
+            val cancelled = object : kotlinx.io.RawSource {
+                override fun readAtMostTo(sink: Buffer, byteCount: Long): Long {
+                    if (reads++ > 1) throw kotlinx.coroutines.CancellationException()
+                    return input.readAtMostTo(sink, minOf(byteCount, 1024))
+                }
+                override fun close() = Unit
+            }
+            assertFailsWith<kotlinx.coroutines.CancellationException> { repository.importPackage(cancelled) }
+            assertEquals(before, repository.observe(PackageQuery()).first().success().items.map { it.id }.toSet())
+            assertTrue(files.access { ids(true).isEmpty() })
+            files.access { create("import-abandoned"); createTransfer("abandoned") }
+            db.close()
+            db = database(Path(root, "catalog.db").toString())
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
+            repository.reconcile().success()
+            assertTrue(files.access { ids(true).isEmpty() })
+            assertFalse(files.access { SystemFileSystem.exists(transferDirectory("abandoned")) })
+            assertEquals(listOf(marker), repository.annotations(first).success().items)
+            val mbtiles = files.access { read(request.packageId.value, false, "map_data.mbtiles", 1_000_000) }
+            val standalone = repository.importMbTiles(Buffer().apply { write(mbtiles) }, "Standalone").success()
+            repository.open(standalone).success().close()
         } finally { db.close() }
     }
 

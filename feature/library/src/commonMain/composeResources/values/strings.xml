@@ -59,4 +59,14 @@
     <string name="library_elevation_replace_key">Replace OpenTopography key</string>
     <string name="library_finishing_assets">Downloading elevation and finishing map</string>
     <string name="library_assets_incomplete">Map tiles are saved. The remaining download or finalization needs to be retried.</string>
+    <string name="transfer_import">Import map file</string>
+    <string name="transfer_share">Share map</string>
+    <string name="transfer_working">Preparing map transfer…</string>
+    <string name="transfer_imported">Map imported as a new copy.</string>
+    <string name="transfer_failed">Could not transfer this file. Check available storage and try again.</string>
+    <string name="transfer_unsupported">Choose a .bmaps archive or a PNG/JPEG MBTiles file with bounds and complete tile coverage. Import GeoJSON from Map objects in an open map.</string>
+    <string name="transfer_version">This transfer version is not supported.</string>
+    <string name="transfer_corrupt">The file is incomplete or invalid. No map was imported.</string>
+    <string name="transfer_storage">Not enough storage, or the file exceeds the transfer or layer size limit.</string>
+    <string name="transfer_default_name">Imported map</string>
 </resources>

@@ -30,6 +30,7 @@ For tasks spanning multiple areas, read the relevant sections from each affected
 ## 1. Commenting and Documentation
 * **Minimal Comments:** Write comments *only* when absolutely necessary to explain complex, non-obvious logic or the "why" behind a specific architectural decision. If the code is self-explanatory, do not leave any comments.
 * **English Only:** All comments, commit messages, and documentation must be written strictly in English.
+* **License Notices:** Preserve original Bmaps license/provenance headers and `NOTICE`. Add the standard header to new original source files using `scripts/license_headers.py --write` after reviewing ownership; check with `scripts/license_headers.py`. Required legal notices are an intentional exception to the minimal-comments rule. Never replace third-party notices or attribute third-party code to the project owner. See `CONTRIBUTING.md` and `docs/18_LICENSING_AND_PROVENANCE.md`.
 
 ## 2. Architectural Boundaries
 * **Presentation Layer Validation:** Data validation rules must be invoked independently inside the presentation layer (UI/ViewModel). Do not embed data validation logic inside structural business use cases. Use cases must maintain single responsibility.

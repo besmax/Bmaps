@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.feature.shell
 
 import bes.max.bmaps.core.ui.theme.BmapsTheme
@@ -85,7 +93,7 @@ fun AppShell(
                     navigationIcon = { if (destination != ShellDestination.LIBRARY) IconButton(onClick = onBack) { Icon(painterResource(Res.drawable.ic_back), stringResource(Res.string.back)) } },
                     title = { Text(stringResource(Res.string.bmaps), style = MaterialTheme.typography.titleLarge) },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    actions = { IconButton(onClick = viewModel::openPreferences) { Icon(painterResource(Res.drawable.ic_settings), stringResource(Res.string.preferences)) } },
+                    actions = { IconButton(onClick = viewModel::openPreferences) { Icon(painterResource(Res.drawable.ic_settings), stringResource(Res.string.settings)) } },
                 )
             },
         ) { padding ->

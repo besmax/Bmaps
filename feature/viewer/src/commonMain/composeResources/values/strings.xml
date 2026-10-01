@@ -29,6 +29,8 @@
     <string name="viewer_size">Package size: %1$d bytes</string>
     <string name="viewer_avatar">Map avatar</string>
     <string name="viewer_done">Done</string>
+    <string name="viewer_show_more">Show more</string>
+    <string name="viewer_show_less">Show less</string>
     <string name="avatar_map">Map</string>
     <string name="avatar_mountain">Mountain</string>
     <string name="avatar_forest">Forest</string>
@@ -69,6 +71,7 @@
     <string name="annotations_finish">Finish</string>
     <string name="annotations_draw">Draw on map</string>
     <string name="annotations_move">Move</string>
+    <string name="annotations_move_hint">Tap the map to move the placemark.</string>
     <string name="annotations_drawing_hint">Tap the map to add a vertex. Tap a draft pin to move that vertex. Undo reverses your last edit.</string>
     <string name="annotations_replace_hint">Tap the map to place the selected vertex.</string>
     <string name="annotations_vertex_count">Vertices: %1$d</string>
@@ -95,10 +98,19 @@
     <string name="position_latitude_longitude">Lat / Lon: %1$s</string>
     <string name="position_preferences_unavailable">Coordinate preferences unavailable</string>
     <string name="position_coordinates_unsupported">Coordinate system unsupported</string>
+    <string name="position_coordinates_calculating">Calculating coordinates…</string>
     <string name="position_elevation_value">Elevation: %1$s m · %2$s</string>
     <string name="position_elevation_loading">Elevation: …</string>
     <string name="position_elevation_no_data">Elevation: no data at this point</string>
     <string name="position_elevation_outside">Elevation: outside coverage</string>
     <string name="position_elevation_unsupported">Elevation: unsupported data</string>
     <string name="position_elevation_unavailable">Elevation: could not read data</string>
+    <string name="position_transform_accuracy">Coordinate transform accuracy: ±%1$s m</string>
+    <string name="position_transform_outside">Coordinate transformation is outside its area of use</string>
+    <string name="position_transform_resources_missing">Required offline transformation data is unavailable</string>
+    <string name="position_transform_failed">Coordinate transformation failed</string>
+    <string name="position_coordinate_epoch">Coordinate epoch: %1$s</string>
+    <string name="annotations_pick_file">Import GeoJSON file</string>
+    <string name="annotations_share_file">Share GeoJSON file</string>
+    <string name="annotations_file_error">Could not read or share this file. Import a GeoJSON Feature or FeatureCollection, up to 4 MB, with supported point, line, or polygon geometry.</string>
 </resources>

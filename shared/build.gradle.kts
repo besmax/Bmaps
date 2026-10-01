@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 plugins {
     id("app.shared")
 }
@@ -9,6 +17,8 @@ kotlin {
         implementation(project(":domain:map-builder"))
         implementation(project(":core:database"))
         implementation(project(":core:storage"))
+        implementation(project(":core:sharing"))
+        implementation(project(":core:map-engine"))
         implementation(project(":core:network"))
         implementation(project(":core:datastore"))
         implementation(project(":feature:shell"))

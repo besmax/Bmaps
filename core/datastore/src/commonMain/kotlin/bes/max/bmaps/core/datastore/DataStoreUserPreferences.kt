@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.core.datastore
 
 import androidx.datastore.core.DataStore
@@ -31,15 +39,25 @@ class DataStoreUserPreferences(private val dataStore: DataStore<Preferences>) : 
         dataStore.edit { it[ThemeKey] = theme.name }
     }
 
+    override suspend fun setClusterMapObjects(enabled: Boolean) {
+        dataStore.edit { it[ClusterMapObjectsKey] = enabled }
+    }
+
+    override suspend fun setCoordinateFormat(format: CoordinateFormat) {
+        dataStore.edit { it[CoordinateFormatKey] = format.name }
+    }
+
     override suspend fun setDefaultCoordinateSystem(identifier: String) {
         dataStore.edit { it[CoordinateSystemKey] = identifier }
     }
 
-    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean, coordinateFormat: CoordinateFormat) {
+    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean,
+        coordinateFormat: CoordinateFormat, defaultCoordinateSystem: String) {
         dataStore.edit {
             it[ThemeKey] = theme.name
             it[ClusterMapObjectsKey] = clusterMapObjects
             it[CoordinateFormatKey] = coordinateFormat.name
+            it[CoordinateSystemKey] = defaultCoordinateSystem
         }
     }
 

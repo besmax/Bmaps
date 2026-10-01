@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.feature.viewer
 
 import androidx.compose.ui.graphics.Color
@@ -37,7 +45,7 @@ internal fun projectAnnotation(value: Annotation, pyramid: TilePyramid, selected
     if (value.kind == AnnotationKind.MARKER) {
         val point = pyramid.positionOf(value.coordinates.first()) ?: return null
         return ProjectedAnnotation(value, point, MapWindow(point.x, point.y, point.x, point.y),
-            marker = MapMarker(id, point, value.icon, color, value.name, zIndex = z))
+            marker = MapMarker(id, point, value.icon, color, value.name, anchor = MapMarkerAnchor.CENTER, zIndex = z))
     }
     val side = (1L shl pyramid.levels.min).toDouble()
     val points = value.coordinates.map { point ->

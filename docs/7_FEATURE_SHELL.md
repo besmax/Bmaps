@@ -1,12 +1,12 @@
 # Feature Shell and DI Composition
 
-Phase 2 introduced feature composition and the preferences dialog. Phase 6 replaces tab navigation with a home library, a constructor FAB, and package-specific offline viewer entries; see `13_LIBRARY_AND_OFFLINE_VIEWER.md`.
+Phase 2 introduced feature composition and preferences. Phase 6 replaces tab navigation with a home library, a constructor FAB, and package-specific offline viewer entries; see `13_LIBRARY_AND_OFFLINE_VIEWER.md`. Settings now uses a full-screen navigation destination with immediate, independent persistence instead of the original draft dialog.
 
 ## Module ownership
 
-- `feature:shell` owns application chrome, theme state, navigation events, and preferences presentation. It depends on core infrastructure and accepts content callbacks; it never imports another feature.
+- `feature:shell` owns application chrome, theme state, navigation events, and the Settings screen. It depends on core infrastructure and accepts navigation callbacks; it never imports another feature. Its platform presentation adapters read the installed app version code.
 - `feature:library`, `feature:constructor`, and `feature:viewer` own their screen UI, ViewModels, and navigation callbacks.
-- `shared` composes a Navigation Compose host and connects the feature callbacks. It contains no screen ViewModels, preference mutation, or business logic.
+- `shared` composes a Navigation Compose host and connects feature callbacks. It contains no screen ViewModels, preference mutation, or business logic.
 - `core:di` owns `AppScope` and the Metro ViewModel factory binding.
 - `core:datastore` owns the preference contract, DataStore implementation, and platform DataStore construction.
 
@@ -16,31 +16,45 @@ All four features apply `app.feature`. Dependencies come from the version catalo
 
 Android creates one `AndroidAppGraph` lazily on `BmapsApplication`, registered in the application manifest. Its factory receives application context, never activity context. Recreating an activity reuses the graph and the DataStore instance.
 
-iOS creates one `IosAppGraph` lazily for the application process and reuses it across `MainViewController` instances. The graph uses the platform contributions from `core:datastore`.
+iOS creates one `IosAppGraph` lazily for the application process and reuses it across `MainViewController` instances. It uses platform contributions from `core:datastore`.
 
-Application-scoped repository, DataStore, and ViewModel factory bindings use `SingleIn(AppScope::class)`. Contributed ViewModel classes must be public so the umbrella graph can discover them across module boundaries. Feature-only state may remain internal. ViewModels are unscoped Metro map contributions; `metroViewModel()` resolves them through the current `ViewModelStoreOwner`. The root native owner retains `ShellViewModel`, while the preferences navigation dialog owns `PreferencesViewModel` and clears it when popped.
+Application-scoped repository, DataStore, and ViewModel factory bindings use `SingleIn(AppScope::class)`. Contributed ViewModel classes must be public so the umbrella graph can discover them across module boundaries. Feature-only state may remain internal. ViewModels are unscoped Metro map contributions; `metroViewModel()` resolves them through the current `ViewModelStoreOwner`. The root native owner retains `ShellViewModel`; the Settings navigation entry owns `PreferencesViewModel` and clears it when popped.
 
 The DataStore artifact is an API dependency of `core:datastore` because its types appear in generated Metro factories used by the umbrella graph. The iOS adapter uses only Okio's path conversion required by DataStore's factory API; this is not an alternate application file-IO implementation. Custom application file IO remains assigned to `kotlinx-io-core`.
 
-## Navigation, state, and effects
+## Navigation and settings layout
 
-The root starts at Library. Its FAB opens the constructor, and ready package rows open a viewer entry carrying the package ID. There is no bottom navigation or saved tab stack. Back returns through the navigation stack. The top-bar gear opens Preferences. Feature callbacks are converted into `ShellEvent` values by `ShellViewModel`; the shell consumes them while RESUMED and the umbrella performs the corresponding navigation operation. This keeps navigation events out of durable screen state.
+The root starts at Library. Its FAB opens the constructor, and ready package rows open a viewer entry carrying the package ID. There is no bottom navigation or saved tab stack. The top-bar gear opens **Settings** at route `settings`. It is a normal composable destination with its own top app bar and Back button; the outer shell hides its chrome and insets for this destination. Back returns to the previous entry. Feature callbacks become Channel-backed `ShellEvent` values; the shell consumes them while RESUMED and the umbrella performs navigation.
 
-Preferences is a navigation dialog destination, not a Boolean attached to the shell's ViewModel. Its lifetime therefore follows dismissal, back navigation, and restoration. A draft survives ordinary activity recreation through its retained ViewModel. Dismissing without Save discards the draft; reopening reads persisted preferences. Uncommitted drafts are not promised to survive process death.
+`SettingsScreen` observes one immutable preference state. Portrait/narrow windows show a centered, scrollable stack of Appearance, map settings, and About cards. Landscape windows at least 600 dp wide use two independent scrolling columns: Appearance and About on the left, map settings on the right. Insets and a fixed top bar remain outside the scrolling content. Recreating or rotating the activity retains the navigation entry and ViewModel.
 
-Each ViewModel exposes a single immutable StateFlow. Navigation and save-completion effects use buffered Channels exposed by `receiveAsFlow()`. Each UI effect stream has one collector, scoped with `repeatOnLifecycle(RESUMED)`. Recomposition updates callbacks without recreating event state. Collector suspension does not replay already consumed events; pending events can be received on resume. These are in-process effects, not durable delivery guarantees across process death.
+The appearance selector is a single-choice segmented control with **System**, **Light**, and **Dark**. Its buttons have a minimum 48 dp touch height. Existing map-object clustering, coordinate-system selection, and coordinate-format selection remain available. About is available even if settings fail to load.
 
-Save disables repeat submission, persists the selected theme, and then emits one completion event to dismiss the dialog. Failed reads/writes remain visible and retryable. Cancellation propagates normally; clearing a dialog owner cancels its ViewModel work. As with any durable write, cancelling the UI after a write commits does not undo that commit.
+## Independent persistence and failures
 
-## Preferences
+There is no Save or Cancel action and no draft-dismissal event. Each control immediately updates its field and starts its own DataStore edit through `setTheme`, `setClusterMapObjects`, `setDefaultCoordinateSystem`, or `setCoordinateFormat`. Each edit changes only its own key. The existing bulk `setDisplayPreferences` API remains available, but the Settings screen does not use it.
 
-The supported appearance choices are device setting, light, and dark. The shell observes successful persisted changes and applies the selected color scheme. Unknown stored theme values fall back to device setting without erasing other keys.
+Only the setting currently being written is disabled; unrelated controls remain usable. A per-setting saving indicator reflects pending persistence. A failed write restores that field's latest persisted value and displays a message beside it; selecting the desired value again retries. Other successful changes remain applied. Failed reads show a retry action and prevent mutations until preferences are available. The ViewModel continuously observes persisted preferences, including a write completing after a previous Settings entry was closed.
 
-`defaultCoordinateSystem` defaults to `EPSG:4326`. It has a persistence API and appears as WGS 84 in the dialog. Selection of other coordinate systems is deferred until Phase 9 supplies verified transformations. Theme updates preserve the coordinate identifier, including future/custom values.
+Accepted writes begin immediately and finish in a non-cancellable persistence block, so an immediate Back action does not discard an already accepted selection. Loading/observation still follows the ViewModel lifetime. Process death before a write commits cannot promise persistence. There are no save-completion navigation effects to replay after rotation or backgrounding.
 
-Android stores the file in the application's DataStore directory. iOS uses Application Support. Only one DataStore is created per file and process. Preference failures are surfaced rather than silently replacing stored preferences with defaults.
+The shell observes persisted theme changes and applies the color scheme. Unknown stored theme values fall back to System without erasing other keys. Supported coordinate systems are WGS 84 (`EPSG:4326`), SK-42 / Pulkovo 1942 (`EPSG:4284`), and PZ-90.11 (`EPSG:9475`). Coordinate format applies independently: decimal degrees, degrees/minutes, or degrees/minutes/seconds. An unrelated settings change preserves future/custom persisted CRS identifiers. The viewer also supports existing EPSG:3857 data as labeled X/Y meters; native transformation acceptance is tracked separately.
 
-## Verification commands
+Android stores preferences in the application's DataStore directory; iOS uses Application Support. Only one DataStore is created per file and process.
+
+## About and visual system
+
+The selectable **About Bmaps · Licensing** card retains the copyright, canonical repository URL, PolyForm Noncommercial license summary and URL, and commercial contact. It adds **Version code**, read from Android's installed `PackageInfo.longVersionCode` or iOS `CFBundleVersion`; it is not a hardcoded marketing version. Unavailable metadata gets an explicit fallback label. All of this works offline.
+
+`feature:shell` bundles copies of `LICENSE`, `NOTICE`, and the commercial request policy in Compose resources; `scripts/license_headers.py` checks they match the root documents. This section identifies Bmaps itself, not a complete dependency-license inventory. See `18_LICENSING_AND_PROVENANCE.md`.
+
+`core:ui/theme/BmapsTheme.kt` owns the palette, Inter font family, responsive typography, and shapes applied by AppShell. All destinations inherit the theme without feature-to-feature imports. See `10_BMAPS_DESIGN.md`.
+
+## Verification handoff
+
+Updated tests cover individual setting writes, independent pending writes, duplicate-submit prevention, failed-field rollback and retry, load failure, unknown-CRS preservation, persistence after leaving Settings, and continuous observation after reopening. The DataStore reopening test now exercises concurrent clustering and coordinate-format edits. The Android navigation scenario checks immediate theme changes, recreation, background/foreground, Back/reopen, and the absence of Save/Cancel.
+
+Static syntax, resources, and notice checks do not establish compilation or runtime behavior. Builds, automated test execution, and visual/device acceptance remain assigned to the project owner.
 
 ```sh
 ./gradlew :core:datastore:testAndroidHostTest :feature:shell:testAndroidHostTest
@@ -51,13 +65,4 @@ Android stores the file in the application's DataStore directory. iOS uses Appli
 ./gradlew :androidApp:connectedDebugAndroidTest
 ```
 
-Host coverage includes real DataStore file reopening, preservation of unrelated keys, load/save failures and retry, cancellation on ViewModel clearing, discarded dialog drafts, live theme observation, and single delivery across event-collector restart. The shared Android UI scenario checks navigation, activity recreation, dialog draft retention, background/foreground transitions, save completion, reopening, and Cancel behavior. It is runnable under Robolectric or on an Android device.
-
-Native smoke checks should open each destination, save a theme, dismiss/reopen preferences, background/foreground the app, and relaunch to verify persisted appearance. Runtime/device results are tracked in the implementation plan separately from compilation.
-
-
-## Bmaps visual system
-
-`core:ui/theme/BmapsTheme.kt` owns the palette, bundled Inter font family, responsive typography, and shapes applied by AppShell. All destinations inherit the theme without feature-to-feature imports. Implementation details and mappings from the supplied Stitch design are recorded in `10_BMAPS_DESIGN.md`.
-
-Phase 9 (2026-09-29) adds a WGS 84 coordinate-format draft to Preferences: decimal degrees, degrees/minutes, or degrees/minutes/seconds. Save persists `coordinate_format` atomically with theme and clustering. The existing CRS identifier stays separate; EPSG:3857 display remains supported by the viewer, but selecting other coordinate systems is still pending.
+Native acceptance: change all settings independently; verify live theme, coordinate display, and clustering after Back and relaunch. Rotate while writing, test portrait/landscape and narrow split windows, scroll both landscape columns, check large text/touch targets and system Back, and compare the About version code against the installed APK/IPA metadata. Confirm read/write failure recovery and that all licensing content remains visible offline.

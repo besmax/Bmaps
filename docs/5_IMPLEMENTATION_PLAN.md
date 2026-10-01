@@ -1,6 +1,6 @@
 # Bmaps Implementation Plan
 
-Planning baseline: 2026-09-08. Last updated: 2026-09-19. Phases 1, 2, and 3A are implemented. Phase 3B's renderer and coordinate implementation is in place; Android deterministic-fixture acceptance remains pending. Phase 3C's provider catalog, fullscreen constructor flow, secure credentials dialog, and OSM rendering are implemented; broader provider entitlement and native acceptance remain pending. Phase 3D area selection and save-settings UI are implemented; its full acceptance matrix is pending. Phase 0's remaining build/CI work is also pending.
+Planning baseline: 2026-09-08. Last updated: 2026-09-29. Phases 1, 2, and 3A are implemented. Phase 3B's renderer and coordinate implementation is in place; Android deterministic-fixture acceptance remains pending. Phase 3C's provider catalog, fullscreen constructor flow, secure credentials dialog, and OSM rendering are implemented; broader provider entitlement and native acceptance remain pending. Phase 3D area selection and save-settings UI are implemented; its full acceptance matrix is pending. Phase 9 is completed by the project owner’s decision on 2026-09-29; outstanding coordinate-accuracy and mobile/DEM verification is explicitly deferred to Phase 11 before release. Phase 0's remaining build/CI work is also pending.
 
 ## Current implementation status
 
@@ -14,9 +14,10 @@ Planning baseline: 2026-09-08. Last updated: 2026-09-19. Phases 1, 2, and 3A are
 | Phase 6 | Home library/FAB navigation, local offline viewer, details, filters, deletion, favourite/avatar persistence implemented; not built or tested | User-run Room migration/schema verification and offline/native acceptance; see document 13 |
 | Phase 7 | Raster layer composition, sequential downloads, viewer appearance persistence, continuous download zoom range, and layers icon implemented | User-run builds, tests, and native acceptance; see document 14 |
 | Phase 8 | Package-local annotations, SVG marker catalog, colors, geometry editing with Undo, viewport queries, and GeoJSON implemented | User-run builds, tests, and native acceptance; see document 15 |
-| Phases 9–11 | Contracts and plans | Elevation/CRS, sharing, and release hardening |
+| Phase 9 | Completed: DEM reading, center readout, and PROJ display-CRS implementation | Coordinate-accuracy checks and outstanding mobile/DEM acceptance transferred to Phase 11 |
+| Phases 10–11 | Contracts and plans | Sharing and release hardening |
 
-Current work: Phase 8 implementation is ready for user verification; current state and handoff are in `15_ANNOTATIONS_AND_GEOJSON.md`. Phase 7 handoff remains in `14_RASTER_LAYER_COMPOSITION.md`. Phase 6 handoff remains in `13_LIBRARY_AND_OFFLINE_VIEWER.md`. Phase 5 download verification remains in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Builds and all test execution are assigned to the user.
+Current work: Phase 9 is completed by the project owner’s decision. Phase 10 source implementation is present; builds, tests, and Android ↔ iOS transfer acceptance remain pending. See `19_PACKAGE_TRANSFER.md`. Outstanding mobile/DEM verification and independent coordinate-accuracy checks are tracked in Phase 11 before release. The PROJ SQLite archive path and build dependency were corrected after the reported Android Ninja failure; the host CMake native target build passed. Details are in `9_MAP_ENGINE.md` and `17_ELEVATION_READER.md`. Phase 8 handoff remains in `15_ANNOTATIONS_AND_GEOJSON.md`. Phase 7 handoff remains in `14_RASTER_LAYER_COMPOSITION.md`. Phase 6 handoff remains in `13_LIBRARY_AND_OFFLINE_VIEWER.md`. Phase 5 download verification remains in `12_DOWNLOAD_PIPELINE.md`. Outstanding provider prerequisites and native acceptance remain open. Download eligibility follows configured provider capabilities; configuration alone is not external entitlement evidence. Mobile app builds and all test execution remain assigned to the user; the focused host CMake build used to validate the PROJ dependency fix is recorded below.
 
 This plan follows `AGENTS.md` and documents 1–4. Checked boxes represent completed deliverables. Estimates are intentionally omitted until the platform integration spikes establish effort and supported formats. The table below preserves the original source-inspection baseline; current Phase 1 decisions are recorded in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`.
 
@@ -65,9 +66,9 @@ Record decisions in the relevant existing architecture/product document. These a
 | Package identity | Use stable IDs and safe storage directory names; treat the user-visible name as metadata. Version the package manifest from the first package. | Phase 1 |
 | Provider availability | Choose actual providers after verifying current download rights, attribution, authentication, caching, and request limits from their official documentation. The OSM example is not authorization to bulk-download any particular endpoint. | Phase 3 |
 | Download lifecycle | Durable Phase 4 checkpoints; Phase 5 Android WorkManager with foreground progress, plus iOS BGProcessingTask opportunities and foreground lifetime extension. Preserve missing tiles and expose user restore, top-of-library progress, and platform progress/completion surfaces. See document 11. | Phase 5 |
-| CRS support | Specify the exact SK-91 definition, applicable region, parameters/grids, reference fixtures, and accuracy target before implementing its transformation. A name alone is insufficient. | Phase 9 |
+| CRS support | Use WGS 84 (EPSG:4326), Pulkovo 1942 (EPSG:4284), and PZ-90.11 (EPSG:9475). Plan PROJ integration; select area-valid operations, offline resources, reference fixtures and accuracy targets before enabling the new systems. SK-91 is superseded. | Phase 9 |
 | DEM support | Define accepted TIFF/GeoTIFF encodings, compression, CRS, no-data rules, and size limits after a bounded reader spike on both platforms. | Phase 9 |
-| Transfer format | Proposed versioned archive of a consistent package snapshot, with a manifest and integrity metadata. Define standalone MBTiles and GeoJSON import behavior separately. | Phase 10 |
+| Transfer format | Version 1 framed `.bmaps` snapshot with SHA-256 metadata; bounded standalone raster MBTiles and GeoJSON flows. See document 19. | Phase 10 |
 
 Presentation owns user-input validation, invoked separately before structural use cases. Storage and network boundaries must still reject corrupt files, unsupported formats, and failed IO operations; those checks are not form validation.
 
@@ -258,32 +259,36 @@ Acceptance: annotations survive restart and remain isolated between packages; vi
 
 Dependencies: Phases 3–4 and 6; resolve CRS/DEM decisions before implementation.
 
-Current status (2026-09-29): **In progress; acceptance is not complete.** Source implementation includes DEM downloads and bounded reading, package-owned sampling, the center crosshair and coordinate/altitude widget, three saved WGS 84 formats, diagnostics, and the Android JNI handle/status correction. The user confirmed that the JNI correction resolved the reported SRTM15Plus elevation error on Android. This confirms that scenario, not all-dataset accuracy or iOS acceptance. SK-91 definition/transformation/reference fixtures, additional CRS selection, and real-file/native acceptance on Android and iOS remain pending. The agent did not run builds or tests for the September 29 changes, at the user's request.
+Current status (2026-09-29): **Completed by the project owner’s decision.** Coordinate-accuracy testing and outstanding mobile/DEM acceptance are deferred to Phase 11 before release. This planning decision does not assert that unexecuted checks passed. Source implementation includes DEM downloads and bounded reading, package-owned sampling, the center crosshair and coordinate/altitude widget, three coordinate formats, saved selection of EPSG:4326/4284/9475, and offline PROJ transformations through Android JNI/iOS cinterop. It embeds `proj.db`, disables network access, rejects ballpark and grid-dependent operations, and reports the selected operation, accuracy, and 2010.0 epoch when required. The user confirmed that the Android JNI correction resolved the reported SRTM15Plus elevation error. After the user-reported Android Ninja missing-archive failure, the SQLite imported archive path was corrected to the root CMake build directory and an explicit `bmaps_proj` dependency on `bmaps_proj_sqlite` was added. Host CMake configuration and the `bmaps_proj` static target build passed, including SQLite archive generation. This does not verify Android JNI shared-library linking or iOS linking. No Android Gradle build, app run, or tests were executed for this fix. PROJ reference-point accuracy, mobile native compilation, real-file DEM coverage, and platform acceptance remain pending. Testing remains with the user.
 
-- [ ] Run bounded feasibility spikes for SK-91 transformations and TIFF/GeoTIFF reading on both platforms using independently sourced reference fixtures.
-- [x] Implement the libtiff reader feasibility harness, Android/iOS bindings, explicit WGS 84 subset, bounded strip/tile reads, and host reference checks. See `17_ELEVATION_READER.md` (2026-09-27). Mobile execution, all-dataset validation and the separate SK-91 spike remain pending; this does not complete the combined feasibility gate above.
-- [ ] Document supported CRS definitions, transformation accuracy, DEM encodings, and rejected variants in the product specification.
-- [ ] Implement transformation interfaces in `core:map-engine`; keep storage coordinates distinct from user-selected display coordinates. Existing interfaces and WGS 84/Web Mercator transformations are available; viewer formatting leaves WGS 84 sampling unchanged. SK-91 remains pending.
-- [ ] Add coordinate-system selection and formatted coordinate display through presentation and preferences. WGS 84 format selection and viewer display are implemented (2026-09-29); additional CRS selection/SK-91 remain pending.
+Deferred verification: independently sourced PROJ reference fixtures and remaining mobile TIFF/GeoTIFF checks are tracked in Phase 11.
+
+- [x] Implement the libtiff reader feasibility harness, Android/iOS bindings, explicit WGS 84 subset, bounded strip/tile reads, and host reference checks. See `17_ELEVATION_READER.md` (2026-09-27). Remaining mobile execution, all-dataset validation, and PROJ reference verification are transferred to Phase 11.
+- [x] Integrate PROJ through Android JNI and iOS cinterop source sets, with pinned native dependencies, embedded `proj.db`, networking disabled, normalized axis order, and explicit operation/accuracy policy. Keep native types out of the public transformation contract. Native build and runtime acceptance remain pending.
+- [x] Document supported CRS definitions, transformation policy, DEM encodings, and rejected variants in the product specification and map-engine contract.
+- [x] Implement transformation interfaces in `core:map-engine`; keep storage coordinates distinct from user-selected display coordinates. The viewer transforms the WGS 84 map center for display while elevation continues to sample WGS 84.
+- [x] Add coordinate-system selection and formatted coordinate display through presentation and preferences. WGS 84, Pulkovo 1942 and PZ-90.11 selection and all three angular formats are implemented in source.
 - [x] Implement DEM asset ingestion and bounded-memory parsing/sampling in `core:storage`. Source implementation covers the documented GeoTIFF subset; all-dataset and mobile acceptance remain pending.
-- [ ] Implement geographic-to-raster lookup, no-data handling, interpolation policy, altitude units, and elevation display/overlays in the viewer. Center crosshair/readout, nearest-cell sampling and provider-based meter semantics are implemented (2026-09-29); real-file/native acceptance remains pending.
+- [x] Implement geographic-to-raster lookup, no-data handling, interpolation policy, altitude units, and elevation display/overlays in the viewer. Center crosshair/readout, nearest-cell sampling and provider-based meter semantics are implemented (2026-09-29); real-file/native acceptance remains pending.
 - [x] Handle missing or unsupported DEM/CRS data explicitly without guessing transformations or showing misleading altitude. Source implementation only; verification remains with the user.
 
-Acceptance: independent reference points meet the documented transformation tolerance; known raster samples yield expected elevation; large fixtures do not require loading the entire DEM; supported files work fully offline on both platforms.
+Release verification transferred to Phase 11: independent reference points meet the documented transformation tolerance; known raster samples yield expected elevation; large fixtures do not require loading the entire DEM; supported files work fully offline on both platforms.
 
 ### Phase 10 — Implement import, export, and native sharing
 
 Dependencies: Phases 7–9 for complete-package support; transport contracts can be drafted in Phase 1.
 
-- [ ] Define domain package-transfer contracts independent of native share sheets and future transport implementations.
-- [ ] Implement versioned streaming export of a consistent package snapshot, including all layers, annotations, configuration, elevation, and auxiliary assets.
-- [ ] Ensure database snapshots include committed data even when the package was recently edited; avoid copying an inconsistent live database.
-- [ ] Implement import into a staging directory with manifest/version checks, asset integrity checks, safe path handling, capacity limits, and collision handling.
-- [ ] Finalize imports and register metadata only after successful verification; recover interrupted import/export and clean temporary files.
-- [ ] Add native picker/share adapters for Android and iOS, including temporary access grants and cleanup appropriate to each platform.
-- [ ] Implement the agreed standalone MBTiles/GeoJSON import flows and unsupported-format messages.
+- [x] Define domain package-transfer contracts independent of native share sheets and future transport implementations.
+- [x] Implement versioned streaming export of a consistent package snapshot, including all layers, annotations, configuration, elevation, and auxiliary assets.
+- [x] Ensure database snapshots include committed data even when the package was recently edited; avoid copying an inconsistent live database.
+- [x] Implement import into a staging directory with manifest/version checks, asset integrity checks, safe path handling, capacity limits, and collision handling.
+- [x] Finalize imports and register metadata only after successful verification; recover interrupted import/export and clean temporary files.
+- [x] Add native picker/share adapters for Android and iOS, including temporary access grants and cleanup appropriate to each platform.
+- [x] Implement the agreed standalone MBTiles/GeoJSON import flows and unsupported-format messages.
 
-Acceptance: export on Android and import on iOS, and vice versa; verify tiles, layer settings, annotations, and DEM results. Cancellation or malformed archives leave no apparently complete package behind.
+Implementation handoff: `19_PACKAGE_TRANSFER.md` specifies the framed archive, import-as-copy policy, standalone format subset, native adapters, cleanup, and unrun verification fixtures. Checkmarks describe source deliverables, not acceptance evidence.
+
+Acceptance pending: export on Android and import on iOS, and vice versa; verify tiles, layer settings, annotations, and DEM results. Cancellation or malformed archives leave no apparently complete package behind.
 
 ### Phase 11 — Harden and prepare a release candidate
 
@@ -295,8 +300,11 @@ Dependencies: Phases 0–10; perform focused verification during each phase, not
 - [ ] Inspect Compose compiler stability metrics and correct unstable presentation models where measurements show avoidable recomposition.
 - [ ] Verify accessibility labels, touch targets, contrast, text scaling, and readable validation/recovery messages.
 - [ ] Review provider attribution, application permissions, backup behavior, logging, and credentials against the offline-first/privacy product requirements.
+- [ ] Complete the third-party license/notice inventory for shipped artifacts, configure release signing with the owner's key, and retain signed tags and signed artifact checksums. Original-code PolyForm licensing, attribution headers, packaged notices, and a CI notice check are implemented; see `18_LICENSING_AND_PROVENANCE.md`.
 - [ ] Run migration fixtures, deterministic integration tests, and end-to-end smoke flows on Android and iOS; document physical-device checks beyond simulator coverage.
 - [ ] Update README, module registry, package-format documentation, supported format/CRS tables, and known limitations to match implementation.
+- [ ] Complete the deferred Phase 9 mobile build/offline/DEM acceptance on Android and iOS, including known elevation samples, NoData, coverage edges, and bounded memory with large rasters.
+- [ ] Before closing the plan and releasing, verify coordinate-conversion accuracy between WGS 84 (EPSG:4326), Pulkovo 1942 (EPSG:4284), and PZ-90.11 (EPSG:9475) in both directions on Android and iOS using independently sourced reference points. Record the operation, area of use, epoch where applicable (including 2010.0), expected coordinates, measured errors, and justified per-operation tolerances. Include coverage boundaries and unavailable-operation cases; round trips through PROJ alone are insufficient evidence.
 
 Acceptance for M4: every documented MVP capability has a reproducible acceptance flow on both platforms; known limitations are explicit; critical recovery and data-integrity failures are resolved.
 
@@ -328,7 +336,7 @@ Apply these constraints to every work item:
 
 Split each phase into reviewable changes around coherent behavior. Each implementation change records its affected modules, user-visible outcome, verification performed, and remaining limitations. Do not add tests that merely mirror boilerplate or reversible documentation edits.
 
-A phase is complete only when its deliverables and acceptance criteria pass and the documentation reflects the result. Track deviations with rationale rather than silently narrowing the MVP. Following Phase 1, finish the remaining Phase 0 foundation work before feature-shell and renderer integration.
+Normally, a phase is complete only when its deliverables and acceptance criteria pass and the documentation reflects the result. Explicit exception (2026-09-29): the project owner closed Phase 9 with implementation complete and transferred outstanding verification to Phase 11; release acceptance still requires these checks. Track deviations with rationale rather than silently narrowing the MVP. Following Phase 1, finish the remaining Phase 0 foundation work before feature-shell and renderer integration.
 
 
 ## UI ownership and selection follow-up — 2026-09-11
@@ -377,3 +385,5 @@ Phase 9 viewer increment (2026-09-29): fixed black/white center crosshair, botto
 Phase 9 diagnostics follow-up: preserve package/DEM exceptions and native libtiff diagnostics under `BmapsElevation`; log opening metadata and result-kind transitions; keep camera observation active after a per-lookup exception. The user-reported unreadable elevation remains awaiting runtime evidence; no builds/tests executed.
 
 Phase 9 Android JNI follow-up (2026-09-29): separate DEM open status from pointer bits to accept valid signed-negative tagged handles and avoid leaking readers rejected by the old sign check. Add explicit JNI status logging and retain native status in exceptions. The user subsequently confirmed that the SRTM15Plus error was resolved on Android. No agent-run builds/tests; remaining dataset and platform acceptance is pending.
+
+Phase 9 CRS scope revision and source implementation (2026-09-29): replace SK-91 with WGS 84 (EPSG:4326), SK-42 / Pulkovo 1942 (EPSG:4284), and PZ-90.11 (EPSG:9475). PROJ is integrated as the offline conversion engine in source. All three are geographic 2D systems; projected SK-42 zones and vertical transformations are outside this increment. Mobile native compilation, independent reference checks, and device acceptance remain pending; see `9_MAP_ENGINE.md`.

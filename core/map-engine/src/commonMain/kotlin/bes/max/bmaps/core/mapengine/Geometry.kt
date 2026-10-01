@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.core.mapengine
 
 import kotlinx.serialization.Serializable
@@ -17,6 +25,8 @@ data class BoundingBox(
 data class CoordinateSystemId(val value: String) {
     companion object {
         val Wgs84 = CoordinateSystemId("EPSG:4326")
+        val Pulkovo1942 = CoordinateSystemId("EPSG:4284")
+        val Pz9011 = CoordinateSystemId("EPSG:9475")
         val WebMercator = CoordinateSystemId("EPSG:3857")
     }
 }
@@ -34,8 +44,15 @@ interface CoordinateTransformer {
 }
 
 sealed interface TransformResult {
-    data class Success(val coordinate: ProjectedCoordinate) : TransformResult
+    data class Success(val coordinate: ProjectedCoordinate, val operation: CoordinateOperation? = null) : TransformResult
     data object UnsupportedCoordinateSystem : TransformResult
     data object OutsideCoverage : TransformResult
     data object MissingTransformationData : TransformResult
+    data object Failed : TransformResult
 }
+
+data class CoordinateOperation(
+    val name: String,
+    val accuracyMeters: Double,
+    val coordinateEpoch: Double? = null,
+)

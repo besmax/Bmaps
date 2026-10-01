@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.feature.viewer
 
 import bes.max.bmaps.core.mapengine.*
@@ -13,8 +21,8 @@ internal data class AnnotationRenderData(
 )
 
 internal fun AnnotationEditorState.renderData() = AnnotationRenderData(
-    if (catalogReady) catalog else items, layers.filter { it.visible }.map { it.kind }.toSet(),
-    selected?.id, draft, catalogReady && clusteringEnabled && draft == null,
+    source, layers.filter { it.visible }.map { it.kind }.toSet(),
+    activeObjectId, draft, catalogReady && clusteringEnabled && draft == null,
 )
 
 internal data class AnnotationDisplay(val pyramid: TilePyramid? = null, val camera: MapCameraSnapshot? = null, val density: Float = 1f)

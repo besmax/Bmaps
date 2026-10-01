@@ -1,6 +1,15 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.core.mapengine
 
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.animation.core.tween
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
@@ -23,6 +32,7 @@ class RasterMapRenderer {
     private val size = MutableStateFlow(IntSize.Zero)
     private val mutableState = MutableStateFlow(RasterRendererState())
     internal val state = mutableState.asStateFlow()
+    internal val calloutTouchBounds = mutableMapOf<String, Rect>()
     private val mutableCamera = MutableStateFlow<MapCameraSnapshot?>(null)
     val camera = mutableCamera.asStateFlow()
     private val eventChannel = Channel<RasterRendererEvent>(64, BufferOverflow.DROP_OLDEST)

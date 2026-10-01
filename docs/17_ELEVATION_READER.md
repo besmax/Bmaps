@@ -1,6 +1,6 @@
 # Elevation reader feasibility increment
 
-Implemented 2026-09-27 as the elevation part of Phase 9's first feasibility step. Device/emulator execution and actual OpenTopography dataset acceptance remain with the user. The 2026-09-29 increment adds coordinate formatting, package-owned DEM sampling and viewer center altitude; SK-91 and device/provider-file acceptance remain pending. The combined Phase 9 feasibility checkbox is not complete.
+Implemented 2026-09-27 as the elevation part of Phase 9's first feasibility step. Device/emulator execution and actual OpenTopography dataset acceptance remain with the user. The 2026-09-29 increment adds coordinate formatting, package-owned DEM sampling, viewer center altitude, selectable geographic CRSs, and source-level offline PROJ transformation. Native compilation, independent CRS reference-point verification, and device/provider-file acceptance remain pending. The project owner closed Phase 9 on 2026-09-29; remaining verification is tracked in Phase 11 before release.
 
 ## Ownership and native dependency
 
@@ -66,7 +66,7 @@ Before expanding Phase 9:
 2. Inspect actual downloads from SRTM15+, NASADEM, COP30, COP90 and EU_DTM with an independent tool. Record sample type, compression, predictor, block dimensions, CRS/keys, NoData, scale/offset and vertical units/reference. No API credentials or URLs belong in fixtures or logs.
 3. Compare selected reader values against independent reference values for every offered dataset. Unsupported files must fail explicitly; extend the documented subset based on evidence.
 4. Profile realistic large files on mobile, repeatedly open/sample/close, and check cancellation/concurrent read/close. The native call is synchronous, so cancellation waits for the current bounded block decode.
-5. Verify the provider-based physical elevation semantics and package-owned viewer sampling below with actual downloaded files. Keep the separately pending SK-91 reference-definition spike independent.
+5. Verify the provider-based physical elevation semantics and package-owned viewer sampling below with actual downloaded files. Keep the separately pending PROJ coordinate-transformation spike independent.
 
 ## References
 
@@ -83,7 +83,9 @@ The unit policy is unscaled meters for these provider products. Vertical referen
 
 `MapPositionViewModel` owns its package session, observes the renderer's actual camera center and saved preferences, and clears the previous altitude as soon as the center changes. A cancellable 120 ms settling delay avoids DEM reads for every animation frame; results from retired lookups cannot update the current point. Raster rendering remains independent of DEM failures. One decimal place is display rounding, not a claim of decimeter DEM accuracy. A tile-only package omits the elevation row. The fixed black cross has a white outline and does not intercept gestures.
 
-Coordinate formats are signed latitude then longitude: decimal degrees (six decimal places), degrees/minutes (three minute decimals), and degrees/minutes/seconds (one second decimal). Rounding carries across minute/degree boundaries. Persisted EPSG:3857 uses the existing transformer and labeled X/Y meters; unknown systems are explicitly unavailable. SK-91 remains unimplemented. Preferences retain their existing CRS identifier separately from the new format key.
+Coordinate formats are signed latitude then longitude: decimal degrees (six decimal places), degrees/minutes (three minute decimals), and degrees/minutes/seconds (one second decimal). Rounding carries across minute/degree boundaries. Preferences select WGS 84 (EPSG:4326), Pulkovo 1942 (EPSG:4284), or PZ-90.11 (EPSG:9475); the map center is transformed from WGS 84 before formatting. Persisted EPSG:3857 remains supported as labeled X/Y meters; unknown systems are explicitly unavailable. PROJ rejects out-of-area, ballpark, and grid-dependent operations; time-dependent PZ-90.11 conversions use epoch 2010.0 and expose that epoch. Native build and independent reference-point acceptance remain pending.
+
+While a new camera position is awaiting coordinate transformation, the readout displays **Calculating coordinates…**. A temporarily absent transformed coordinate is not an unsupported-system error. Explicit transformation/preference failures and unsupported formatting still display their corresponding messages; coordinate lookup timing is unchanged.
 
 Source changes only in this increment: no builds, automated tests, device runs or live provider calls were performed, at the user's request. Suggested manual acceptance: all three formats across negative coordinates and rounding boundaries; changing zoom/region; rapid pan and navigation; tile-only packages; known DEM reference points including zero/negative values; NoData and coverage edges; unsupported/corrupt DEM; deletion/session closure; annotation tools and large text without overlapping the bottom readout.
 

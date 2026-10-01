@@ -1,0 +1,16 @@
+name: License notices
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check-notices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check source attribution and packaged license documents
+        run: python3 scripts/license_headers.py

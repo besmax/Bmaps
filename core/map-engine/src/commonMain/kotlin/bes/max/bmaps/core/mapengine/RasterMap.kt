@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.core.mapengine
 
 import androidx.compose.foundation.layout.Box
@@ -6,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.SideEffect
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -15,10 +24,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.geometry.Offset
 import ovh.plrapps.mapcompose.api.*
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ovh.plrapps.mapcompose.ui.MapUI
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.launch
 
 @Composable
 fun RasterMap(
@@ -28,21 +44,36 @@ fun RasterMap(
     paths: List<MapPath> = emptyList(),
     onOverlayClick: (String, MapPoint) -> Unit = { _, _ -> },
     onGestureStart: () -> Unit = {},
+    onLongPress: () -> Unit = {},
     markerContent: @Composable (MapMarker) -> Unit = {},
 ) {
     val state by renderer.state.collectAsStateWithLifecycle()
     val clicked by rememberUpdatedState(onOverlayClick)
     val marker by rememberUpdatedState(markerContent)
+    val markerItems by rememberUpdatedState(markers.associateBy(MapMarker::id))
     val gesture by rememberUpdatedState(onGestureStart)
+    val longPress by rememberUpdatedState(onLongPress)
     val engine = state.engine
+    val scope = rememberCoroutineScope()
+    var mapOrigin by remember { mutableStateOf(Offset.Zero) }
     val markerRegistry = remember(engine) {
         OverlayRegistry<MapMarker>(MapMarker::id, { item ->
                 engine?.addMarker(
                     item.id, item.position.x, item.position.y,
                     relativeOffset = if (item.anchor == MapMarkerAnchor.CENTER) Offset(-0.5f, -0.5f) else Offset(-0.5f, -1f),
                     zIndex = item.zIndex,
-                ) { marker(item) }
-        }, { engine?.removeMarker(it) })
+                ) { markerItems[item.id]?.let { marker(it) } }
+        }, { engine?.removeMarker(it) }, { previous, item ->
+            if (previous.position != item.position) engine?.moveMarker(item.id, item.position.x, item.position.y)
+            if (previous.zIndex != item.zIndex) engine?.updateMarkerZ(item.id, item.zIndex)
+            if (previous.anchor != item.anchor) scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                engine?.updateMarkerOffset(
+                    item.id,
+                    relativeOffset = if (item.anchor == MapMarkerAnchor.CENTER) Offset(-0.5f, -0.5f) else Offset(-0.5f, -1f),
+                    animationSpec = null,
+                )
+            }
+        })
     }
     val pathRegistry = remember(engine) {
         OverlayRegistry<MapPath>(MapPath::id, { item ->
@@ -66,12 +97,35 @@ fun RasterMap(
             engine?.onPathClick { _, _, _ -> }
         }
     }
-    Box(modifier.onSizeChanged(renderer::resize).pointerInput(renderer) {
+    Box(modifier.onSizeChanged(renderer::resize).onGloballyPositioned {
+        mapOrigin = it.positionInRoot()
+    }.pointerInput(renderer) {
         awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            if (renderer.calloutTouchBounds.values.any { it.contains(down.position + mapOrigin) }) {
+                while (currentEvent.changes.any { it.pressed }) awaitPointerEvent(PointerEventPass.Initial)
+                return@awaitEachGesture
+            }
             renderer.controller.cancelMove()
             gesture()
-            do { val event = awaitPointerEvent(PointerEventPass.Initial) } while (event.changes.any { it.pressed })
+            val recognizedLongPress = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                var cancelled = false
+                while (!cancelled) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id }
+                    if (change == null || !change.pressed) {
+                        cancelled = true
+                    } else {
+                        val delta = change.position - down.position
+                        cancelled = delta.x * delta.x + delta.y * delta.y > viewConfiguration.touchSlop * viewConfiguration.touchSlop
+                    }
+                }
+                !cancelled
+            } ?: true
+            if (recognizedLongPress) longPress()
+            while (currentEvent.changes.any { it.pressed }) {
+                awaitPointerEvent(PointerEventPass.Initial)
+            }
         }
     }) {
         state.engine?.let { MapUI(Modifier.fillMaxSize(), it) }

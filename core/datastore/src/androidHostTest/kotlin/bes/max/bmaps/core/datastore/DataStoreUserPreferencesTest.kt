@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.core.datastore
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
@@ -11,6 +19,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 
@@ -25,15 +35,20 @@ class DataStoreUserPreferencesTest {
             assertEquals(UserPreferences(), repository.preferences.first())
             repository.setTheme(ThemePreference.DARK)
             repository.setDefaultCoordinateSystem("EPSG:3857")
-            repository.setDisplayPreferences(ThemePreference.DARK, false)
+            repository.setDisplayPreferences(ThemePreference.DARK, false, CoordinateFormat.DECIMAL_DEGREES, "EPSG:3857")
+            coroutineScope {
+                launch { repository.setClusterMapObjects(true) }
+                launch { repository.setCoordinateFormat(CoordinateFormat.DEGREES_MINUTES) }
+            }
             scope.cancel()
             scope.coroutineContext[Job]!!.join()
             scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             val reopened = DataStoreUserPreferences(PreferenceDataStoreFactory.create(scope = scope) { file })
-            assertEquals(UserPreferences(ThemePreference.DARK, "EPSG:3857", false), reopened.preferences.first())
+            assertEquals(UserPreferences(ThemePreference.DARK, "EPSG:3857", true, CoordinateFormat.DEGREES_MINUTES), reopened.preferences.first())
             reopened.setTheme(ThemePreference.LIGHT)
             assertEquals("EPSG:3857", reopened.preferences.first().defaultCoordinateSystem)
-            assertEquals(false, reopened.preferences.first().clusterMapObjects)
+            assertEquals(true, reopened.preferences.first().clusterMapObjects)
+            assertEquals(CoordinateFormat.DEGREES_MINUTES, reopened.preferences.first().coordinateFormat)
         } finally {
             scope.cancel()
             scope.coroutineContext[Job]!!.join()

@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.core.storage
 
 import androidx.sqlite.SQLiteConnection
@@ -48,6 +56,10 @@ class AnnotationDatabase private constructor(private val connection: SQLiteConne
         }
     }
 
+    suspend fun reassign(packageId: String) = transaction {
+        connection.prepare("UPDATE annotation_owner SET package_id=?").use { it.bindText(1, packageId); it.step() }
+    }
+
     fun modifiedAt(): Long = scalar("SELECT updated_at FROM annotation_owner")
 
     private fun execute(sql: String) { connection.prepare(sql).use { it.step() } }
@@ -68,6 +80,7 @@ class AnnotationDatabase private constructor(private val connection: SQLiteConne
             try {
                 val database = AnnotationDatabase(connection)
                 database.execute("PRAGMA busy_timeout=5000")
+                database.execute("PRAGMA trusted_schema=OFF")
                 database.execute("PRAGMA journal_mode=DELETE")
                 database.execute("PRAGMA synchronous=FULL")
                 val version = database.scalar("PRAGMA user_version")
@@ -79,7 +92,11 @@ class AnnotationDatabase private constructor(private val connection: SQLiteConne
                     database.execute("PRAGMA user_version=1")
                 } else check(version == 1L) { "Unsupported annotation schema" }
                 connection.prepare("SELECT package_id FROM annotation_owner").use { check(it.step() && it.getText(0) == packageId && !it.step()) }
-                if (verify) connection.prepare("PRAGMA quick_check").use { check(it.step() && it.getText(0) == "ok" && !it.step()) }
+                if (verify) {
+                    check(database.scalar("SELECT count(*) FROM sqlite_schema WHERE type IN ('trigger', 'view')") == 0L)
+                    connection.prepare("PRAGMA quick_check").use { check(it.step() && it.getText(0) == "ok" && !it.step()) }
+                    connection.prepare("SELECT 1 FROM annotations GROUP BY id HAVING count(*) > 1 LIMIT 1").use { check(!it.step()) }
+                }
                 database.block()
             } finally { connection.close() }
         }

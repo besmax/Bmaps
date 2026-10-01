@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# Required Notice: Copyright (c) 2026 Maksim Bespalov.
+# Required Notice: Bmaps — https://github.com/besmax/Bmaps
+# License: https://polyformproject.org/licenses/noncommercial/1.0.0
+# Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+
+set(SQLite3_FOUND TRUE)
+file(STRINGS "${BMAPS_SQLITE_SOURCE}/sqlite3.h" SQLITE_VERSION_LINE REGEX "^#define SQLITE_VERSION +\"[0-9.]+\"")
+string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" SQLite3_VERSION "${SQLITE_VERSION_LINE}")
+set(SQLite3_INCLUDE_DIR "${BMAPS_SQLITE_SOURCE}")
+set(SQLite3_INCLUDE_DIRS "${BMAPS_SQLITE_SOURCE}")
+set(SQLite3_LIBRARY "${CMAKE_BINARY_DIR}/lib/libbmaps_proj_sqlite.a")
+set(SQLite3_LIBRARIES "${SQLite3_LIBRARY}")
+set(SQLite3_FOUND TRUE)
+if(NOT TARGET SQLite::SQLite3)
+    add_library(SQLite::SQLite3 STATIC IMPORTED GLOBAL)
+    set_target_properties(SQLite::SQLite3 PROPERTIES
+        IMPORTED_LOCATION "${SQLite3_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${BMAPS_SQLITE_SOURCE}")
+endif()

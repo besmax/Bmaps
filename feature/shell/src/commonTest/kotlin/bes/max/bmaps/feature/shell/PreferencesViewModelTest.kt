@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.feature.shell
 
 import androidx.lifecycle.ViewModel
@@ -13,11 +21,13 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.CompletableDeferred
+import bes.max.bmaps.core.datastore.CoordinateFormat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -41,78 +51,84 @@ class PreferencesViewModelTest {
     }
 
     @Test
-    fun saveIsSingleAndBufferedUntilTheScreenResumes() = runTest {
+    fun eachSettingAppliesImmediatelyWithoutOverwritingOtherKeys() = runTest {
         val repository = FakePreferences()
         val viewModel = retain(PreferencesViewModel(repository))
         runCurrent()
         viewModel.selectTheme(ThemePreference.DARK)
         viewModel.clusterMapObjects(false)
-        assertEquals(ThemePreference.SYSTEM, repository.current.value.theme)
-        viewModel.save()
-        viewModel.save()
+        viewModel.selectCoordinateFormat(CoordinateFormat.DEGREES_MINUTES_SECONDS)
+        viewModel.selectCoordinateSystem("EPSG:9475")
         runCurrent()
-        assertEquals(1, repository.writes)
+        assertEquals(UserPreferences(ThemePreference.DARK, "EPSG:9475", false,
+            CoordinateFormat.DEGREES_MINUTES_SECONDS), repository.current.value)
+        assertEquals(4, repository.writes)
+        assertTrue(viewModel.state.value.saving.isEmpty())
+    }
+
+    @Test
+    fun failedSettingRollsBackWithoutUndoingAnotherChangeAndCanBeRetried() = runTest {
+        val repository = FakePreferences().apply { failSetting = PreferenceSetting.THEME }
+        val viewModel = retain(PreferencesViewModel(repository))
+        runCurrent()
+        viewModel.selectTheme(ThemePreference.DARK)
+        viewModel.clusterMapObjects(false)
+        runCurrent()
+        assertEquals(setOf(PreferenceSetting.THEME), viewModel.state.value.saveErrors)
+        assertEquals(ThemePreference.SYSTEM, viewModel.state.value.selectedTheme)
+        assertFalse(viewModel.state.value.clusterMapObjects)
+        assertFalse(repository.current.value.clusterMapObjects)
+        repository.failSetting = null
+        viewModel.selectTheme(ThemePreference.DARK)
+        runCurrent()
+        assertEquals(ThemePreference.DARK, repository.current.value.theme)
+        assertTrue(viewModel.state.value.saveErrors.isEmpty())
+    }
+
+    @Test
+    fun pendingThemeDoesNotBlockOtherSettingsOrDuplicateWrites() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val repository = FakePreferences().apply { beforeSave = { if (it == PreferenceSetting.THEME) gate.await() } }
+        val viewModel = retain(PreferencesViewModel(repository))
+        runCurrent()
+        viewModel.selectTheme(ThemePreference.DARK)
+        viewModel.selectTheme(ThemePreference.LIGHT)
+        viewModel.clusterMapObjects(false)
+        runCurrent()
+        assertEquals(setOf(PreferenceSetting.THEME), viewModel.state.value.saving)
+        assertEquals(ThemePreference.DARK, viewModel.state.value.selectedTheme)
+        assertFalse(repository.current.value.clusterMapObjects)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(2, repository.writes)
         assertEquals(ThemePreference.DARK, repository.current.value.theme)
         assertFalse(repository.current.value.clusterMapObjects)
-        val received = mutableListOf<PreferencesEvent>()
-        val firstCollector = launch { viewModel.events.take(1).toList(received) }
-        runCurrent()
-        firstCollector.join()
-        assertEquals(listOf<PreferencesEvent>(PreferencesEvent.Saved), received)
-        val restartedCollector = launch { viewModel.events.toList(received) }
-        runCurrent()
-        assertEquals(1, received.size)
-        restartedCollector.cancel()
     }
 
     @Test
-    fun saveFailureKeepsDraftAndRetrySucceeds() = runTest {
-        val repository = FakePreferences().apply { failSave = true }
-        val viewModel = retain(PreferencesViewModel(repository))
-        runCurrent()
-        viewModel.selectTheme(ThemePreference.DARK)
-        viewModel.clusterMapObjects(false)
-        viewModel.save()
-        runCurrent()
-        assertEquals(PreferencesError.SAVE, viewModel.state.value.error)
-        assertFalse(viewModel.state.value.isSaving)
-        assertEquals(ThemePreference.DARK, viewModel.state.value.selectedTheme)
-        assertFalse(viewModel.state.value.clusterMapObjects)
-        assertTrue(repository.current.value.clusterMapObjects)
-        assertEquals(ThemePreference.SYSTEM, repository.current.value.theme)
-        val received = mutableListOf<PreferencesEvent>()
-        val collector = launch { viewModel.events.toList(received) }
-        runCurrent()
-        assertTrue(received.isEmpty())
-        repository.failSave = false
-        viewModel.save()
-        runCurrent()
-        assertEquals(listOf<PreferencesEvent>(PreferencesEvent.Saved), received)
-        collector.cancel()
-    }
-
-    @Test
-    fun dismissedDraftDoesNotLeakIntoANewDialog() = runTest {
-        val repository = FakePreferences()
+    fun acceptedWriteFinishesAfterBackAndReopenedScreenObservesIt() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val repository = FakePreferences().apply { beforeSave = { gate.await() } }
         val first = retain(PreferencesViewModel(repository))
         runCurrent()
         first.selectTheme(ThemePreference.DARK)
-        first.clusterMapObjects(false)
         stores.first().clear()
-        val second = retain(PreferencesViewModel(repository))
+        val reopened = retain(PreferencesViewModel(repository))
         runCurrent()
-        assertEquals(ThemePreference.SYSTEM, second.state.value.selectedTheme)
-        assertTrue(second.state.value.clusterMapObjects)
-        assertEquals(0, repository.writes)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(ThemePreference.DARK, reopened.state.value.selectedTheme)
+        assertEquals(1, repository.writes)
     }
 
     @Test
-    fun failedLoadCannotOverwritePreferencesAndCanBeRetried() = runTest {
+    fun failedLoadCannotOverwriteSettingsAndCanBeRetried() = runTest {
         val repository = FakePreferences().apply { failRead = true }
         val viewModel = retain(PreferencesViewModel(repository))
         runCurrent()
-        assertEquals(PreferencesError.LOAD, viewModel.state.value.error)
-        viewModel.save()
+        assertTrue(viewModel.state.value.loadFailed)
+        viewModel.selectTheme(ThemePreference.DARK)
+        viewModel.clusterMapObjects(false)
         runCurrent()
         assertEquals(0, repository.writes)
         repository.failRead = false
@@ -120,23 +136,19 @@ class PreferencesViewModelTest {
         viewModel.loadPreferences()
         runCurrent()
         assertEquals(ThemePreference.DARK, viewModel.state.value.selectedTheme)
-        assertEquals(null, viewModel.state.value.error)
+        assertFalse(viewModel.state.value.loadFailed)
     }
 
     @Test
-    fun clearingDialogOwnerCancelsSuspendedSave() = runTest {
-        var cancelled = false
-        val repository = FakePreferences().apply {
-            beforeSave = { try { awaitCancellation() } finally { cancelled = true } }
-        }
+    fun appearanceChangePreservesUnknownCrsAndInvalidSelectionIsRejected() = runTest {
+        val repository = FakePreferences().apply { current.value = UserPreferences(defaultCoordinateSystem = "local:custom") }
         val viewModel = retain(PreferencesViewModel(repository))
         runCurrent()
-        viewModel.save()
+        viewModel.selectTheme(ThemePreference.DARK)
+        viewModel.selectCoordinateSystem("invalid")
         runCurrent()
-        stores.single().clear()
-        runCurrent()
-        assertTrue(cancelled)
-        assertEquals(0, repository.writes)
+        assertEquals("local:custom", repository.current.value.defaultCoordinateSystem)
+        assertEquals(1, repository.writes)
     }
 
     @Test
@@ -179,23 +191,25 @@ class PreferencesViewModelTest {
 private class FakePreferences : UserPreferencesRepository {
     val current = MutableStateFlow(UserPreferences())
     var failRead = false
-    var failSave = false
+    var failSetting: PreferenceSetting? = null
     var writes = 0
-    var beforeSave: suspend () -> Unit = {}
+    var beforeSave: suspend (PreferenceSetting) -> Unit = {}
     override val preferences: Flow<UserPreferences> = flow {
         if (failRead) error("Read failed")
         emitAll(current)
     }
-    override suspend fun setTheme(theme: ThemePreference) {
-        setDisplayPreferences(theme, current.value.clusterMapObjects)
-    }
-    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean, coordinateFormat: bes.max.bmaps.core.datastore.CoordinateFormat) {
-        beforeSave()
-        if (failSave) error("Write failed")
+    private suspend fun change(setting: PreferenceSetting, update: (UserPreferences) -> UserPreferences) {
+        beforeSave(setting)
+        if (failSetting == setting) error("Write failed")
         writes++
-        current.value = current.value.copy(theme = theme, clusterMapObjects = clusterMapObjects, coordinateFormat = coordinateFormat)
+        current.update(update)
     }
-    override suspend fun setDefaultCoordinateSystem(identifier: String) {
-        current.value = current.value.copy(defaultCoordinateSystem = identifier)
+    override suspend fun setTheme(theme: ThemePreference) = change(PreferenceSetting.THEME) { it.copy(theme = theme) }
+    override suspend fun setClusterMapObjects(enabled: Boolean) = change(PreferenceSetting.CLUSTERING) { it.copy(clusterMapObjects = enabled) }
+    override suspend fun setCoordinateFormat(format: CoordinateFormat) = change(PreferenceSetting.COORDINATE_FORMAT) { it.copy(coordinateFormat = format) }
+    override suspend fun setDefaultCoordinateSystem(identifier: String) = change(PreferenceSetting.COORDINATE_SYSTEM) { it.copy(defaultCoordinateSystem = identifier) }
+    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean,
+        coordinateFormat: CoordinateFormat, defaultCoordinateSystem: String) {
+        error("Settings must persist individual fields")
     }
 }

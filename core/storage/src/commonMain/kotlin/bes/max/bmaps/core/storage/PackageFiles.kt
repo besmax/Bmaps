@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.core.storage
 
 import bes.max.bmaps.core.di.AppScope
@@ -35,6 +43,27 @@ class PackageFileStorage(private val location: PackageStorageLocation) {
 
 class PackageFiles internal constructor(private val root: Path) {
     private val fs = SystemFileSystem
+
+    fun transferDirectory(id: String): Path {
+        checkComponent(id)
+        return checked(Path(root, "transfers", id))
+    }
+
+    fun createTransfer(id: String): Path = transferDirectory(id).also { fs.createDirectories(it, mustCreate = true) }
+
+    fun deleteTransfer(id: String) {
+        val path = transferDirectory(id)
+        if (fs.exists(path)) deleteTree(path)
+    }
+
+    fun clearTransfers() {
+        val parent = checked(Path(root, "transfers"))
+        if (fs.exists(parent)) fs.list(parent).forEach { deleteTree(checked(it)) }
+    }
+
+    fun deleteAsset(id: String, staged: Boolean, relativePath: String) {
+        fs.delete(asset(id, staged, relativePath), mustExist = false)
+    }
 
     fun directory(id: String, staged: Boolean): Path {
         checkComponent(id)

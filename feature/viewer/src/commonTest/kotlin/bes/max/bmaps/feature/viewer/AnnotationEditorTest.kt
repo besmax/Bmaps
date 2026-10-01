@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.feature.viewer
 
 import androidx.lifecycle.ViewModelStore
@@ -25,10 +33,10 @@ class AnnotationEditorTest {
             owner.put("editor", model)
             model.open(PackageId("one")); runCurrent()
             assertTrue(model.state.value.catalogReady)
-            preferences.setDisplayPreferences(ThemePreference.SYSTEM, false); runCurrent()
+            preferences.setDisplayPreferences(ThemePreference.SYSTEM, false, preferences.preferences.value.coordinateFormat, preferences.preferences.value.defaultCoordinateSystem); runCurrent()
             assertFalse(model.state.value.clusteringEnabled)
             assertEquals(1, annotationOverlays(model.state.value, TilePyramid(ZoomRange(0, 0))).markers.size)
-            preferences.setDisplayPreferences(ThemePreference.SYSTEM, true); runCurrent()
+            preferences.setDisplayPreferences(ThemePreference.SYSTEM, true, preferences.preferences.value.coordinateFormat, preferences.preferences.value.defaultCoordinateSystem); runCurrent()
             assertTrue(model.state.value.clusteringEnabled)
         } finally { owner.clear(); runCurrent(); Dispatchers.resetMain() }
     }
@@ -131,9 +139,11 @@ private class MemoryAnnotations : AnnotationRepository {
 
 private class MemoryPreferences : UserPreferencesRepository {
     override val preferences = MutableStateFlow(UserPreferences())
+    override suspend fun setClusterMapObjects(enabled: Boolean) { preferences.value = preferences.value.copy(clusterMapObjects = enabled) }
+    override suspend fun setCoordinateFormat(format: bes.max.bmaps.core.datastore.CoordinateFormat) { preferences.value = preferences.value.copy(coordinateFormat = format) }
     override suspend fun setTheme(theme: ThemePreference) { preferences.value = preferences.value.copy(theme = theme) }
     override suspend fun setDefaultCoordinateSystem(identifier: String) { preferences.value = preferences.value.copy(defaultCoordinateSystem = identifier) }
-    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean, coordinateFormat: bes.max.bmaps.core.datastore.CoordinateFormat) {
-        preferences.value = preferences.value.copy(theme = theme, clusterMapObjects = clusterMapObjects, coordinateFormat = coordinateFormat)
+    override suspend fun setDisplayPreferences(theme: ThemePreference, clusterMapObjects: Boolean, coordinateFormat: bes.max.bmaps.core.datastore.CoordinateFormat, defaultCoordinateSystem: String) {
+        preferences.value = preferences.value.copy(theme = theme, clusterMapObjects = clusterMapObjects, coordinateFormat = coordinateFormat, defaultCoordinateSystem = defaultCoordinateSystem)
     }
 }

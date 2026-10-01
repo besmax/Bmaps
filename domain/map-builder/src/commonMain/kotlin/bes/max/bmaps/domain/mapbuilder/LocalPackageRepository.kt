@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.domain.mapbuilder
 
 import bes.max.bmaps.core.database.*
@@ -10,6 +18,7 @@ import dev.zacsweers.metro.SingleIn
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -23,12 +32,52 @@ class LocalPackageRepository(
     private val catalog: PackageCatalog,
     private val storage: PackageFileStorage,
     private val demReaders: DemReaderFactory,
-) : PackageRepository, PackageBuildStorage, AnnotationRepository {
+) : PackageRepository, PackageBuildStorage, AnnotationRepository, PackageTransfer {
     private val mutex = Mutex()
     private var reconciled = false
     private val sessions = mutableMapOf<PackageId, MutableList<LocalOpenedPackage>>()
     private val records get() = catalog.records
     private val json get() = PackageManifestCodec.json
+
+    override suspend fun exportPackage(id: PackageId, destination: kotlinx.io.RawSink): PackageResult<Unit> = operation {
+        val record = records.get(id.value) ?: fail(PackageFailure.NotFound)
+        if (record.state != PackageState.READY.name) fail(PackageFailure.NotReady)
+        storage.access {
+            val manifest = readManifest(id, false)
+            verify(manifest, false)
+            exportSnapshot(manifest, destination)
+        }
+    }
+
+    override suspend fun importPackage(source: kotlinx.io.RawSource): PackageResult<PackageId> = importStaged { id ->
+        readTransfer(source, id)
+    }
+
+    override suspend fun importMbTiles(source: kotlinx.io.RawSource, name: String): PackageResult<PackageId> = importStaged { id ->
+        readStandaloneMbTiles(source, id, name)
+    }
+
+    private suspend fun importStaged(read: suspend PackageFiles.(PackageId) -> PackageManifest): PackageResult<PackageId> = operation {
+        val id = PackageId("import-${kotlin.uuid.Uuid.random()}")
+        storage.access {
+            create(id.value)
+            try {
+                val manifest = read(id)
+                val encoded = PackageManifestCodec.encode(manifest)
+                write(id.value, "config.json", Buffer().apply { write(encoded.encodeToByteArray()) }, MANIFEST_RESERVE, Long.MAX_VALUE)
+                verify(manifest, true)
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                withContext(NonCancellable) {
+                    promote(id.value)
+                    records.putPackage(PackageRecord(id.value, manifest.name, PackageState.READY.name, encoded,
+                        size(id.value, false), manifest.updatedAtEpochMillis, manifest.elevation != null))
+                }
+                id
+            } finally {
+                withContext(NonCancellable) { delete(id.value, true) }
+            }
+        }
+    }
 
     override suspend fun availableBytes(): PackageResult<Long> = operation { storage.access { availableBytes() } }
 
@@ -434,6 +483,7 @@ class LocalPackageRepository(
 
     private suspend fun reconcileFiles() {
         storage.access {
+            clearTransfers()
             for (record in records.all()) {
                 val id = PackageId(record.id)
                 if (record.state == PackageState.DELETING.name) {
@@ -481,7 +531,10 @@ class LocalPackageRepository(
                 }
             }
             for (id in ids(true)) {
-                if (records.get(id) == null) records.putPackage(PackageRecord(id, id, PackageState.CORRUPT.name, "", 0, 0))
+                if (records.get(id) == null) {
+                    if (id.startsWith("import-")) delete(id, true)
+                    else records.putPackage(PackageRecord(id, id, PackageState.CORRUPT.name, "", 0, 0))
+                }
             }
         }
     }
@@ -510,6 +563,9 @@ class LocalPackageRepository(
             PackageManifestCodec.assets(manifest).map { it.relativePath }.toSet() + "config.json") fail(PackageFailure.CorruptData)
         for (asset in PackageManifestCodec.assets(manifest)) {
             if (assetSize(manifest.id.value, staged, asset.relativePath) != asset.sizeBytes) fail(PackageFailure.CorruptData)
+            if (asset.sha256 != null && TransferStreams.digest(this.asset(manifest.id.value, staged, asset.relativePath)) != asset.sha256) {
+                fail(PackageFailure.CorruptData)
+            }
         }
         manifest.elevation?.let {
             if (!validElevation(manifest.id, it.relativePath, staged)) fail(PackageFailure.CorruptData)
@@ -639,6 +695,9 @@ private fun TileKey.address() = TileAddress(level, column, row)
 internal fun failureOf(error: Throwable): PackageFailure = when (error) {
     is CancellationException -> throw error
     is PackageStorageException -> error.failure
+    is UnsupportedTransferVersion -> PackageFailure.UnsupportedVersion(error.version)
+    is InvalidTransfer -> PackageFailure.CorruptData
+    is kotlinx.io.EOFException -> PackageFailure.CorruptData
     is FileNotFoundException -> PackageFailure.NotFound
     is PackageAlreadyExists -> PackageFailure.Conflict
     is StorageLimitExceeded -> PackageFailure.SizeLimitExceeded(error.limit, error.required)

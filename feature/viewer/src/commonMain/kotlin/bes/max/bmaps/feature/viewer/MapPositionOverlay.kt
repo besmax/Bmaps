@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.feature.viewer
 
 import androidx.compose.foundation.Canvas
@@ -41,7 +49,9 @@ internal fun MapCrosshair(modifier: Modifier = Modifier) {
 @Composable
 internal fun MapPositionOverlay(state: MapPositionState, modifier: Modifier = Modifier) {
     val point = state.coordinate ?: return
-    val coordinates = state.preferences?.let { formatCoordinate(point, it) }
+    val displayCoordinate = state.displayCoordinate
+    val coordinates = if (displayCoordinate != null && state.preferences != null)
+        formatCoordinate(displayCoordinate, state.preferences.coordinateFormat) else null
     Surface(
         modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f), tonalElevation = 3.dp
@@ -52,12 +62,22 @@ internal fun MapPositionOverlay(state: MapPositionState, modifier: Modifier = Mo
         ) {
             Text(
                 when {
+                    state.coordinateError != null -> stringResource(state.coordinateError)
                     state.preferenceError -> stringResource(Res.string.position_preferences_unavailable)
+                    displayCoordinate == null -> stringResource(Res.string.position_coordinates_calculating)
                     coordinates == null -> stringResource(Res.string.position_coordinates_unsupported)
-                    state.preferences?.defaultCoordinateSystem == "EPSG:3857" -> coordinates
                     else -> stringResource(Res.string.position_latitude_longitude, coordinates)
                 }, style = MaterialTheme.typography.labelMedium
             )
+            state.coordinateOperation?.takeIf { it.accuracyMeters > 0 }?.let {
+                Text(stringResource(Res.string.position_transform_accuracy,
+                    if (it.accuracyMeters < 0.01) "<0.01" else fixedDecimal(it.accuracyMeters, 1)),
+                    style = MaterialTheme.typography.labelSmall)
+            }
+            state.coordinateOperation?.coordinateEpoch?.let {
+                Text(stringResource(Res.string.position_coordinate_epoch, fixedDecimal(it, 1)),
+                    style = MaterialTheme.typography.labelSmall)
+            }
             val elevation = state.elevation
             val label = when {
                 state.error != null -> stringResource(state.error)

@@ -1,3 +1,11 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps.core.mbtiles
 
 import androidx.sqlite.SQLiteConnection
@@ -34,15 +42,51 @@ class MbTiles private constructor(private val connection: SQLiteConnection, priv
     }
 
     suspend fun metadata(): Map<String, String> = access {
-        connection.prepare("SELECT name, value FROM metadata").use { query ->
+        connection.prepare("SELECT name, value, length(CAST(name AS BLOB)), length(CAST(value AS BLOB)) FROM metadata").use { query ->
             buildMap {
                 while (query.step()) {
                     check(size < 256)
+                    check(query.getLong(2) in 1..128 && query.getLong(3) in 0..8192)
                     val name = query.getText(0)
                     val value = query.getText(1)
                     check(name.length <= 128 && value.length <= 8192)
+                    check(name !in this)
                     put(name, value)
                 }
+            }
+        }
+    }
+
+    suspend fun reassign(previousId: String, newId: String) = access {
+        check(writable)
+        require(scalar("SELECT count(*) FROM sqlite_schema WHERE type IN ('trigger', 'view')") == 0L)
+        transaction {
+            connection.prepare("SELECT value FROM metadata WHERE name='bmaps_package_id'").use {
+                require(it.step() && it.getText(0) == previousId && !it.step())
+            }
+            connection.prepare("UPDATE metadata SET value=? WHERE name='bmaps_package_id'").use {
+                it.bindText(1, newId); it.step()
+            }
+        }
+    }
+
+    suspend fun levels(): Set<Int> = access {
+        connection.prepare("SELECT DISTINCT zoom_level FROM tiles LIMIT 64").use {
+            buildSet {
+                while (it.step()) { val level = it.getLong(0); require(level in 0..52); add(level.toInt()) }
+            }
+        }
+    }
+
+    suspend fun visitTiles(block: suspend (TileWrite) -> Unit) = access {
+        connection.prepare("PRAGMA quick_check").use { require(it.step() && it.getText(0) == "ok" && !it.step()) }
+        connection.prepare("SELECT zoom_level, tile_column, tile_row, length(tile_data), tile_data FROM tiles").use {
+            while (it.step()) {
+                currentCoroutineContext().ensureActive()
+                val level = it.getLong(0)
+                require(level in 0..52 && it.getLong(3) in 1..MAX_TILE_BYTES.toLong())
+                val stored = TileAddress(level.toInt(), it.getLong(1), it.getLong(2))
+                block(TileWrite(stored.copy(row = tmsRow(stored)), it.getBlob(4)))
             }
         }
     }
@@ -105,6 +149,10 @@ class MbTiles private constructor(private val connection: SQLiteConnection, priv
     }
 
     suspend fun verify(accepts: (TileAddress) -> Boolean = { true }) = access {
+        require(scalar("SELECT count(*) FROM sqlite_schema WHERE type IN ('trigger', 'view')") == 0L)
+        connection.prepare("SELECT 1 FROM tiles GROUP BY zoom_level, tile_column, tile_row HAVING count(*) > 1 LIMIT 1").use {
+            require(!it.step())
+        }
         connection.prepare("PRAGMA quick_check").use {
             check(it.step() && it.getText(0) == "ok" && !it.step()) { "Invalid MBTiles database" }
         }
@@ -187,6 +235,7 @@ class MbTiles private constructor(private val connection: SQLiteConnection, priv
                     val handle = MbTiles(connection, writable)
                     pending = handle
                     handle.execute("PRAGMA busy_timeout=5000")
+                    handle.execute("PRAGMA trusted_schema=OFF")
                     if (writable) {
                         handle.execute("PRAGMA journal_mode=DELETE")
                         handle.execute("PRAGMA synchronous=FULL")

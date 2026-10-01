@@ -1,9 +1,18 @@
+/*
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+Required Notice: Copyright (c) 2026 Maksim Bespalov.
+Required Notice: Bmaps — https://github.com/besmax/Bmaps
+License: https://polyformproject.org/licenses/noncommercial/1.0.0
+Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
+*/
+
 package bes.max.bmaps
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.isSelected
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -23,36 +32,46 @@ abstract class ShellNavigationChecks {
     }
 
     @Test
-    fun navigationAndDialogSurviveRecreationWithoutReplayingSave() {
+    fun settingsApplyImmediatelyAndSurviveRecreationAndBack() {
         compose.onNodeWithText("Build a map").performClick()
         compose.onNodeWithText("Choose a place. Take it offline.").assertIsDisplayed()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Choose a place. Take it offline.").assertIsDisplayed()
 
-        compose.onNodeWithContentDescription("Preferences").performClick()
+        compose.onNodeWithContentDescription("Settings").performClick()
         compose.waitUntil(5_000) { compose.onAllNodes(hasText("Dark")).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Dark").performClick()
         compose.activityRule.scenario.recreate()
+        waitForSelectedTheme("Dark")
         compose.onNodeWithText("Dark").assertIsSelected()
 
         compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
         compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
-        compose.onNodeWithText("Save").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodes(isDialog()).fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("Save").assertDoesNotExist()
+        compose.onNodeWithText("Cancel").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Choose a place. Take it offline.").assertIsDisplayed()
 
-        compose.onNodeWithContentDescription("Preferences").performClick()
+        compose.onNodeWithContentDescription("Settings").performClick()
         compose.waitUntil(5_000) { compose.onAllNodes(hasText("Dark")).fetchSemanticsNodes().isNotEmpty() }
+        waitForSelectedTheme("Dark")
         compose.onNodeWithText("Dark").assertIsSelected()
         compose.onNodeWithText("Light").performClick()
-        compose.onNodeWithText("Cancel").performClick()
-        compose.onNodeWithContentDescription("Preferences").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithContentDescription("Settings").performClick()
         compose.waitUntil(5_000) { compose.onAllNodes(hasText("Dark")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Dark").assertIsSelected()
-        compose.onNodeWithText("Use device setting").performClick()
-        compose.onNodeWithText("Save").performClick()
-        compose.waitUntil(5_000) { compose.onAllNodes(isDialog()).fetchSemanticsNodes().isEmpty() }
+        waitForSelectedTheme("Light")
+        compose.onNodeWithText("Light").assertIsSelected()
+        compose.onNodeWithText("System").performClick()
+        compose.onNodeWithText("Version code:", substring = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Save").assertDoesNotExist()
+        compose.onNodeWithText("Cancel").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Your maps").assertIsDisplayed()
+    }
+
+    private fun waitForSelectedTheme(label: String) {
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText(label) and isSelected()).fetchSemanticsNodes().isNotEmpty() }
     }
 }

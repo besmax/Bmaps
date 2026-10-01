@@ -1,4 +1,8 @@
 <resources>
+    <string name="project_licensing">About Bmaps · Licensing</string>
+    <string name="project_copyright">Copyright © 2026 Maksim Bespalov</string>
+    <string name="project_license_summary">Bmaps original code: PolyForm Noncommercial 1.0.0. Third-party components retain their own licenses.</string>
+    <string name="project_commercial_contact">Additional permissions and commercial terms: bespalov.m.9@gmail.com</string>
     <string name="cluster_map_objects">Cluster map objects</string>
     <string name="cluster_map_objects_hint">Group nearby markers, small lines, and polygons into numbered circles.</string>
     <string name="appearance">Appearance</string>
@@ -18,10 +22,17 @@
     <string name="use_device_setting">Use device setting</string>
     <string name="viewer">Viewer</string>
     <string name="wgs_84">WGS 84</string>
+    <string name="pulkovo_1942">SK-42 / Pulkovo 1942 (EPSG:4284)</string>
+    <string name="pz_90_11">PZ-90.11 (EPSG:9475)</string>
     <string name="your_preferences_could_not_be_loaded">Your preferences could not be loaded.</string>
     <string name="back">Back</string>
     <string name="coordinate_format">Coordinate format</string>
     <string name="coordinate_decimal">Decimal degrees · 55.755800°</string>
     <string name="coordinate_minutes">Degrees, minutes · 55° 45.348′</string>
     <string name="coordinate_seconds">Degrees, minutes, seconds · 55° 45′ 20.9″</string>
+    <string name="settings">Settings</string>
+    <string name="system">System</string>
+    <string name="app_version_code">Version code: %1$s</string>
+    <string name="app_version_unavailable">Version code unavailable</string>
+    <string name="setting_save_failed">Could not apply this setting. Your previous value was restored. Select it again to retry.</string>
 </resources>

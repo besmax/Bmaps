@@ -43,9 +43,14 @@ The architecture must remain highly modular to accommodate the following future 
 
 ## 5. Coordinate Systems
 The application handles complex geospatial mathematics and must not be hardcoded to a single projection. The architecture must natively support transformations between multiple coordinate systems, explicitly including:
-* **WGS-84** (Standard GPS coordinates).
-* **SK-91** (СК-91).
+* **WGS 84 — EPSG:4326** (geographic 2D).
+* **SK-42 / Pulkovo 1942 — EPSG:4284** (geographic 2D).
+* **PZ-90.11 — EPSG:9475** (geographic 2D).
 * Interface contracts for adding new local coordinate reference systems (CRS) as needed.
+
+The September 29 scope revision replaces SK-91 with these three exact CRS identifiers. EPSG:4284 does not select a Gauss–Krüger projected zone; zoned easting/northing systems require separate definitions and are outside this increment. Coordinate system and angular display format remain separate preferences. Package geometry and DEM lookup remain WGS 84; switching the display CRS does not reproject raster tiles or change the DEM vertical reference.
+
+PROJ is the transformation engine behind the renderer-independent contract. Its matching `proj.db` is embedded for offline use; grid-dependent operations are rejected because no grids are bundled. Select operations by area of use, report operation identity and accuracy, reject ballpark fallback, and report unavailable operations explicitly. Source implementation is present; independent reference fixtures and Android/iOS acceptance remain required before declaring the additional systems verified. See `9_MAP_ENGINE.md`.
 
 ## 6. Import, Export, and Sharing
 The application acts as a hub for geospatial data and must support seamless peer-to-peer package transfers.
