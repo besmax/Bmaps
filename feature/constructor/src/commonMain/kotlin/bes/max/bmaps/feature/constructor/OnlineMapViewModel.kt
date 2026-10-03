@@ -19,6 +19,8 @@ import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -52,15 +54,74 @@ data class OnlineMapState(
 class OnlineMapViewModel(private val providers: ProviderRepository, private val sources: OnlineSourceOpener) : ViewModel() {
     private val mutableState = MutableStateFlow(OnlineMapState())
     val state = mutableState.asStateFlow()
+    private val channel = Channel<StringResource>(Channel.BUFFERED)
+    val events = channel.receiveAsFlow()
     private var generation = 0
     private var viewport: MapViewport? = null
+    private var initialLocationPending = true
+    private var locationRequestId = Long.MIN_VALUE
+    private var requestedLocation: GeographicCoordinate? = null
+    private var requestedLocationZoom: Int? = null
+
+    fun requestLocationCenter(coordinate: GeographicCoordinate) {
+        requestedLocationZoom = if (initialLocationPending) 13 else null
+        initialLocationPending = false
+        requestedLocation = coordinate
+        applyRequestedLocation()
+    }
+
+    private fun applyRequestedLocation() {
+        val coordinate = requestedLocation ?: return
+        if (centerLocation(coordinate, requestedLocationZoom)) cancelLocationCenter()
+    }
+
+    fun cancelLocationCenter() { requestedLocation = null; requestedLocationZoom = null }
+    fun interacted() { initialLocationPending = false; cancelLocationCenter() }
+
+    fun focusInitially(coordinate: GeographicCoordinate, accuracyMeters: Double) {
+        if (!initialLocationPending || !accuracyMeters.isFinite() || accuracyMeters < 0) return
+        if (centerLocation(coordinate, zoom = 13)) initialLocationPending = false
+    }
+
+    fun centerLocation(coordinate: GeographicCoordinate, zoom: Int? = null): Boolean {
+        val choice = state.value.selected ?: return false
+        val session = state.value.session ?: return false
+        val camera = renderer.camera.value?.takeIf { it.generation == session.generation } ?: return false
+        val worldCenter = WebMercator.normalized(coordinate) ?: run {
+            cancelLocationCenter()
+            channel.trySend(Res.string.location_center_failed)
+            return false
+        }
+        val levelLimits = choice.provider.configFor(choice.style).levelLimits
+        val targetZoom = zoom?.let { it.coerceIn(levelLimits.levelMin, levelLimits.levelMax ?: it) }
+        val scale = targetZoom?.let(camera::scaleAtZoom) ?: camera.viewport.scale
+        val worldScale = camera.pyramid.worldViewport(camera.viewport.copy(scale = scale)).scale
+        val world = MapViewport(worldCenter, worldScale)
+        val desired = rasterConfig(choice.provider.configFor(choice.style), world, session.config.pyramid) ?: run {
+            cancelLocationCenter()
+            channel.trySend(Res.string.location_center_failed)
+            return false
+        }
+        viewport = world
+        if (desired.pyramid != session.config.pyramid) start(choice)
+        else renderer.controller.moveTo(camera.session, locationRequestId++, desired.initialViewport)
+        return true
+    }
 
     val renderer = RasterMapRenderer()
     private val fixtureLayers = listOf(RasterLayer("fixture", TileSourceFactory { openFixtureTileSource() }))
     private var showFixture = false
 
     init {
+        viewModelScope.launch { renderer.camera.collect { applyRequestedLocation() } }
         viewModelScope.launch { renderer.run() }
+        viewModelScope.launch {
+            renderer.controller.results.collect {
+                if (it.requestId < 0 && it.outcome == CameraMoveOutcome.REJECTED) {
+                    channel.trySend(Res.string.location_center_failed)
+                }
+            }
+        }
         viewModelScope.launch { renderer.events.collect { onEvent(it.generation, it.event) } }
         loadChoices()
     }

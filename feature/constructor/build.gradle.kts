@@ -14,6 +14,7 @@ kotlin {
     sourceSets.commonMain.dependencies {
         implementation(project(":core:ui"))
         implementation(project(":core:map-engine"))
+        implementation(project(":core:location"))
         implementation(project(":domain:providers"))
         implementation(project(":domain:map-builder"))
         implementation(libs.kotlinx.datetime)

@@ -35,7 +35,10 @@ internal fun ViewerScreenEffects(
         annotations.cameraChanged(pyramid, camera, density)
     }
     LaunchedEffect(annotations, model) {
-        model.renderer.controller.results.collect(annotations::cameraResult)
+        model.renderer.controller.results.collect {
+            annotations.cameraResult(it)
+            model.locationCameraResult(it)
+        }
     }
     DisposableEffect(annotations, model) {
         onDispose {

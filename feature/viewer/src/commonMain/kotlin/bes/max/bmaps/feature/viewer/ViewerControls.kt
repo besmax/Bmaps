@@ -59,6 +59,8 @@ internal fun BoxScope.ViewerMapControls(
     state: ViewerState,
     annotations: AnnotationEditorViewModel,
     onBack: () -> Unit,
+    onLocation: () -> Unit = {},
+    onInteraction: () -> Unit = {},
 ) {
     MapIconButton(
         onClick = onBack,
@@ -75,19 +77,25 @@ internal fun BoxScope.ViewerMapControls(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         MapIconButton(
-            onClick = { annotations.cancelExpansion(); model.renderer.controller.zoomIn() },
+            onClick = { onInteraction(); annotations.cancelExpansion(); model.renderer.controller.zoomIn() },
             iconResId = MapIcons.zoomIn,
             contentDescription = stringResource(Res.string.viewer_zoom_in),
         )
 
         MapIconButton(
-            onClick = { annotations.cancelExpansion(); model.renderer.controller.zoomOut() },
+            onClick = { onInteraction(); annotations.cancelExpansion(); model.renderer.controller.zoomOut() },
             iconResId = MapIcons.zoomOut,
             contentDescription = stringResource(Res.string.viewer_zoom_out),
         )
+        MapIconButton(
+            onClick = { annotations.cancelExpansion(); onLocation() },
+            iconResId = MapIcons.myLocation,
+            contentDescription = stringResource(Res.string.my_location),
+            enabled = state.manifest != null && state.error == null,
+        )
     }
     MapIconButton(
-        onClick = model::showLayers,
+        onClick = { onInteraction(); model.showLayers() },
         iconResId = MapIcons.layers,
         contentDescription = stringResource(Res.string.layers_title),
         enabled = state.manifest != null && state.error == null,

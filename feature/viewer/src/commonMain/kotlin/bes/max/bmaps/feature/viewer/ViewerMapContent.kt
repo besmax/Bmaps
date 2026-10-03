@@ -16,6 +16,9 @@ import androidx.compose.ui.unit.dp
 import bmaps.feature.viewer.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.semantics.*
+import bes.max.bmaps.core.mapengine.CurrentLocationOverlays
+import bes.max.bmaps.core.mapengine.CURRENT_LOCATION_MARKER
+import bes.max.bmaps.core.mapengine.CurrentLocationMarker
 import bes.max.bmaps.core.mapengine.MapCameraSnapshot
 import bes.max.bmaps.core.mapengine.MapMarker
 import bes.max.bmaps.core.mapengine.MapPoint
@@ -31,6 +34,8 @@ internal fun ViewerMapContent(
     camera: MapCameraSnapshot?,
     calloutAnimated: Boolean,
     autoDismiss: Boolean,
+    location: CurrentLocationOverlays = CurrentLocationOverlays(),
+    onLocationGesture: () -> Unit = {},
 ) {
     val renderData = annotationState.renderData()
     val fallback = remember(renderData, state.annotationPyramid) {
@@ -46,10 +51,12 @@ internal fun ViewerMapContent(
     RasterMap(
         model.renderer,
         Modifier.fillMaxSize(),
-        overlays.markers,
-        overlays.paths,
+        overlays.markers + location.markers,
+        overlays.paths + location.paths,
         handleOverlayClick,
         onGestureStart = {
+            onLocationGesture()
+            model.cancelLocationMove()
             annotations.cancelExpansion()
             if (autoDismiss && !annotationState.hasMovingObject) annotations.dismissSelection()
         },
@@ -59,7 +66,8 @@ internal fun ViewerMapContent(
             }
         }
     ) { marker ->
-        ViewerMarker(marker, overlays.targets[marker.id], annotationState) {
+        if (marker.id == CURRENT_LOCATION_MARKER) CurrentLocationMarker(marker.label)
+        else ViewerMarker(marker, overlays.targets[marker.id], annotationState) {
             handleOverlayClick(marker.id, marker.position)
         }
     }

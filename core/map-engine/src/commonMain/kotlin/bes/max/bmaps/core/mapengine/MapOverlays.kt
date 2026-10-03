@@ -21,4 +21,4 @@ data class MapMarker(
     val anchor: MapMarkerAnchor = MapMarkerAnchor.BOTTOM_CENTER,
     val zIndex: Float = 0f,
 )
-data class MapPath(val id: String, val points: List<MapPoint>, val color: Color, val filled: Boolean = false, val zIndex: Float = 0f)
+data class MapPath(val id: String, val points: List<MapPoint>, val color: Color, val filled: Boolean = false, val zIndex: Float = 0f, val clickable: Boolean = true)

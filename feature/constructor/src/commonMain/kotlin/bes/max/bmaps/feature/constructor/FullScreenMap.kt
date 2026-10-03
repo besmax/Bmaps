@@ -29,6 +29,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import bes.max.bmaps.core.mapengine.*
+import bes.max.bmaps.core.location.*
+import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.getString
 import bes.max.bmaps.core.ui.components.MapIconButton
 import bes.max.bmaps.core.ui.components.MapIcons
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -45,6 +48,16 @@ fun FullScreenMap(
 ) {
     val model = metroViewModel<OnlineMapViewModel>()
     val area = metroViewModel<AreaSelectionViewModel>()
+    val location = metroViewModel<LocationViewModel>()
+    val locationState by location.state.collectAsStateWithLifecycle()
+    val locationAccess = LocationTracking(location, enabled = !showFixture, onStopped = model::cancelLocationCenter)
+    val camera by model.renderer.camera.collectAsStateWithLifecycle()
+    val snackbar = remember { SnackbarHostState() }
+    val locationLabel = stringResource(Res.string.my_location)
+    val coordinate = locationState.fix?.let { GeographicCoordinate(it.latitude, it.longitude) }
+    val locationOverlays = remember(coordinate, locationState.fix?.accuracyMeters, camera?.pyramid, locationLabel) {
+        currentLocationOverlays(coordinate, locationState.fix?.accuracyMeters, camera?.pyramid, locationLabel)
+    }
     val state by model.state.collectAsStateWithLifecycle()
     val selection by area.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -60,14 +73,42 @@ fun FullScreenMap(
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { area.events.collect { settings() } }
     }
     LaunchedEffect(state.visibleWindow) { area.updateWindow(state.visibleWindow) }
+    LaunchedEffect(model, locationState.fix, camera, ready, showFixture) {
+        if (ready && !showFixture) locationState.fix?.let {
+            model.focusInitially(GeographicCoordinate(it.latitude, it.longitude), it.accuracyMeters)
+        }
+    }
+    LaunchedEffect(model, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            model.events.collect { message -> launch { snackbar.showSnackbar(getString(message)) } }
+        }
+    }
+    LaunchedEffect(location, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            location.events.collect { event ->
+                when (event) {
+                    is LocationEvent.Center -> location.takeCenter(event)?.let {
+                        model.requestLocationCenter(GeographicCoordinate(it.latitude, it.longitude))
+                    }
+                    is LocationEvent.Message -> launch { snackbar.showSnackbar(getString(locationMessage(event.status))) }
+                }
+            }
+        }
+    }
+    val interacted = { model.interacted(); location.cancelCenter() }
     BoxWithConstraints(Modifier.fillMaxSize().testTag("full-screen-map")) {
         val margin = if (maxWidth < 600.dp) 16.dp else 24.dp
         if (ready) {
             RasterMap(
                 model.renderer,
-                Modifier.fillMaxSize().testTag(if (showFixture) "sample-map" else "online-map")
-            )
+                Modifier.fillMaxSize().testTag(if (showFixture) "sample-map" else "online-map"),
+                markers = locationOverlays.markers,
+                paths = locationOverlays.paths,
+                onGestureStart = interacted,
+            ) { CurrentLocationMarker(locationLabel) }
         }
+        if (!showFixture) LocationNotice(locationState, locationAccess, location,
+            Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(horizontal = 80.dp, vertical = 16.dp).widthIn(max = 360.dp))
         if (selection.selecting) SelectionFrame(selection, area::startDrawing, area::draw, area::finishDrawing, area::cancelDrawing)
         Row(
             Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(margin),
@@ -88,15 +129,26 @@ fun FullScreenMap(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             MapIconButton(
-                onClick = controls::zoomIn,
+                onClick = { interacted(); controls.zoomIn() },
                 iconResId = MapIcons.zoomIn,
                 contentDescription = stringResource(Res.string.zoom_in)
             )
 
             MapIconButton(
-                onClick = controls::zoomOut,
+                onClick = { interacted(); controls.zoomOut() },
                 iconResId = MapIcons.zoomOut,
                 contentDescription = stringResource(Res.string.zoom_out)
+            )
+            if (!showFixture) MapIconButton(
+                onClick = {
+                    when (locationState.status) {
+                        LocationStatus.PERMISSION_DENIED, LocationStatus.PRECISE_PERMISSION_REQUIRED -> locationAccess.requestPermission(openSettingsIfDenied = true)
+                        LocationStatus.DISABLED -> locationAccess.openSettings()
+                        else -> location.center()
+                    }
+                },
+                iconResId = MapIcons.myLocation,
+                contentDescription = locationLabel,
             )
         }
         Column(
@@ -114,7 +166,7 @@ fun FullScreenMap(
                 )
             } else {
                 MapIconButton(
-                    onClick = area::choose,
+                    onClick = { interacted(); area.choose() },
                     iconResId = Res.drawable.ic_crop_area,
                     contentDescription = stringResource(Res.string.choose_area),
                 )
@@ -190,6 +242,7 @@ fun FullScreenMap(
                 color = MaterialTheme.colorScheme.error
             )
         }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
         if (provider == "yandex") Image(
             painterResource(Res.drawable.yandex_logo), stringResource(Res.string.yandex_maps),
             Modifier.align(Alignment.BottomEnd).safeDrawingPadding().width(100.dp).clickable {

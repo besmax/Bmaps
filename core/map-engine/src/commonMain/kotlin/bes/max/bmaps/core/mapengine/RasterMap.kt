@@ -79,7 +79,7 @@ fun RasterMap(
         OverlayRegistry<MapPath>(MapPath::id, { item ->
                 engine?.addPath(item.id, color = item.color, width = 3.dp, zIndex = item.zIndex,
                     fillColor = if (item.filled) item.color.copy(alpha = 0.22f) else null,
-                    clickable = true, simplify = 0f) {
+                    clickable = item.clickable, simplify = 0f) {
                     item.points.forEach { addPoint(it.x, it.y) }
                 }
         }, { engine?.removePath(it) })

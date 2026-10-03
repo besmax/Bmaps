@@ -111,4 +111,17 @@
     <string name="elevation_key_instructions">Get your personal API key from OpenTopography. It is stored securely on this device. If your old key has expired or been revoked, replace it with a new one. After saving, retry the download.</string>
     <string name="elevation_get_key">Get an API key</string>
     <string name="elevation_link_failed">Could not open the browser. Visit your provider account to get your API key.</string>
+    <string name="my_location">My location</string>
+    <string name="location_waiting">Waiting for your location…</string>
+    <string name="location_stale">Your location is out of date. Waiting for a fresh GPS fix…</string>
+    <string name="location_permission_denied">Allow location access to show your position. Tap My location to open Settings.</string>
+    <string name="location_precise_permission">Allow precise location in Settings to use GPS.</string>
+    <string name="location_disabled">Location services are disabled. Tap My location to open Settings.</string>
+    <string name="location_unavailable">Your location is currently unavailable.</string>
+    <string name="location_outside_map">You’re outside this map.</string>
+    <string name="location_timeout">No current position received. Check location services and try again; GPS may need a clear view of the sky.</string>
+    <string name="location_invalid_fix">The device returned an invalid position. Try again.</string>
+    <string name="location_settings">Location settings</string>
+    <string name="location_retry">Retry location</string>
+    <string name="location_center_failed">Could not center the map on your location.</string>
 </resources>

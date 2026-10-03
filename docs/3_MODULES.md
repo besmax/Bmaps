@@ -18,12 +18,12 @@ Modules containing Compose Multiplatform screens, ViewModels, and presentation-l
 * **`feature:shell`**
     * **Responsibility:** Application chrome, theme selection/application, and a responsive Settings screen with its own ViewModel and independent immediate persistence. Platform presentation adapters read the installed app version code for the About/licensing card. Accepts content/navigation callbacks from `:shared`; never imports other features. Visual theme definitions come from `core:ui`. Theme preferences use `core:datastore` and ViewModel injection uses `core:di`.
 * **`feature:constructor`**
-    * **Phase 3C:** Online map presentation, source/style selection, presentation validation, loading/error/retry state, attribution, and a separate dialog-scoped credentials ViewModel. Uses `core:ui`, `domain:providers`, `core:map-engine`, `core:datastore`, and `core:di`.
+    * **Phase 3C:** Online map presentation, source/style selection, presentation validation, loading/error/retry state, attribution, and a separate dialog-scoped credentials ViewModel. Uses `core:ui`, `domain:providers`, `core:map-engine`, `core:location`, `core:datastore`, and `core:di`.
     * **Responsibility:** UI for the map builder. Handles user interaction for bounding box selection, continuous zoom range selection, layer ordering and visibility, and initiating the download process.
 * **`feature:library`**
     * **Responsibility:** Home UI for local packages, constructor FAB, search/status/favourite filters, incremental loading, details, avatar preferences, and confirmed deletion. Retains download progress and recovery actions. Phase 10 adds native package import/sharing through a separate transfer ViewModel.
 * **`feature:viewer`**
-    * **Responsibility:** The offline map rendering screen. Phase 6 owns package sessions, regional raster configuration, exact-level selection, lifecycle viewport retention, details, and favourite/avatar editing. Depends on `domain:map-builder`, `core:map-engine`, `core:ui`, and `core:di`. Phase 7 owns raster layer composition. Phase 8 adds a separate annotation editor, kind-specific layer managers, SVG marker icons, Undo, GeoJSON controls, and presentation-only clustering for nearby markers, small lines, and polygons. Phase 9 adds a separate map-position ViewModel, saved coordinate formatting and package-owned DEM sampling for the bottom center readout.
+    * **Responsibility:** The offline map rendering screen. Phase 6 owns package sessions, regional raster configuration, exact-level selection, lifecycle viewport retention, details, and favourite/avatar editing. Depends on `domain:map-builder`, `core:map-engine`, `core:location`, `core:ui`, and `core:di`. Phase 7 owns raster layer composition. Phase 8 adds a separate annotation editor, kind-specific layer managers, SVG marker icons, Undo, GeoJSON controls, and presentation-only clustering for nearby markers, small lines, and polygons. Phase 9 adds a separate map-position ViewModel, saved coordinate formatting and package-owned DEM sampling for the bottom center readout.
 
 ## 3. Domain Layer (Business Logic & Contracts)
 Modules containing pure use cases, models, and interface contracts.
@@ -36,6 +36,11 @@ Modules containing pure use cases, models, and interface contracts.
     * **Implementation ownership:** Domain adapters implement domain repositories using lower-level core APIs; core modules never import domain contracts. Metro bindings are assembled in `:shared`. Phase 4 implements persistence and reconciliation through `LocalPackageRepository`; Phase 5 adds streaming tile planning, durable execution, Android WorkManager and iOS BGProcessingTask adapters. The constructor owns submission validation; the library owns list/progress/recovery presentation. `core:map-engine` exposes raster dimension validation without renderer types. See `12_DOWNLOAD_PIPELINE.md`.
 
 ## 4. Core Layer (Infrastructure, Shared UI & Data)
+* **`:core:location`**
+    * **Responsibility:** Renderer-independent native location streams, foreground permission launchers, and the shared location widget ViewModel/lifecycle attachment. Android uses internal GPS and available native fused/network providers without a Google Play services SDK dependency; iOS uses Core Location. Fixes include WGS 84 coordinates, horizontal accuracy, acquisition time, optional speed, and course.
+    * **Constraints:** No domain, feature, or renderer dependencies. Collection owns native updates and cancellation releases listeners/delegates. Feature map ViewModels own camera decisions; navigator camera following and background tracking remain future work.
+    * **Build:** Existing Android, Compose Multiplatform, and DI convention plugins with catalog dependencies. Metro contributes the platform service and unscoped widget ViewModel; no iOS framework.
+
 * **`:core:sharing`**
     * **Responsibility:** Native document picker/share adapters, transient document access, bounded temporary export files, and expiry cleanup. Compose launchers contain only platform presentation machinery; feature ViewModels own transfer state. Depends on `core:di`, Compose, coroutines, and kotlinx-io; no domain dependencies.
     * **Build:** Existing Android, Compose Multiplatform, and DI convention plugins; platform dependencies come from the central catalog.

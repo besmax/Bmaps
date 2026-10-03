@@ -19,6 +19,7 @@ kotlin {
         implementation(project(":core:storage"))
         implementation(project(":core:sharing"))
         implementation(project(":core:map-engine"))
+        implementation(project(":core:location"))
         implementation(project(":core:network"))
         implementation(project(":core:datastore"))
         implementation(project(":feature:shell"))

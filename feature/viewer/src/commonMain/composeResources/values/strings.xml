@@ -113,4 +113,17 @@
     <string name="annotations_pick_file">Import GeoJSON or GPX file</string>
     <string name="annotations_share_file">Share GeoJSON file</string>
     <string name="annotations_file_error">Could not read or share this file. Import UTF-8 GeoJSON or GPX 1.0/1.1, up to 4 MB, 1,000 objects, and 1,000 points per object.</string>
+    <string name="my_location">My location</string>
+    <string name="location_waiting">Waiting for your location…</string>
+    <string name="location_stale">Your location is out of date. Waiting for a fresh GPS fix…</string>
+    <string name="location_permission_denied">Allow location access to show your position. Tap My location to open Settings.</string>
+    <string name="location_precise_permission">Allow precise location in Settings to use GPS.</string>
+    <string name="location_disabled">Location services are disabled. Tap My location to open Settings.</string>
+    <string name="location_unavailable">Your location is currently unavailable.</string>
+    <string name="location_outside_map">You’re outside this map.</string>
+    <string name="location_timeout">No current position received. Check location services and try again; GPS may need a clear view of the sky.</string>
+    <string name="location_invalid_fix">The device returned an invalid position. Try again.</string>
+    <string name="location_settings">Location settings</string>
+    <string name="location_retry">Retry location</string>
+    <string name="location_center_failed">Could not center the map on your location.</string>
 </resources>

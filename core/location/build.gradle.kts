@@ -7,16 +7,19 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
 plugins {
-    id("app.feature")
+    id("app.android.library")
+    id("app.compose.multiplatform")
+    id("app.di")
 }
 
 kotlin {
     sourceSets.commonMain.dependencies {
-        implementation(project(":core:ui"))
-        implementation(project(":domain:map-builder"))
-        implementation(project(":core:sharing"))
-        implementation(project(":core:map-engine"))
-        implementation(project(":core:location"))
-        implementation(project(":core:datastore"))
+        implementation(project(":core:di"))
+        implementation(libs.metro.viewmodel)
+        api(libs.kotlinx.coroutines.core)
+    }
+    sourceSets.androidMain.dependencies {
+        implementation(libs.androidx.activity.compose)
+        implementation(libs.androidx.core.ktx)
     }
 }

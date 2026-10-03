@@ -51,7 +51,7 @@ The first usable slice is intentionally smaller than the full documented MVP. It
 | M3: Complete product scope | Read supported elevation files, use verified coordinate transformations, import/export and share packages | 9–10 |
 | M4: Release candidate | Recovery, performance, accessibility, and platform checks pass | 11 |
 
-Vector tile rendering, professional grid UI, BLE transport, and local Wi-Fi transport remain future extensions. Their contracts should remain possible without implementing those features now. Routes mean user-drawn geometry; automatic routing is not specified. Live GPS tracking is not specified.
+Vector tile rendering, professional grid UI, BLE transport, and local Wi-Fi transport remain future extensions. Their contracts should remain possible without implementing those features now. Routes mean user-drawn geometry; automatic routing is not specified. Foreground current-location updates are implemented as described in `20_CURRENT_LOCATION.md`. Navigator camera following, route guidance, recording, and background location tracking remain future extensions.
 
 ## 3. Decisions to settle before dependent implementation
 
@@ -387,3 +387,9 @@ Phase 9 diagnostics follow-up: preserve package/DEM exceptions and native libtif
 Phase 9 Android JNI follow-up (2026-09-29): separate DEM open status from pointer bits to accept valid signed-negative tagged handles and avoid leaking readers rejected by the old sign check. Add explicit JNI status logging and retain native status in exceptions. The user subsequently confirmed that the SRTM15Plus error was resolved on Android. No agent-run builds/tests; remaining dataset and platform acceptance is pending.
 
 Phase 9 CRS scope revision and source implementation (2026-09-29): replace SK-91 with WGS 84 (EPSG:4326), SK-42 / Pulkovo 1942 (EPSG:4284), and PZ-90.11 (EPSG:9475). PROJ is integrated as the offline conversion engine in source. All three are geographic 2D systems; projected SK-42 zones and vertical transformations are outside this increment. Mobile native compilation, independent reference checks, and device acceptance remain pending; see `9_MAP_ENGINE.md`.
+
+## Current location — 2026-10-03
+
+Source implementation adds Android internal-GPS and iOS Core Location streams, foreground permissions/lifecycle cleanup, current-position/accuracy overlays, My location controls, builder initial focus at zoom 13, and offline coverage-aware recentering. Continuous fixes carry time, accuracy, speed, and course for a future navigator consumer. Builds, automated tests, and device acceptance are reserved for the user and have not been run for this increment. See `20_CURRENT_LOCATION.md` for the native acceptance scenarios and remaining navigator scope.
+
+Android current-location recovery: native fused/network acquisition and fresh cached startup supplement continuous GPS; monotonic fix age prevents device clock offsets from rejecting live fixes. Both maps now expose persistent acquisition/failure notices and a 30-second timeout, with `BmapsLocation` diagnostics. Initial focus accepts all fresh valid positions and first manual focus uses zoom 13. Builds, tests, and Android 16 device acceptance remain with the user.

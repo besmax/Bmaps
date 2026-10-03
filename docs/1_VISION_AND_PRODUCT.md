@@ -56,3 +56,7 @@ PROJ is the transformation engine behind the renderer-independent contract. Its 
 The application acts as a hub for geospatial data and must support seamless peer-to-peer package transfers.
 * **Standard OS Sharing:** Integration with native intents (Quick Share on Android, AirDrop on iOS).
 * **Direct Hardware Transport:** The architecture should anticipate custom data transport protocols for direct device-to-device synchronization in fully offline environments, including Bluetooth Low Energy (GATT) payload chunking and local Wi-Fi (UDP/TCP) file transfers.
+
+## Current location
+
+Online and offline maps show the device location while visible, with an accuracy circle and a My location action. The builder centers once on a fresh location at source zoom 13, constrained by provider and renderer limits; early user interaction preserves the chosen view. Offline maps retain their package viewport and recenter only within package coverage. A shared continuous location stream prepares for future navigator mode; automatic camera following and background tracking are not implemented. See `20_CURRENT_LOCATION.md`.

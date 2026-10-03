@@ -21,6 +21,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import org.jetbrains.compose.resources.StringResource
+import kotlin.math.pow
 
 data class ViewerState(
     val summary: PackageSummary? = null,
@@ -59,8 +60,49 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
     private var generation = 0
     private var pyramid: TilePyramid? = null
     private var viewport = MapViewport()
+    private var pendingLocation: GeographicCoordinate? = null
+    private var pendingLocationZoomScale: Double? = null
+    private var locationRequestId = Long.MIN_VALUE
+
+    fun centerLocation(coordinate: GeographicCoordinate) {
+        cancelLocationMove()
+        val layer = state.value.manifest?.layers?.firstOrNull() ?: return
+        val region = WebMercator.splitBounds(layer.bounds).orEmpty().indexOfFirst { bounds ->
+            coordinate.latitude in bounds.south..bounds.north && coordinate.longitude in bounds.west..bounds.east
+        }
+        if (region < 0) {
+            channel.trySend(Res.string.location_outside_map)
+            return
+        }
+        pendingLocation = coordinate
+        pendingLocationZoomScale = renderer.camera.value?.let {
+            it.viewport.scale * it.fitScale * 2.0.pow(it.pyramid.levels.max)
+        }
+        if (region != state.value.region) selectRegion(region)
+        else applyPendingLocation()
+    }
+
+    internal fun locationCameraResult(result: CameraMoveResult) {
+        if (result.requestId < 0 && result.outcome == CameraMoveOutcome.REJECTED) {
+            channel.trySend(Res.string.location_center_failed)
+        }
+    }
+
+    fun cancelLocationMove() { pendingLocation = null; pendingLocationZoomScale = null }
+
+    private fun applyPendingLocation() {
+        val coordinate = pendingLocation ?: return
+        val camera = renderer.camera.value?.takeIf { it.generation == generation } ?: return
+        val point = camera.pyramid.positionOf(coordinate) ?: return
+        val scale = pendingLocationZoomScale?.let {
+            (it / (camera.fitScale * 2.0.pow(camera.pyramid.levels.max))).coerceIn(camera.minScale, camera.maxScale)
+        } ?: camera.viewport.scale
+        cancelLocationMove()
+        renderer.controller.moveTo(camera.session, locationRequestId++, camera.viewport.copy(center = point, scale = scale))
+    }
 
     init {
+        viewModelScope.launch { renderer.camera.collect { applyPendingLocation() } }
         viewModelScope.launch { renderer.events.collect { tagged ->
             if (tagged.generation != generation) return@collect
             if (tagged.event is MapEvent.Tap || tagged.event is MapEvent.ViewportChanged) {
@@ -80,6 +122,7 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
     fun open(id: PackageId) {
         if (packageId == id) return
         packageId = id
+        cancelLocationMove()
         pyramid = null
         viewport = MapViewport()
         mutableState.value = ViewerState()

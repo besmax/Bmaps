@@ -24,12 +24,4 @@ class BmapsViewModelFactory(
     override val viewModelProviders: Map<KClass<out ViewModel>, () -> ViewModel>,
     override val assistedFactoryProviders: Map<KClass<out ViewModel>, () -> ViewModelAssistedFactory>,
     override val manualAssistedFactoryProviders: Map<KClass<out ManualViewModelAssistedFactory>, () -> ManualViewModelAssistedFactory>,
-) : MetroViewModelFactory() {
-
-    init {
-        println("METRO VIEW MODELS:")
-        viewModelProviders.keys.forEach {
-            println("  -> $it")
-        }
-    }
-}
+) : MetroViewModelFactory()
