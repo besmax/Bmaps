@@ -66,7 +66,9 @@ fun ViewerScreen(
                     is LocationEvent.Center -> location.takeCenter(event)?.let {
                         model.centerLocation(GeographicCoordinate(it.latitude, it.longitude))
                     }
-                    is LocationEvent.Message -> launch { snackbar.showSnackbar(getString(locationMessage(event.status))) }
+                    is LocationEvent.Message -> if (!model.state.value.immersive) {
+                        launch { snackbar.showSnackbar(getString(locationMessage(event.status))) }
+                    }
                 }
             }
         }
@@ -74,41 +76,49 @@ fun ViewerScreen(
 
     ViewerScreenEffects(packageId, model, position, annotations, state.annotationPyramid, camera, snackbar)
 
-    Box(Modifier.fillMaxSize()) {
+    LaunchedEffect(state.immersive) {
+        if (state.immersive) snackbar.currentSnackbarData?.dismiss()
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         ViewerMapContent(model, state, annotations, annotationState, camera, calloutAnimated, autoDismiss,
             locationOverlays, location::cancelCenter)
-        if (positionState.coordinate != null && state.error == null) {
-            MapCrosshair(Modifier.align(Alignment.Center))
-        }
-        ViewerBottomContent(
-            model, state, annotations, annotationState, positionState,
-            Modifier.align(Alignment.BottomCenter),
-        )
-        LocationNotice(locationState, locationAccess, location,
-            Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(horizontal = 80.dp, vertical = 16.dp).widthIn(max = 360.dp),
-            outsideCoverage = locationState.fix != null && state.manifest != null && coordinate == null,
-        )
-        ViewerMapControls(model, state, annotations, onBack,
-            onLocation = {
-                when (locationState.status) {
-                    LocationStatus.PERMISSION_DENIED, LocationStatus.PRECISE_PERMISSION_REQUIRED -> locationAccess.requestPermission(openSettingsIfDenied = true)
-                    LocationStatus.DISABLED -> locationAccess.openSettings()
-                    else -> location.center()
-                }
-            },
-            onInteraction = { location.cancelCenter(); model.cancelLocationMove() },
-        )
-        state.error?.let { error ->
-            ViewerError(
-                error = error,
-                onRetry = {
-                    model.retry()
-                    position.open(packageId, model.renderer.camera, retry = true)
-                },
-                modifier = Modifier.align(Alignment.BottomCenter),
+        if (!state.immersive) {
+            if (positionState.coordinate != null && state.error == null) {
+                MapCrosshair(Modifier.align(Alignment.Center))
+            }
+            ViewerBottomContent(
+                state, annotations, annotationState, positionState,
+                Modifier.align(Alignment.BottomCenter),
+                singleLine = maxWidth > maxHeight,
             )
+            LocationNotice(locationState, locationAccess, location,
+                Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(horizontal = 80.dp, vertical = 16.dp).widthIn(max = 360.dp),
+                outsideCoverage = locationState.fix != null && state.manifest != null && coordinate == null,
+            )
+            ViewerMapControls(model, state, annotations, onBack,
+                landscape = maxWidth > maxHeight,
+                onLocation = {
+                    when (locationState.status) {
+                        LocationStatus.PERMISSION_DENIED, LocationStatus.PRECISE_PERMISSION_REQUIRED -> locationAccess.requestPermission(openSettingsIfDenied = true)
+                        LocationStatus.DISABLED -> locationAccess.openSettings()
+                        else -> location.center()
+                    }
+                },
+                onInteraction = { location.cancelCenter(); model.cancelLocationMove() },
+            )
+            state.error?.let { error ->
+                ViewerError(
+                    error = error,
+                    onRetry = {
+                        model.retry()
+                        position.open(packageId, model.renderer.camera, retry = true)
+                    },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
         }
-        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
-    ViewerDialogs(model, state, annotations, annotationState)
+    if (!state.immersive) ViewerDialogs(model, state, annotations, annotationState)
 }

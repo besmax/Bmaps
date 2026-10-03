@@ -12,6 +12,8 @@ import bes.max.bmaps.core.di.AppScope
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.NonCancellable
@@ -34,6 +36,7 @@ class CoordinateTransformSession internal constructor() {
     suspend fun transform(coordinate: ProjectedCoordinate, target: CoordinateSystemId): TransformResult =
         withContext(Dispatchers.IO) {
             mutex.withLock {
+                currentCoroutineContext().ensureActive()
                 if (closed) return@withLock TransformResult.Failed
                 val sourceIsMercator = coordinate.coordinateSystem == CoordinateSystemId.WebMercator
                 val targetIsMercator = target == CoordinateSystemId.WebMercator
@@ -57,7 +60,9 @@ class CoordinateTransformSession internal constructor() {
                 }
                 try {
                     val handle = native ?: openNativeProjection().also { native = it }
+                    currentCoroutineContext().ensureActive()
                     val projected = handle.transform(input, targetGeographic)
+                    currentCoroutineContext().ensureActive()
                     val result = if (targetIsMercator && projected is TransformResult.Success) {
                         when (val mercator = WebMercator.transform(projected.coordinate, target)) {
                             is TransformResult.Success -> mercator.copy(operation = projected.operation)

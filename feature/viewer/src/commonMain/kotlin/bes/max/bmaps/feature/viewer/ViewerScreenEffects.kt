@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import bes.max.bmaps.core.mapengine.MapEvent
 import bes.max.bmaps.core.mapengine.MapCameraSnapshot
 import bes.max.bmaps.core.mapengine.TilePyramid
 import bes.max.bmaps.domain.mapbuilder.PackageId
@@ -54,18 +55,24 @@ internal fun ViewerScreenEffects(
     }
     LaunchedEffect(model, annotations) {
         model.annotationEvents.collect { (pyramid, event) ->
-            annotations.mapEvent(pyramid, event)
+            if (event !is MapEvent.Tap || !model.state.value.immersive) {
+                annotations.mapEvent(pyramid, event)
+            }
         }
     }
     LaunchedEffect(annotations, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            annotations.events.collect { snackbar.showSnackbar(getString(it)) }
+            annotations.events.collect {
+                if (!model.state.value.immersive) snackbar.showSnackbar(getString(it))
+            }
         }
     }
 
     LaunchedEffect(model, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            model.events.collect { snackbar.showSnackbar(getString(it)) }
+            model.events.collect {
+                if (!model.state.value.immersive) snackbar.showSnackbar(getString(it))
+            }
         }
     }
 }

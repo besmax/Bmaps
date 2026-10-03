@@ -22,12 +22,12 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Visual design and styling | `docs/10_BMAPS_DESIGN.md` |
 | Package storage, MBTiles and reconciliation | `docs/11_PACKAGE_STORAGE.md` |
 | Download execution, scheduling, progress and restore | `docs/12_DOWNLOAD_PIPELINE.md` |
-| Library, package opening/deletion, offline viewer and viewport retention | `docs/13_LIBRARY_AND_OFFLINE_VIEWER.md` |
+| Library, package opening/deletion, offline viewer, adaptive control layout, immersive gestures and viewport retention | `docs/13_LIBRARY_AND_OFFLINE_VIEWER.md` |
 | Raster layer alignment, ordering, visibility, opacity and composition | `docs/14_RASTER_LAYER_COMPOSITION.md` |
 | Map annotations, marker icons, geometry editing, GeoJSON and GPX import | `docs/15_ANNOTATIONS_AND_GEOJSON.md` |
 | Map object clustering, cluster interaction and expansion | `docs/15_ANNOTATIONS_AND_GEOJSON.md`, `docs/plans/MAP_OBJECT_CLUSTERING.md` (design proposal; verify current implementation in source) |
 | Elevation/DEM download selection, provider credentials and persistence | `docs/16_ELEVATION_DOWNLOADS.md` |
-| Elevation/DEM reading, TIFF/native integration, sampling and viewer center readout | `docs/17_ELEVATION_READER.md` |
+| Elevation/DEM reading, TIFF/native integration, sampling, center lookup cancellation and compact viewer center readout | `docs/17_ELEVATION_READER.md` |
 | Licensing, provenance, source headers, packaged notices and release signing | `docs/18_LICENSING_AND_PROVENANCE.md`, `CONTRIBUTING.md` |
 | Package import/export, `.bmaps` transfer format, standalone MBTiles and native document access/sharing | `docs/19_PACKAGE_TRANSFER.md` |
 | Current location/GPS, permissions, native location providers, lifecycle, accuracy overlays, initial focus and navigator preparation | `docs/20_CURRENT_LOCATION.md` |

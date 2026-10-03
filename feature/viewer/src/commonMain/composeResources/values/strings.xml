@@ -99,17 +99,15 @@
     <string name="position_preferences_unavailable">Coordinate preferences unavailable</string>
     <string name="position_coordinates_unsupported">Coordinate system unsupported</string>
     <string name="position_coordinates_calculating">Calculating coordinates…</string>
-    <string name="position_elevation_value">Elevation: %1$s m · %2$s</string>
+    <string name="position_elevation_value">H: %1$s m</string>
     <string name="position_elevation_loading">Elevation: …</string>
     <string name="position_elevation_no_data">Elevation: no data at this point</string>
     <string name="position_elevation_outside">Elevation: outside coverage</string>
     <string name="position_elevation_unsupported">Elevation: unsupported data</string>
     <string name="position_elevation_unavailable">Elevation: could not read data</string>
-    <string name="position_transform_accuracy">Coordinate transform accuracy: ±%1$s m</string>
     <string name="position_transform_outside">Coordinate transformation is outside its area of use</string>
     <string name="position_transform_resources_missing">Required offline transformation data is unavailable</string>
     <string name="position_transform_failed">Coordinate transformation failed</string>
-    <string name="position_coordinate_epoch">Coordinate epoch: %1$s</string>
     <string name="annotations_pick_file">Import GeoJSON or GPX file</string>
     <string name="annotations_share_file">Share GeoJSON file</string>
     <string name="annotations_file_error">Could not read or share this file. Import UTF-8 GeoJSON or GPX 1.0/1.1, up to 4 MB, 1,000 objects, and 1,000 points per object.</string>
@@ -126,4 +124,6 @@
     <string name="location_settings">Location settings</string>
     <string name="location_retry">Retry location</string>
     <string name="location_center_failed">Could not center the map on your location.</string>
+    <string name="viewer_hide_controls">Hide map controls</string>
+    <string name="viewer_show_controls">Show map controls</string>
 </resources>

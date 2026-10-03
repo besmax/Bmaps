@@ -46,12 +46,14 @@ internal fun ViewerMapContent(
             it.display.camera?.session == camera?.session
     }?.overlays ?: fallback
     val handleOverlayClick: (String, MapPoint) -> Unit = { id, point ->
-        overlays.targets[id]?.let { annotations.clickOverlay(it, point, model.renderer.controller) }
+        if (!state.immersive) {
+            overlays.targets[id]?.let { annotations.clickOverlay(it, point, model.renderer.controller) }
+        }
     }
     RasterMap(
         model.renderer,
-        Modifier.fillMaxSize(),
-        overlays.markers + location.markers,
+        Modifier.fillMaxSize().then(viewerImmersiveGesture(state.immersive, model::toggleImmersive)),
+        overlays.markers.filterNot { state.immersive && overlays.targets[it.id] is AnnotationHit.Vertex } + location.markers,
         overlays.paths + location.paths,
         handleOverlayClick,
         onGestureStart = {
@@ -61,7 +63,7 @@ internal fun ViewerMapContent(
             if (autoDismiss && !annotationState.hasMovingObject) annotations.dismissSelection()
         },
         onLongPress = {
-            if (state.manifest != null && state.error == null && !annotationState.busy && annotationState.draft == null) {
+            if (!state.immersive && state.manifest != null && state.error == null && !annotationState.busy && annotationState.draft == null) {
                 annotations.panel(true)
             }
         }
@@ -71,7 +73,9 @@ internal fun ViewerMapContent(
             handleOverlayClick(marker.id, marker.position)
         }
     }
-    ViewerObjectCallout(model, state, annotations, annotationState, camera, calloutAnimated)
+    if (!state.immersive) {
+        ViewerObjectCallout(model, state, annotations, annotationState, camera, calloutAnimated)
+    }
 }
 
 @Composable

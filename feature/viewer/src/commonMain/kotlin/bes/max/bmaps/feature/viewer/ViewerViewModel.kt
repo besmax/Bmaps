@@ -34,6 +34,7 @@ data class ViewerState(
     val automaticAvailable: Boolean = false,
     val region: Int = 0,
     val regionCount: Int = 1,
+    val immersive: Boolean = false,
     val details: Boolean = false,
     val layersVisible: Boolean = false,
     val layerDraft: List<PackageLayer> = emptyList(),
@@ -63,6 +64,8 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
     private var pendingLocation: GeographicCoordinate? = null
     private var pendingLocationZoomScale: Double? = null
     private var locationRequestId = Long.MIN_VALUE
+
+    fun toggleImmersive() { mutableState.update { it.copy(immersive = !it.immersive) } }
 
     fun centerLocation(coordinate: GeographicCoordinate) {
         cancelLocationMove()

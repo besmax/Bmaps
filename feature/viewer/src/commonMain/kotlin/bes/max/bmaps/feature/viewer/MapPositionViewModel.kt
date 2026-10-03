@@ -21,6 +21,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.channels.Channel
 import org.jetbrains.compose.resources.StringResource
 
 data class MapPositionState(
@@ -47,10 +48,14 @@ class MapPositionViewModel(
     val state = mutableState.asStateFlow()
     private var observation: Job? = null
     private var packageId: PackageId? = null
+    private var observationVersion = 0L
+    private var lookupVersion = 0L
 
     fun open(id: PackageId, camera: StateFlow<MapCameraSnapshot?>, retry: Boolean = false) {
         if (packageId == id && !retry) return
         packageId = id
+        val owner = ++observationVersion
+        lookupVersion++
         val previous = observation
         previous?.cancel()
         mutableState.value = MapPositionState()
@@ -69,30 +74,41 @@ class MapPositionViewModel(
                     }
                 combine(camera.map { it?.let { snapshot -> snapshot.pyramid.coordinateAt(snapshot.viewport.center) } }
                     .distinctUntilChanged(), settings) { point, prefs -> point to prefs }
-                    .collectLatest { (point, prefs) ->
+                    .map { (point, prefs) ->
+                        currentCoroutineContext().ensureActive()
+                        val request = ++lookupVersion
                         mutableState.value = MapPositionState(
                             coordinate = point, displayCoordinate = null,
                             preferences = prefs,
                             preferenceError = prefs == null
                         )
+                        Triple(request, point, prefs)
+                    }
+                    .buffer(Channel.CONFLATED)
+                    .collectLatest { (request, point, prefs) ->
+                        if (request != lookupVersion) return@collectLatest
                         if (point == null) return@collectLatest
                         try {
-                            if (point != null && prefs != null) {
+                            delay(120)
+                            if (request != lookupVersion) return@collectLatest
+                            if (prefs != null) {
                                 when (val transformed = coordinates.transform(
                                     ProjectedCoordinate(point.longitude, point.latitude, CoordinateSystemId.Wgs84),
                                     CoordinateSystemId(prefs.defaultCoordinateSystem),
                                 )) {
-                                    is TransformResult.Success -> mutableState.update { it.copy(
+                                    is TransformResult.Success -> updateLookup(request) { it.copy(
                                         displayCoordinate = transformed.coordinate,
                                         coordinateOperation = transformed.operation,
                                         coordinateError = null,
                                     ) }
-                                    TransformResult.UnsupportedCoordinateSystem -> coordinateFailure(Res.string.position_coordinates_unsupported)
-                                    TransformResult.OutsideCoverage -> coordinateFailure(Res.string.position_transform_outside)
-                                    TransformResult.MissingTransformationData -> coordinateFailure(Res.string.position_transform_resources_missing)
-                                    TransformResult.Failed -> coordinateFailure(Res.string.position_transform_failed)
+                                    TransformResult.UnsupportedCoordinateSystem -> coordinateFailure(request, Res.string.position_coordinates_unsupported)
+                                    TransformResult.OutsideCoverage -> coordinateFailure(request, Res.string.position_transform_outside)
+                                    TransformResult.MissingTransformationData -> coordinateFailure(request, Res.string.position_transform_resources_missing)
+                                    TransformResult.Failed -> coordinateFailure(request, Res.string.position_transform_failed)
                                 }
                             }
+                            currentCoroutineContext().ensureActive()
+                            if (request != lookupVersion) return@collectLatest
                             if (session == null) {
                                 when (val result = packages.open(id)) {
                                     is PackageResult.Success -> {
@@ -103,34 +119,39 @@ class MapPositionViewModel(
                                     }
                                     is PackageResult.Failure -> {
                                         ElevationDiagnostics.error("widget_package_open package=${id.value} reason=${result.reason}")
-                                        mutableState.update { it.copy(error = Res.string.position_elevation_unavailable) }
+                                        updateLookup(request) { it.copy(error = Res.string.position_elevation_unavailable) }
                                         return@collectLatest
                                     }
                                 }
                             }
+                            currentCoroutineContext().ensureActive()
+                            if (request != lookupVersion) return@collectLatest
                             val opened = checkNotNull(session)
                             if (opened.manifest.elevation == null) return@collectLatest
-                            mutableState.update { it.copy(sampling = true) }
-                            delay(120)
+                            updateLookup(request) { it.copy(sampling = true) }
                             val value = opened.elevation(point.latitude, point.longitude)
+                            currentCoroutineContext().ensureActive()
+                            if (request != lookupVersion) return@collectLatest
                             val kind = value::class.simpleName
                             if (kind != lastSampleKind) {
                                 ElevationDiagnostics.info("widget_result package=${id.value} result=$value")
                                 lastSampleKind = kind
                             }
-                            mutableState.update { it.copy(elevation = value, sampling = false) }
+                            updateLookup(request) { it.copy(elevation = value, sampling = false) }
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (error: Exception) {
+                            currentCoroutineContext().ensureActive()
+                            if (request != lookupVersion) return@collectLatest
                             ElevationDiagnostics.error("widget_lookup package=${id.value}", error)
-                            mutableState.update { it.copy(sampling = false, error = Res.string.position_elevation_unavailable) }
+                            updateLookup(request) { it.copy(sampling = false, error = Res.string.position_elevation_unavailable) }
                         }
                     }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 ElevationDiagnostics.error("widget_observation package=${id.value}", error)
-                mutableState.update {
+                if (owner == observationVersion) mutableState.update {
                     it.copy(
                         sampling = false,
                         error = Res.string.position_elevation_unavailable
@@ -146,7 +167,9 @@ class MapPositionViewModel(
                         session?.close()
                     } catch (error: Exception) {
                         ElevationDiagnostics.error("widget_session_close package=${id.value}", error)
-                        mutableState.update { it.copy(error = Res.string.viewer_close_error) }
+                        if (owner == observationVersion) {
+                            mutableState.update { it.copy(error = Res.string.viewer_close_error) }
+                        }
                     }
                     ElevationDiagnostics.info("widget_stop package=${id.value}")
                 }
@@ -154,7 +177,11 @@ class MapPositionViewModel(
         }
     }
 
-    private fun coordinateFailure(message: StringResource) {
-        mutableState.update { it.copy(coordinateError = message, displayCoordinate = null, coordinateOperation = null) }
+    private inline fun updateLookup(request: Long, update: (MapPositionState) -> MapPositionState) {
+        mutableState.update { if (request == lookupVersion) update(it) else it }
+    }
+
+    private fun coordinateFailure(request: Long, message: StringResource) {
+        updateLookup(request) { it.copy(coordinateError = message, displayCoordinate = null, coordinateOperation = null) }
     }
 }
