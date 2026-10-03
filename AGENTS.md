@@ -18,12 +18,25 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Domain contracts and package format | `docs/6_CONTRACTS_AND_PACKAGE_FORMAT.md` |
 | Feature shell, navigation and application composition | `docs/7_FEATURE_SHELL.md` |
 | Providers, networking and credentials | `docs/8_PROVIDER_NETWORKING_AND_CREDENTIALS.md` |
-| Map rendering and coordinates | `docs/9_MAP_ENGINE.md` |
+| Map rendering, camera control and coordinate transformations | `docs/9_MAP_ENGINE.md` |
 | Visual design and styling | `docs/10_BMAPS_DESIGN.md` |
 | Package storage, MBTiles and reconciliation | `docs/11_PACKAGE_STORAGE.md` |
 | Download execution, scheduling, progress and restore | `docs/12_DOWNLOAD_PIPELINE.md` |
+| Library, package opening/deletion, offline viewer and viewport retention | `docs/13_LIBRARY_AND_OFFLINE_VIEWER.md` |
+| Raster layer alignment, ordering, visibility, opacity and composition | `docs/14_RASTER_LAYER_COMPOSITION.md` |
+| Map annotations, marker icons, geometry editing, GeoJSON and GPX import | `docs/15_ANNOTATIONS_AND_GEOJSON.md` |
+| Map object clustering, cluster interaction and expansion | `docs/15_ANNOTATIONS_AND_GEOJSON.md`, `docs/plans/MAP_OBJECT_CLUSTERING.md` (design proposal; verify current implementation in source) |
+| Elevation/DEM download selection, provider credentials and persistence | `docs/16_ELEVATION_DOWNLOADS.md` |
+| Elevation/DEM reading, TIFF/native integration, sampling and viewer center readout | `docs/17_ELEVATION_READER.md` |
+| Licensing, provenance, source headers, packaged notices and release signing | `docs/18_LICENSING_AND_PROVENANCE.md`, `CONTRIBUTING.md` |
+| Package import/export, `.bmaps` transfer format, standalone MBTiles and native document access/sharing | `docs/19_PACKAGE_TRANSFER.md` |
+| Current location/GPS, permissions, native location providers, lifecycle, accuracy overlays, initial focus and navigator preparation | `docs/20_CURRENT_LOCATION.md` |
 
 For tasks spanning multiple areas, read the relevant sections from each affected area. Discover additional documents with targeted filename or text searches when needed. Reuse context already read in the conversation unless it has changed or needs verification. Update affected documentation when behavior, contracts, or implementation status changes.
+
+Keep this task-to-document guide current as part of the same change that adds, renames, moves, splits, or removes project documentation. Also update the affected rows when a document gains a new responsibility or a task area gets its own implementation document. Before completing documentation work, check that each new or changed task area has an accurate entry here and that referenced paths still exist. Do not leave new documents discoverable only through searches or links in other documents.
+
+Documents under `docs/plans/` describe proposals and implementation approaches; they do not establish completion or override the current architecture and contracts. Use the relevant implementation document, `docs/5_IMPLEMENTATION_PLAN.md`, and source code to establish current behavior. Distinguish source implementation, automated verification, and user-reported device acceptance when updating status; do not mark unperformed builds or tests as passed.
 
 # Bmaps: AI Agent Core Conventions
 
