@@ -22,10 +22,16 @@ internal fun fixedDecimal(value: Double, decimals: Int): String {
 }
 
 internal fun formatCoordinate(point: ProjectedCoordinate, format: CoordinateFormat): String? =
+    formatCoordinateAxes(point, format)?.let { (first, second) ->
+        if (point.coordinateSystem == CoordinateSystemId.WebMercator) "X $first · Y $second m"
+        else "$first  $second"
+    }
+
+internal fun formatCoordinateAxes(point: ProjectedCoordinate, format: CoordinateFormat): Pair<String, String>? =
     when (point.coordinateSystem.value) {
         "EPSG:4326", "EPSG:4284", "EPSG:9475" ->
-            "${angle(point.y, format)}  ${angle(point.x, format)}"
-        "EPSG:3857" -> "X ${fixedDecimal(point.x, 1)} · Y ${fixedDecimal(point.y, 1)} m"
+            angle(point.y, format) to angle(point.x, format)
+        "EPSG:3857" -> fixedDecimal(point.x, 1) to fixedDecimal(point.y, 1)
         else -> null
     }
 

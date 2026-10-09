@@ -11,6 +11,7 @@ package bes.max.bmaps.feature.viewer.position.ui
 import bes.max.bmaps.feature.viewer.position.presentation.MapPositionState
 import bes.max.bmaps.feature.viewer.position.presentation.fixedDecimal
 import bes.max.bmaps.feature.viewer.position.presentation.formatCoordinate
+import bes.max.bmaps.feature.viewer.position.presentation.formatCoordinateAxes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import bes.max.bmaps.domain.mapbuilder.PackageElevation
+import bes.max.bmaps.core.mapengine.CoordinateSystemId
 import bmaps.feature.viewer.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 
@@ -60,6 +62,9 @@ internal fun MapPositionOverlay(
     val displayCoordinate = state.displayCoordinate
     val coordinates = if (displayCoordinate != null && state.preferences != null)
         formatCoordinate(displayCoordinate, state.preferences.coordinateFormat) else null
+    val coordinateAxes = if (!singleLine && displayCoordinate != null && state.preferences != null &&
+        state.coordinateError == null && !state.preferenceError)
+        formatCoordinateAxes(displayCoordinate, state.preferences.coordinateFormat) else null
     val coordinateLabel = when {
         state.coordinateError != null -> stringResource(state.coordinateError)
         state.preferenceError -> stringResource(Res.string.position_preferences_unavailable)
@@ -96,10 +101,23 @@ internal fun MapPositionOverlay(
             Column(
                 Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                horizontalAlignment = Alignment.Start,
             ) {
-                Text(coordinateLabel, style = MaterialTheme.typography.labelMedium)
-                if (elevationLabel != null) Text(elevationLabel, style = MaterialTheme.typography.labelMedium)
+                if (coordinateAxes != null) {
+                    val projected = displayCoordinate?.coordinateSystem == CoordinateSystemId.WebMercator
+                    Text(stringResource(
+                        if (projected) Res.string.position_x else Res.string.position_latitude,
+                        coordinateAxes.first,
+                    ), style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(
+                        if (projected) Res.string.position_y else Res.string.position_longitude,
+                        coordinateAxes.second,
+                    ), style = MaterialTheme.typography.labelMedium)
+                } else {
+                    Text(coordinateLabel, style = MaterialTheme.typography.labelMedium)
+                }
+                Text(elevationLabel ?: stringResource(Res.string.position_elevation_missing),
+                    style = MaterialTheme.typography.labelMedium)
             }
         }
     }

@@ -96,6 +96,11 @@
     <string name="annotations_cluster_too_many">Clustering is unavailable for maps with more than 1,000 objects. Showing objects in the visible area.</string>
     <string name="annotations_cluster_unavailable">Clustering is temporarily unavailable. Showing objects in the visible area.</string>
     <string name="position_latitude_longitude">Lat / Lon: %1$s</string>
+    <string name="position_latitude">Lat: %1$s</string>
+    <string name="position_longitude">Lon: %1$s</string>
+    <string name="position_x">X: %1$s m</string>
+    <string name="position_y">Y: %1$s m</string>
+    <string name="position_elevation_missing">H: —</string>
     <string name="position_preferences_unavailable">Coordinate preferences unavailable</string>
     <string name="position_coordinates_unsupported">Coordinate system unsupported</string>
     <string name="position_coordinates_calculating">Calculating coordinates…</string>
