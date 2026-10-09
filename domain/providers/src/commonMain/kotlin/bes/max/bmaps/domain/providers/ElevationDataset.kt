@@ -33,6 +33,17 @@ enum class ElevationDataset(val apiValue: String?, val arcSeconds: Double, val m
         return area <= maxAreaKm2
     }
 
+    fun paddedBounds(bounds: BoundingBox): BoundingBox {
+        require(this != NONE)
+        val step = arcSeconds / 3600
+        return BoundingBox(
+            (floor(bounds.west / step) * step - 2 * step).coerceAtLeast(-180.0),
+            (floor(bounds.south / step) * step - 2 * step).coerceAtLeast(-90.0),
+            (ceil(bounds.east / step) * step + 2 * step).coerceAtMost(180.0),
+            (ceil(bounds.north / step) * step + 2 * step).coerceAtMost(90.0),
+        )
+    }
+
     fun estimatedBytes(bounds: BoundingBox): Long {
         if (this == NONE) return 0
         val columns = ceil((bounds.east - bounds.west).coerceAtLeast(0.0) * 3600 / arcSeconds) + 2

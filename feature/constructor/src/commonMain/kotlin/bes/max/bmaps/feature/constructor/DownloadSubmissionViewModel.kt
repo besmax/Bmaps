@@ -123,7 +123,7 @@ class DownloadSubmissionViewModel(
 }
 
 internal fun validateDownload(settings: MapSaveSettings, config: ProviderConfig): StringResource? {
-    if (!settings.elevationDataset.supportsRequest(settings.bounds)) return Res.string.elevation_area_unsupported
+    if (!settings.elevationDataset.supportsTileRequest(settings.bounds, settings.levels)) return Res.string.elevation_area_unsupported
     if (settings.name.isBlank() || settings.name.length > 120 || settings.name.any { it.code < 32 }) return Res.string.invalid_map_name
     val selected = settings.levels
     if (selected.isEmpty()) return Res.string.zoom_selection_required

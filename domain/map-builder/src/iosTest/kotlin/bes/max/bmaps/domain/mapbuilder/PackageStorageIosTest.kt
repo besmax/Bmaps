@@ -28,4 +28,6 @@ class PackageStorageIosTest {
     @Test fun recoverAndReopen() = runBlocking { scenarios.recoverAndReopen() }
     @Test fun reconcilePromotionAndMissingAssets() = runBlocking { scenarios.reconcilePromotionAndMissingAssets() }
     @Test fun paginationAndWriteRollback() = runBlocking { scenarios.paginationAndWriteRollback() }
+    @Test fun elevationCommitRejectsInsufficientFootprint() = runBlocking { scenarios.elevationCommitRejectsInsufficientFootprint() }
+
 }

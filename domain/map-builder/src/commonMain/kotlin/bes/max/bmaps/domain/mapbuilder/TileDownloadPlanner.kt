@@ -9,6 +9,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.domain.mapbuilder
 
 import bes.max.bmaps.core.di.AppScope
+import bes.max.bmaps.domain.providers.ElevationDataset
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
 import kotlinx.coroutines.currentCoroutineContext
@@ -27,7 +28,9 @@ class TileDownloadPlanner : DownloadPlanner {
             total + next
         }
         val estimate = TileAreaEstimate.estimate(count)
-        val elevation = request.elevationDataset.estimatedBytes(request.bounds)
+        val elevation = if (request.elevationDataset == ElevationDataset.NONE) 0L
+            else request.elevationDownloadArea()?.let { request.elevationDataset.estimatedBytes(it.requestBounds) }
+                ?: throw PackageStorageException(PackageFailure.ElevationUnavailable)
         estimate.copy(estimatedPackageBytes = estimate.estimatedPackageBytes?.takeIf { it <= Long.MAX_VALUE - elevation }?.plus(elevation),
             estimatedLargestLayerBytes = TileAreaEstimate.estimate(largestCount).estimatedPackageBytes)
     }

@@ -158,7 +158,7 @@ class ElevationLayerGenerator(
                                 ensureWanted(id, token)
                                 if (resumed && db.contains(TileAddress(key.level, key.column, key.row))) continue
                                 val start = TimeSource.Monotonic.markNow()
-                                val tile = sampler.sample(key, base.tileWidth, base.bounds)
+                                val tile = sampler.sample(key, base.tileWidth)
                                 sampled.send(tile to start.elapsedNow().inWholeNanoseconds)
                             }
                         } finally { sampled.close() }
@@ -356,9 +356,6 @@ private class ReliefPerformance(private val id: PackageId) {
         reported = TimeSource.Monotonic.markNow()
     }
 }
-
-internal suspend fun renderTile(reader: DemReader, key: TileKey, size: Int, bounds: BoundingBox, style: ElevationReliefStyle): IntArray =
-    ElevationTileSampler(reader.metadata, reader::readGrid).sample(key, size, bounds).colors(style)
 
 @Inject
 @SingleIn(AppScope::class)

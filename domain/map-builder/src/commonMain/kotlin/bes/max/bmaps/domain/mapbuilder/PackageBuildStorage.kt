@@ -8,6 +8,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.domain.mapbuilder
 
+import bes.max.bmaps.core.mapengine.BoundingBox
 import bes.max.bmaps.core.mapengine.TileKey
 import bes.max.bmaps.core.mapengine.TileReadFailure
 import kotlinx.coroutines.flow.Flow
@@ -41,7 +42,7 @@ interface PackageBuildStorage {
     suspend fun elevationComplete(id: PackageId): PackageResult<Boolean> = PackageResult.Success(false)
     suspend fun beginElevation(id: PackageId): PackageResult<Unit> = PackageResult.Failure(PackageFailure.UnsupportedContent)
     suspend fun appendElevation(id: PackageId, bytes: ByteArray, count: Int): PackageResult<Unit> = PackageResult.Failure(PackageFailure.UnsupportedContent)
-    suspend fun finishElevation(id: PackageId): PackageResult<Unit> = PackageResult.Failure(PackageFailure.UnsupportedContent)
+    suspend fun finishElevation(id: PackageId, expectedBounds: BoundingBox? = null): PackageResult<Unit> = PackageResult.Failure(PackageFailure.UnsupportedContent)
     suspend fun discardElevation(id: PackageId): PackageResult<Unit> = PackageResult.Success(Unit)
     suspend fun setState(id: PackageId, state: BuildJobState, failure: PackageFailure? = null): PackageResult<Unit>
     suspend fun finalize(id: PackageId): PackageResult<Unit>

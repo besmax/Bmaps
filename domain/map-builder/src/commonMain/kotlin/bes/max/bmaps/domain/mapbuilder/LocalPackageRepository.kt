@@ -336,12 +336,25 @@ class LocalPackageRepository(
         storage.access { appendStream(id.value, ELEVATION_PATH, bytes, count) }
     }
 
-    override suspend fun finishElevation(id: PackageId): PackageResult<Unit> = operation {
+    override suspend fun finishElevation(id: PackageId, expectedBounds: BoundingBox?): PackageResult<Unit> = operation {
         val record = building(id)
         val draft = PackageManifestCodec.decode(record.manifestJson)
         val job = job(id)
         storage.access {
             if (!validElevation(id, "$ELEVATION_PATH.part")) fail(PackageFailure.CorruptData)
+            if (expectedBounds != null) {
+                val reader = try { demReaders.open(asset(id.value, true, "$ELEVATION_PATH.part").toString()) }
+                catch (error: DemReadException) {
+                    fail(if (error.reason in setOf(DemFailure.UNSUPPORTED, DemFailure.MEMORY_LIMIT))
+                        PackageFailure.UnsupportedContent else PackageFailure.CorruptData)
+                }
+                try {
+                    if (!reader.metadata.coversTileBounds(expectedBounds)) {
+                        ElevationDiagnostics.info("dem_coverage_mismatch package=${id.value} expected=$expectedBounds metadata=${reader.metadata}")
+                        fail(PackageFailure.ElevationUnavailable)
+                    }
+                } finally { reader.close() }
+            }
             val length = assetSize(id.value, true, "$ELEVATION_PATH.part")
             finishStream(id.value, ELEVATION_PATH)
             val updated = draft.copy(elevation = PackageAsset(ELEVATION_PATH, length))

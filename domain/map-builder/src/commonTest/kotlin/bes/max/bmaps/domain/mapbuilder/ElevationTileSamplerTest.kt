@@ -15,7 +15,6 @@ import kotlin.math.floor
 import kotlin.test.*
 
 class ElevationTileSamplerTest {
-    private val bounds = BoundingBox(-180.0, -WebMercator.MAX_LATITUDE, 180.0, WebMercator.MAX_LATITUDE)
     private val style = ElevationReliefStyle(ElevationReliefOptions(), -100.0, 200.0)
     private fun value(column: Int, row: Int) = if (column == 3 && row == 2) Double.NaN else column * 13.0 + row * 27.0 - 60
 
@@ -29,11 +28,11 @@ class ElevationTileSamplerTest {
                 samples += columns.size * rows.size
                 DoubleArray(columns.size * rows.size) { value(columns[it % columns.size], rows[it / columns.size]) }
             }
-            val tile = sampler.sample(TileKey(0, 0, 0), 256, bounds)
+            val tile = sampler.sample(TileKey(0, 0, 0), 256)
             val actual = tile.colors(style)
             assertEquals(1, calls)
             assertEquals(35, samples)
-            val repeated = sampler.sample(TileKey(0, 0, 0), 256, bounds)
+            val repeated = sampler.sample(TileKey(0, 0, 0), 256)
             assertContentEquals(actual, repeated.colors(style))
             assertEquals(1, calls)
             for (row in 0 until 256) for (column in 0 until 256) {
@@ -66,18 +65,25 @@ class ElevationTileSamplerTest {
         val sampler = ElevationTileSampler(metadata) { columns, rows ->
             DoubleArray(columns.size * rows.size) { value(columns[it % columns.size], rows[it / columns.size]) }
         }
-        val full = sampler.sample(TileKey(0, 0, 0), 512, bounds).colors(style)
+        val full = sampler.sample(TileKey(0, 0, 0), 512).colors(style)
         for (tileRow in 0..1) for (tileColumn in 0..1) {
-            val quarter = sampler.sample(TileKey(1, tileColumn.toLong(), tileRow.toLong()), 256, bounds).colors(style)
+            val quarter = sampler.sample(TileKey(1, tileColumn.toLong(), tileRow.toLong()), 256).colors(style)
             for (row in 0 until 256) for (column in 0 until 256) {
                 assertEquals(full[(tileRow * 256 + row) * 512 + tileColumn * 256 + column], quarter[row * 256 + column])
             }
         }
     }
 
+    @Test fun edgeTilesAreColoredAcrossTheirWholeFootprint() = runTest {
+        val metadata = DemMetadata(8, 4, -180.0, 85.0, 45.0, -42.5, false, 32, 3, 1, false, 128)
+        val sampler = ElevationTileSampler(metadata) { columns, rows -> DoubleArray(columns.size * rows.size) { 10.0 } }
+        val tile = sampler.sample(TileKey(8, 135, 92), 256).colors(style)
+        assertTrue(tile.all { it == style.color(10.0) })
+    }
+
     @Test fun transparentTilesAvoidNativeReads() = runTest {
         val metadata = DemMetadata(2, 2, 10.0, 50.0, 0.25, -0.25, false, 16, 2, 1, false, 8)
         val sampler = ElevationTileSampler(metadata) { _, _ -> error("Outside coverage must not read DEM") }
-        assertTrue(sampler.sample(TileKey(2, 0, 0), 256, bounds).colors(style).all { it == 0 })
+        assertTrue(sampler.sample(TileKey(2, 0, 0), 256).colors(style).all { it == 0 })
     }
 }

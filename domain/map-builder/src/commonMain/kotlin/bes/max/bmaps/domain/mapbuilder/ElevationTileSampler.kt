@@ -62,24 +62,24 @@ internal class ElevationTileSampler(
 ) {
     private var longitudeKey: Triple<Int, Long, Int>? = null
     private var longitudeAxis: ReliefAxis? = null
-    private var longitudeBounds: BoundingBox? = null
     private var cachedColumns = IntArray(0)
     private val cache = linkedMapOf<Int, DoubleArray>()
     private var cacheBytes = 0
 
-    suspend fun sample(key: TileKey, size: Int, bounds: BoundingBox): SampledReliefTile {
+    suspend fun sample(key: TileKey, size: Int): SampledReliefTile {
+        require(key.level in 0..52 && key.isValidXyz())
         val side = (1L shl key.level).toDouble()
         val latitude = DoubleArray(size) {
             checkNotNull(WebMercator.geographic(MapPoint(0.5, (key.row + (it + 0.5) / size) / side))).latitude
         }
         val axisKey = Triple(key.level, key.column, size)
-        val x = if (axisKey == longitudeKey && bounds == longitudeBounds) checkNotNull(longitudeAxis) else {
+        val x = if (axisKey == longitudeKey) checkNotNull(longitudeAxis) else {
             val longitude = DoubleArray(size) { (key.column + (it + 0.5) / size) / side * 360 - 180 }
-            axis(longitude, metadata.originLongitude, metadata.longitudeStep, metadata.width, bounds.west, bounds.east).also {
-                longitudeKey = axisKey; longitudeAxis = it; longitudeBounds = bounds
+            axis(longitude, metadata.originLongitude, metadata.longitudeStep, metadata.width).also {
+                longitudeKey = axisKey; longitudeAxis = it
             }
         }
-        val y = axis(latitude, metadata.originLatitude, metadata.latitudeStep, metadata.height, bounds.south, bounds.north)
+        val y = axis(latitude, metadata.originLatitude, metadata.latitudeStep, metadata.height)
         if (!x.valid.any { it } || !y.valid.any { it }) return SampledReliefTile(key, x, y, emptyArray())
         if (!cachedColumns.contentEquals(x.cells)) {
             cache.clear(); cacheBytes = 0; cachedColumns = x.cells
@@ -109,7 +109,7 @@ internal class ElevationTileSampler(
         return SampledReliefTile(key, x, y, Array(rows.size) { checkNotNull(rows[it]) })
     }
 
-    private fun axis(values: DoubleArray, origin: Double, step: Double, limit: Int, minimum: Double, maximum: Double): ReliefAxis {
+    private fun axis(values: DoubleArray, origin: Double, step: Double, limit: Int): ReliefAxis {
         val offset = if (metadata.pixelIsPoint) 0.0 else 0.5
         val positions = DoubleArray(values.size) { (values[it] - origin) / step - offset }
         val low = IntArray(values.size) { floor(positions[it]).toLong().coerceIn(0, limit.toLong() - 1).toInt() }
@@ -119,6 +119,6 @@ internal class ElevationTileSampler(
         return ReliefAxis(cells, IntArray(values.size) { lookup.getValue(low[it]) },
             IntArray(values.size) { lookup.getValue(high[it]) },
             DoubleArray(values.size) { positions[it] - floor(positions[it]) },
-            BooleanArray(values.size) { (if (minimum <= maximum) values[it] in minimum..maximum else values[it] >= minimum || values[it] <= maximum) && positions[it] + 0.5 >= 0 && positions[it] + 0.5 < limit })
+            BooleanArray(values.size) { positions[it] + 0.5 >= 0 && positions[it] + 0.5 < limit })
     }
 }

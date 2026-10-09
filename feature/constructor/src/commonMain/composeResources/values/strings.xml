@@ -104,7 +104,7 @@
     <string name="elevation_cop90_description">Global surface elevation at approximately 90 m. A smaller download than GLO-30.</string>
     <string name="elevation_eu_dtm">Europe DTM</string>
     <string name="elevation_eu_dtm_description">Terrain elevation at approximately 30 m for continental Europe. Unavailable outside its coverage.</string>
-    <string name="elevation_area_unsupported">Elevation is unavailable for this selection. Choose a smaller area that does not cross the date line, or select None.</string>
+    <string name="elevation_area_unsupported">Elevation is unavailable for this map’s complete tile coverage. Choose a smaller area or a higher minimum zoom, avoid crossing the date line, or select None.</string>
     <string name="elevation_download_hint">Downloads a GeoTIFF from OpenTopography. Estimated size includes elevation; actual size may vary. Elevation display is not available yet.</string>
     <string name="elevation_manage_key">OpenTopography API key</string>
     <string name="elevation_key_required">Save an OpenTopography API key, then tap Download again.</string>

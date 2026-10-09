@@ -24,8 +24,9 @@ class DownloadValidationTest {
             validateDownload(crossing.copy(elevationDataset = ElevationDataset.COP30), config))
         assertEquals(Res.string.elevation_area_unsupported,
             validateDownload(settings.copy(elevationDataset = ElevationDataset.COP30), config))
-        assertNull(validateDownload(settings.copy(bounds = BoundingBox(10.0, 45.0, 10.1, 45.1),
-            elevationDataset = ElevationDataset.COP30), config))
+        val small = settings.copy(bounds = BoundingBox(10.0, 45.0, 10.1, 45.1), elevationDataset = ElevationDataset.COP30)
+        assertEquals(Res.string.elevation_area_unsupported, validateDownload(small, config))
+        assertNull(validateDownload(small.copy(levels = setOf(8)), config.copy(levelLimits = LevelLimitsConfig(0, 10))))
     }
 
     @Test fun validatesBeforeSubmission() {

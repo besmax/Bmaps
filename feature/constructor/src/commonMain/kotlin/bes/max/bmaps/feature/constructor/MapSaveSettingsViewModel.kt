@@ -18,6 +18,8 @@ import bes.max.bmaps.core.mapengine.*
 import bes.max.bmaps.domain.providers.ElevationDataset
 import bes.max.bmaps.domain.mapbuilder.BuildEstimate
 import bes.max.bmaps.domain.mapbuilder.TileAreaEstimate
+import bes.max.bmaps.domain.mapbuilder.supportsTileRequest
+import bes.max.bmaps.domain.mapbuilder.estimatedTileBytes
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
@@ -113,8 +115,8 @@ class MapSaveSettingsViewModel : ViewModel() {
         val name = current.name.trim()
         val error = when {
             name.isBlank() || name.any { it.code < 32 } -> Res.string.invalid_map_name
-            !current.elevationDataset.supportsRequest(area) -> Res.string.elevation_area_unsupported
             current.selectedLevels.isEmpty() -> Res.string.zoom_selection_required
+            !current.elevationDataset.supportsTileRequest(area, current.selectedLevels) -> Res.string.elevation_area_unsupported
             current.estimate?.estimatedPackageBytes == null -> Res.string.selection_estimate_unavailable
             else -> null
         }
@@ -127,8 +129,8 @@ class MapSaveSettingsViewModel : ViewModel() {
         mutableState.value = state.value.copy(estimate = single.let {
             val count = state.value.layers.size + 1
             val tiles = TileAreaEstimate.estimate(if (it.tileCount <= Long.MAX_VALUE / count) it.tileCount * count else Long.MAX_VALUE)
-            val demBytes = state.value.elevationDataset.estimatedBytes(area)
-            tiles.copy(estimatedPackageBytes = tiles.estimatedPackageBytes?.takeIf { it <= Long.MAX_VALUE - demBytes }?.plus(demBytes),
+            val demBytes = state.value.elevationDataset.estimatedTileBytes(area, state.value.selectedLevels)
+            tiles.copy(estimatedPackageBytes = demBytes?.let { dem -> tiles.estimatedPackageBytes?.takeIf { it <= Long.MAX_VALUE - dem }?.plus(dem) },
                 estimatedLargestLayerBytes = single.estimatedPackageBytes)
         })
     }

@@ -426,6 +426,27 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
         } finally { db.close() }
     }
 
+    suspend fun elevationCommitRejectsInsufficientFootprint() = fixture { root ->
+        val db = database(Path(root, "catalog.db").toString())
+        val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
+        val repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
+        val (baseRequest, baseManifest) = fixtureRequest(ZoomRange(8, 8))
+        val request = baseRequest.copy(elevationDataset = ElevationDataset.COP30)
+        val manifest = baseManifest.copy(elevationDataset = ElevationDataset.COP30)
+        val dem = kotlin.io.encoding.Base64.decode("TU0AKgAAAAgAEwEAAAQAAAABAAAABwEBAAQAAAABAAAABQECAAMAAAABABAAAAEDAAMAAAABAAUAAAEGAAMAAAABAAEAAAERAAQAAAADAAAA8gEVAAMAAAABAAEAAAEWAAQAAAABAAAAAgEXAAMAAAADAAAA/gEaAAUAAAABAAABBAEbAAUAAAABAAABDAEoAAMAAAABAAEAAAExAAIAAAAMAAABFAE9AAMAAAABAAIAAAFTAAMAAAABAAIAAIMOAAwAAAADAAABIISCAAwAAAAGAAABOIevAAMAAAAUAAABaKSBAAIAAAAHAAABkAAAAAAAAAGgAAABsQAAAcYAEQAVAAwAAAABAAAAAQAAAAEAAAABdGlmZmZpbGUucHkAP9AAAAAAAAA/0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQCQAAAAAAABASQAAAAAAAAAAAAAAAAAAAAEAAQAAAAQEAAAAAAEAAgQBAAAAAQABCAAAAAABEOYIBgAAAAEjji0zMjc2OAAAAAAAAAAAAACAP97AAAwSDQWEP9+weGQiAoAAAIAADBD++kACIJCwXC4LD4dAQIAAAkAADBINBYRAQA==")
+        try {
+            repository.prepare(request, manifest).success()
+            repository.beginElevation(request.packageId).success()
+            repository.appendElevation(request.packageId, dem, dem.size).success()
+            assertEquals(PackageFailure.ElevationUnavailable, assertIs<PackageResult.Failure>(repository.finishElevation(
+                request.packageId, BoundingBox(9.99, 48.75, 11.75, 50.0))).reason)
+            assertFalse(repository.elevationComplete(request.packageId).success())
+            assertFalse(files.access { "elevation.geotiff" in relativeFiles(request.packageId.value, true) })
+            repository.finishElevation(request.packageId, BoundingBox(10.0, 48.75, 11.75, 50.0)).success()
+            assertTrue(repository.elevationComplete(request.packageId).success())
+        } finally { db.close() }
+    }
+
     suspend fun generatedElevationLayerReplacementAndSizeAccounting() = fixture { root ->
         var db = database(Path(root, "catalog.db").toString())
         val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))

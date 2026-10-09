@@ -191,7 +191,8 @@ class DownloadRunnerTest {
         var authorized = false
         var calls = 0
         val runner = runner(storage, fixtureProviders(), DownloadSourceOpener { error("Tiles are complete") },
-            ElevationSource { dataset, _, consume ->
+            ElevationSource { dataset, bounds, consume ->
+                assertEquals(assertNotNull(storage.build.elevationDownloadArea()).requestBounds, bounds)
                 calls++
                 assertEquals(ElevationDataset.COP30, dataset)
                 if (!authorized) ElevationDownloadResult.CredentialsRequired else {
@@ -208,6 +209,7 @@ class DownloadRunnerTest {
         assertIs<PackageResult.Success<Unit>>(runner.run(jobId))
         assertTrue(storage.elevationReady)
         assertTrue(storage.finalized)
+        assertEquals(assertNotNull(storage.build.elevationDownloadArea()).tileBounds, storage.checkedElevationBounds)
         assertEquals(2, calls)
     }
 
@@ -251,13 +253,18 @@ class DownloadRunnerTest {
         private val failed = mutableSetOf<Pair<LayerId, TileKey>>()
         var finalized = false
         var elevationReady = false
+        var checkedElevationBounds: BoundingBox? = null
         var partialElevationBytes = 0
         override suspend fun elevationComplete(id: PackageId) = PackageResult.Success(elevationReady)
         override suspend fun beginElevation(id: PackageId): PackageResult<Unit> { partialElevationBytes = 0; return PackageResult.Success(Unit) }
         override suspend fun appendElevation(id: PackageId, bytes: ByteArray, count: Int): PackageResult<Unit> {
             partialElevationBytes += count; return PackageResult.Success(Unit)
         }
-        override suspend fun finishElevation(id: PackageId): PackageResult<Unit> { elevationReady = true; return PackageResult.Success(Unit) }
+        override suspend fun finishElevation(id: PackageId, expectedBounds: BoundingBox?): PackageResult<Unit> {
+            checkedElevationBounds = expectedBounds
+            elevationReady = true
+            return PackageResult.Success(Unit)
+        }
         override suspend fun discardElevation(id: PackageId): PackageResult<Unit> { partialElevationBytes = 0; return PackageResult.Success(Unit) }
 
         override suspend fun availableBytes() = PackageResult.Success(1_000_000_000L)

@@ -26,7 +26,7 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Raster layer alignment, ordering, visibility, opacity and composition | `docs/14_RASTER_LAYER_COMPOSITION.md` |
 | Map annotations, marker icons, geometry editing, GeoJSON and GPX import | `docs/15_ANNOTATIONS_AND_GEOJSON.md` |
 | Map object clustering, cluster interaction and expansion | `docs/15_ANNOTATIONS_AND_GEOJSON.md`, `docs/plans/MAP_OBJECT_CLUSTERING.md` (design proposal; verify current implementation in source) |
-| Elevation/DEM download selection, provider credentials and persistence | `docs/16_ELEVATION_DOWNLOADS.md` |
+| Elevation/DEM download selection, tile-envelope request bounds/margins, area/size estimates, footprint verification, provider credentials and persistence | `docs/16_ELEVATION_DOWNLOADS.md` |
 | Elevation/DEM reading, TIFF/native integration, bounded grid/block caches, sampling, center lookup cancellation and compact viewer center readout | `docs/17_ELEVATION_READER.md` |
 | Generated elevation color layers, palette/range settings, background generation, performance pipeline/range cache, regeneration and disk-size accounting | `docs/21_ELEVATION_COLOR_LAYERS.md` |
 | Licensing, provenance, source headers, packaged notices and release signing | `docs/18_LICENSING_AND_PROVENANCE.md`, `CONTRIBUTING.md` |

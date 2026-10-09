@@ -58,9 +58,10 @@ class DownloadRunner(
 
     private suspend fun downloadElevation(request: BuildRequest) {
         if (request.elevationDataset == ElevationDataset.NONE || storage.elevationComplete(request.packageId).valueOrThrow()) return
+        val area = request.elevationDownloadArea() ?: throw PackageStorageException(PackageFailure.ElevationUnavailable)
         storage.beginElevation(request.packageId).valueOrThrow()
         try {
-            val result = elevation.download(request.elevationDataset, request.bounds) { bytes, count ->
+            val result = elevation.download(request.elevationDataset, area.requestBounds) { bytes, count ->
                 storage.appendElevation(request.packageId, bytes, count).valueOrThrow()
             }
             val failure = when (result) {
@@ -72,7 +73,7 @@ class DownloadRunner(
                 is ElevationDownloadResult.RateLimited -> PackageFailure.RateLimited(result.retryAfterMillis)
             }
             if (failure != null) throw PackageStorageException(failure)
-            storage.finishElevation(request.packageId).valueOrThrow()
+            storage.finishElevation(request.packageId, area.tileBounds).valueOrThrow()
         } finally {
             withContext(NonCancellable) { storage.discardElevation(request.packageId) }
         }

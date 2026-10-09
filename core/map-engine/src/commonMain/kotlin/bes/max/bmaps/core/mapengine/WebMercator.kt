@@ -78,6 +78,22 @@ object WebMercator : CoordinateTransformer {
         return BoundingBox(nw.longitude, se.latitude, se.longitude, nw.latitude)
     }
 
+    fun coveringTileBounds(bounds: BoundingBox, level: Int): BoundingBox? {
+        if (level !in 0..52 || bounds.west >= bounds.east) return null
+        if (splitBounds(bounds)?.size != 1) return null
+        val northWest = normalized(GeographicCoordinate(bounds.north, bounds.west)) ?: return null
+        val southEast = normalized(GeographicCoordinate(bounds.south, bounds.east)) ?: return null
+        val side = (1L shl level).toDouble()
+        val left = floor(northWest.x * side)
+        val right = ceil(southEast.x * side)
+        val top = floor(northWest.y * side)
+        val bottom = ceil(southEast.y * side)
+        if (left >= right || top >= bottom) return null
+        val first = geographic(MapPoint(left / side, top / side)) ?: return null
+        val last = geographic(MapPoint(right / side, bottom / side)) ?: return null
+        return BoundingBox(first.longitude, last.latitude, last.longitude, first.latitude)
+    }
+
     fun splitBounds(bounds: BoundingBox): List<BoundingBox>? {
         if (normalized(GeographicCoordinate(bounds.south, bounds.west)) == null ||
             normalized(GeographicCoordinate(bounds.north, bounds.east)) == null || bounds.south >= bounds.north ||
