@@ -37,6 +37,7 @@ data class ViewerState(
     val immersive: Boolean = false,
     val details: Boolean = false,
     val layersVisible: Boolean = false,
+    val reliefDialogVisible: Boolean = false,
     val layerDraft: List<PackageLayer> = emptyList(),
     val attributionVisible: Boolean = false,
     val busy: Boolean = false,
@@ -242,6 +243,19 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
             }, item.opacity.toFloat(), visible = item.visible)
         })
         if (layers.none { it.visible && it.opacity > 0 }) mutableState.update { it.copy(loading = false) }
+    }
+
+    fun showReliefSettings() {
+        if (state.value.busy || state.value.manifest?.elevation == null) return
+        dismissLayers()
+        mutableState.update { it.copy(reliefDialogVisible = true) }
+    }
+
+    fun dismissReliefSettings() { mutableState.update { it.copy(reliefDialogVisible = false) } }
+
+    fun refreshRelief() {
+        mutableState.update { it.copy(layersVisible = false, layerDraft = emptyList()) }
+        retry()
     }
 
     fun showLayers() {

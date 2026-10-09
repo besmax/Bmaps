@@ -44,6 +44,86 @@ class PackageFileStorage(private val location: PackageStorageLocation) {
 class PackageFiles internal constructor(private val root: Path) {
     private val fs = SystemFileSystem
 
+    fun elevationJobDirectory(id: String): Path {
+        checkComponent(id)
+        return checked(Path(root, "elevation-jobs", id))
+    }
+
+    fun elevationJobIds(): List<String> {
+        val parent = checked(Path(root, "elevation-jobs"))
+        if (!fs.exists(parent)) return emptyList()
+        return fs.list(parent).filter { fs.metadataOrNull(checked(it))?.isDirectory == true }
+            .map { it.name }.onEach(::checkComponent)
+    }
+
+    fun readElevationJob(id: String): String? {
+        val path = checked(Path(elevationJobDirectory(id), "job.json"))
+        if (!fs.exists(path)) return null
+        val length = checkNotNull(fs.metadataOrNull(path)).size
+        require(length in 1L..65_536L)
+        return fs.source(path).buffered().use { it.readByteArray(length.toInt()).decodeToString() }
+    }
+
+    fun writeElevationJob(id: String, json: String) {
+        val directory = elevationJobDirectory(id)
+        fs.createDirectories(directory)
+        val path = checked(Path(directory, "job.json"))
+        val temporary = checked(Path(directory, "job.json.part"))
+        val bytes = json.encodeToByteArray()
+        require(bytes.size <= 65_536)
+        requireCapacity(bytes.size.toLong() + 65_536)
+        fs.sink(temporary).buffered().use { it.write(bytes) }
+        syncPath(temporary.toString(), false)
+        fs.atomicMove(temporary, path)
+        syncPath(directory.toString(), true)
+    }
+
+    fun readElevationRange(id: String): String? {
+        val path = checked(Path(elevationJobDirectory(id), "range.json"))
+        if (!fs.exists(path)) return null
+        val length = checkNotNull(fs.metadataOrNull(path)).size
+        require(length in 1L..65_536L)
+        return fs.source(path).buffered().use { it.readByteArray(length.toInt()).decodeToString() }
+    }
+
+    fun writeElevationRange(id: String, json: String) {
+        val directory = elevationJobDirectory(id)
+        fs.createDirectories(directory)
+        val path = checked(Path(directory, "range.json"))
+        val temporary = checked(Path(directory, "range.json.part"))
+        val bytes = json.encodeToByteArray()
+        require(bytes.size <= 65_536)
+        requireCapacity(bytes.size.toLong() + 65_536)
+        fs.sink(temporary).buffered().use { it.write(bytes) }
+        syncPath(temporary.toString(), false)
+        fs.atomicMove(temporary, path)
+        syncPath(directory.toString(), true)
+    }
+
+    fun elevationTilesPath(id: String): Path = checked(Path(elevationJobDirectory(id), "tiles.mbtiles"))
+
+    fun clearElevationTiles(id: String) {
+        val directory = elevationJobDirectory(id)
+        listOf("tiles.mbtiles", "tiles.mbtiles-journal").forEach {
+            fs.delete(checked(Path(directory, it)), mustExist = false)
+        }
+    }
+
+    fun deleteElevationJob(id: String) {
+        val path = elevationJobDirectory(id)
+        if (fs.exists(path)) deleteTree(path)
+    }
+
+    fun installElevationTiles(id: String, relativePath: String) {
+        val source = checked(Path(elevationJobDirectory(id), "tiles.mbtiles"))
+        val destination = asset(id, false, relativePath)
+        fs.createDirectories(checkNotNull(destination.parent))
+        syncPath(source.toString(), false)
+        fs.atomicMove(source, destination)
+        syncPath(checkNotNull(destination.parent).toString(), true)
+        syncPath(elevationJobDirectory(id).toString(), true)
+    }
+
     fun transferDirectory(id: String): Path {
         checkComponent(id)
         return checked(Path(root, "transfers", id))

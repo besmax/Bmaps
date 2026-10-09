@@ -2,4 +2,6 @@
     <string name="download_channel">Map downloads</string>
     <string name="download_progress">%1$d of %2$d tiles downloaded</string>
     <string name="download_pause">Pause</string>
+    <string name="elevation_channel">Generating elevation layer</string>
+    <string name="elevation_progress">%1$d of %2$d tiles generated</string>
 </resources>

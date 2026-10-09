@@ -27,7 +27,8 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Map annotations, marker icons, geometry editing, GeoJSON and GPX import | `docs/15_ANNOTATIONS_AND_GEOJSON.md` |
 | Map object clustering, cluster interaction and expansion | `docs/15_ANNOTATIONS_AND_GEOJSON.md`, `docs/plans/MAP_OBJECT_CLUSTERING.md` (design proposal; verify current implementation in source) |
 | Elevation/DEM download selection, provider credentials and persistence | `docs/16_ELEVATION_DOWNLOADS.md` |
-| Elevation/DEM reading, TIFF/native integration, sampling, center lookup cancellation and compact viewer center readout | `docs/17_ELEVATION_READER.md` |
+| Elevation/DEM reading, TIFF/native integration, bounded grid/block caches, sampling, center lookup cancellation and compact viewer center readout | `docs/17_ELEVATION_READER.md` |
+| Generated elevation color layers, palette/range settings, background generation, performance pipeline/range cache, regeneration and disk-size accounting | `docs/21_ELEVATION_COLOR_LAYERS.md` |
 | Licensing, provenance, source headers, packaged notices and release signing | `docs/18_LICENSING_AND_PROVENANCE.md`, `CONTRIBUTING.md` |
 | Package import/export, `.bmaps` transfer format, standalone MBTiles and native document access/sharing | `docs/19_PACKAGE_TRANSFER.md` |
 | Current location/GPS, permissions, native location providers, lifecycle, accuracy overlays, initial focus and navigator preparation | `docs/20_CURRENT_LOCATION.md` |

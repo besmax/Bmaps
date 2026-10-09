@@ -58,6 +58,7 @@ data class PackageLayer(
     val zoomLevels: Set<Int> = emptySet(),
     val tileCount: Long? = null,
     val renderOrder: Int = 0,
+    val elevationRelief: ElevationReliefStyle? = null,
 )
 
 @Serializable

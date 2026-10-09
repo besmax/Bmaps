@@ -61,6 +61,17 @@ int main(int argc, char **argv) {
             if (row == 2 && col == 3) CHECK(bmaps_dem_sample(r, col, row, &sample) == BMAPS_DEM_NO_DATA);
             else value(r, col, row, row * 7 + col - 10);
         }
+        int32_t columns[] = {-1, 0, 3, 6, 7};
+        double values[5];
+        CHECK(bmaps_dem_samples(r, columns, 5, 2, values) == BMAPS_DEM_OK);
+        CHECK(isnan(values[0]) && values[1] == 4 && isnan(values[2]) && values[3] == 10 && isnan(values[4]));
+        CHECK(bmaps_dem_samples(r, columns, 5, -1, values) == BMAPS_DEM_OK);
+        for (int i = 0; i < 5; ++i) CHECK(isnan(values[i]));
+        CHECK(bmaps_dem_samples(r, columns, 8193, 0, values) == BMAPS_DEM_INVALID);
+        double range[5];
+        CHECK(bmaps_dem_range(r, 0, range) == BMAPS_DEM_OK);
+        CHECK(range[0] == range[1] && range[2] == -10 && range[3] == 24 && range[4] == 34);
+        CHECK(bmaps_dem_range(r, (uint32_t)range[1], range) == BMAPS_DEM_INVALID);
         CHECK(bmaps_dem_sample(r, 7, 0, &sample) == BMAPS_DEM_OUTSIDE);
         CHECK(bmaps_dem_sample(r, 0, 5, &sample) == BMAPS_DEM_OUTSIDE);
         bmaps_dem_close(r);
@@ -73,6 +84,29 @@ int main(int argc, char **argv) {
     value(r, 16, 0, -21);
     value(r, 0, 16, 51);
     CHECK(bmaps_dem_sample(r, 4, 3, &sample) == BMAPS_DEM_NO_DATA);
+    bmaps_dem_close(r);
+    r = open_fixture(argv[1], "float32-tiled-bigtiff.tif", BMAPS_DEM_OK);
+    bmaps_dem_enable_cache(r);
+    int32_t grid_columns[] = {18, 4, 0, 16, -1};
+    int32_t grid_rows[] = {16, 3, 0, -1};
+    double grid[20], metrics[5], range[5];
+    CHECK(bmaps_dem_grid(r, grid_columns, 5, grid_rows, 4, grid) == BMAPS_DEM_OK);
+    for (int row = 0; row < 4; ++row) for (int column = 0; column < 5; ++column) {
+        if (grid_rows[row] < 0 || grid_columns[column] < 0 || (grid_rows[row] == 3 && grid_columns[column] == 4))
+            CHECK(isnan(grid[row * 5 + column]));
+        else CHECK(grid[row * 5 + column] == (grid_rows[row] * 19 + grid_columns[column] - 100) / 4.0);
+    }
+    bmaps_dem_metrics(r, metrics);
+    CHECK(metrics[1] == 4 && metrics[4] == 1);
+    CHECK(bmaps_dem_grid(r, grid_columns, 5, grid_rows, 4, grid) == BMAPS_DEM_OK);
+    bmaps_dem_metrics(r, metrics);
+    CHECK(metrics[1] == 4 && metrics[4] == 2);
+    CHECK(bmaps_dem_grid(r, grid_columns, 8193, grid_rows, 4, grid) == BMAPS_DEM_INVALID);
+    CHECK(bmaps_dem_grid(r, grid_columns, 8192, grid_rows, 1024, grid) == BMAPS_DEM_INVALID);
+    CHECK(bmaps_dem_range(r, 0, range) == BMAPS_DEM_OK);
+    CHECK(range[0] == range[1] && range[2] == -25 && range[3] == 55.5 && range[4] == 322);
+    bmaps_dem_metrics(r, metrics);
+    CHECK(metrics[1] == 4);
     bmaps_dem_close(r);
     r = open_fixture(argv[1], "float32-numeric-nodata.tif", BMAPS_DEM_OK);
     CHECK(bmaps_dem_sample(r, 0, 0, &sample) == BMAPS_DEM_NO_DATA);

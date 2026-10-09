@@ -49,3 +49,9 @@ Manual acceptance:
 4. Open offline and change each opacity independently, hide the root, hide all layers, and reorder the root above/below the satellite layer. Confirm alignment and expected blending.
 5. Save, close, and reopen to verify settings. Preview a second edit and cancel to verify rollback. Exercise existing sparse packages and date-line halves.
 6. Reject mismatched provider coverage, matrix dimensions, CRS, or selected levels before composition. Verify atomic settings recovery and per-layer limits and whole-download free-space checks under storage pressure.
+
+## Generated elevation layer — 2026-10-09
+
+Raster composition now accepts one locally generated elevation layer alongside provider layers. It has the root's exact matrix/levels/dimensions and complete tile coverage, using transparent PNGs for missing DEM regions. Visibility, opacity, render order, preview, Save/Cancel, and attribution follow existing layer controls. Generate/Regenerate opens an independent settings dialog and schedules a durable operation; it is not rolled back by cancelling a presentation draft. Initial opacity is 0.5; regeneration preserves presentation. The generated layer counts toward the 32-layer bound and has its own effective raster size limit. Actual map storage grows accordingly. See `21_ELEVATION_COLOR_LAYERS.md`; source changes and new verification scenarios remain unexecuted.
+
+Elevation palette endpoints (2026-10-09): the generated-layer legend displays the shades selected for minimum and maximum elevations, including crossed/equal positions. Regeneration keeps normal visibility, opacity and ordering and stores the chosen endpoint positions in the generated layer's options. Legacy reversed layers retain their legend/appearance. Source changes are not yet runtime verified; see `21_ELEVATION_COLOR_LAYERS.md`.

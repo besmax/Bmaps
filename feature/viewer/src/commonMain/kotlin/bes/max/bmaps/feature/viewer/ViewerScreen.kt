@@ -38,6 +38,14 @@ fun ViewerScreen(
 ) {
     val model = metroViewModel<ViewerViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
+    val relief = metroViewModel<ElevationProgressViewModel>()
+    val reliefProgress by relief.state.collectAsStateWithLifecycle()
+    LaunchedEffect(packageId) { relief.open(packageId) }
+    LaunchedEffect(reliefProgress.job?.token, reliefProgress.job?.state, state.manifest) {
+        val job = reliefProgress.job
+        if (job?.state == bes.max.bmaps.domain.mapbuilder.ElevationGenerationState.COMPLETED &&
+            state.manifest != null && state.manifest?.layers?.none { it.tiles.relativePath == "layers/elevation-relief-${job.token}.mbtiles" } == true) model.refreshRelief()
+    }
     val position = metroViewModel<MapPositionViewModel>()
     val positionState by position.state.collectAsStateWithLifecycle()
     val annotations = metroViewModel<AnnotationEditorViewModel>()
@@ -120,5 +128,5 @@ fun ViewerScreen(
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
         }
     }
-    if (!state.immersive) ViewerDialogs(model, state, annotations, annotationState)
+    if (!state.immersive) ViewerDialogs(model, state, annotations, annotationState, reliefProgress, relief::cancel)
 }

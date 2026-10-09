@@ -60,3 +60,7 @@ A parallel vertical swipe with two fingers starting on the map toggles immersive
 `ViewerState.immersive` owns this session state and resets when another package opens. Immersive mode hides application controls, the crosshair/readout, editing panels and vertex handles, object callouts, dialogs, notices and snackbars. Raster layers, annotation geometry and the current-location marker remain visible. Annotation taps and long presses cannot edit hidden tools. Camera observation, DEM access and foreground location tracking remain mounted; toggling does not reopen the package or recreate the renderer. Native system bars are unchanged.
 
 Source implementation only; builds and device testing remain with the user. Manual acceptance should cover toggling in both directions, pinch zoom and panning, restoration during annotation editing, ongoing GPS updates, accessibility actions, and Android/iOS gesture handling.
+
+## Elevation color layers — 2026-10-09
+
+Layers offers Create/Regenerate elevation layer for maps with DEM and shows local job progress/cancellation. A separate settings dialog supplies palettes, reversal, and automatic/manual meter ranges. The completed layer uses normal visibility/opacity/order controls and shows a color legend and its disk size. Completion reloads viewer sources using existing camera retention. Library/map details use the updated actual package size, including the generated layer. Source implementation is present; builds and runtime acceptance remain pending. See `21_ELEVATION_COLOR_LAYERS.md`.

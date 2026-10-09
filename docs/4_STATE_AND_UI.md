@@ -64,3 +64,7 @@ The viewer clusters nearby markers, small lines, and small polygons from a compl
 ## Current-location widget
 
 `core:location` provides an unscoped location widget ViewModel with one immutable state stream and Channel-backed events. Native updates attach only while the map entry is resumed. Map features consume Center events and own coverage checks, viewport changes, and the builder's single initial focus. Fresh fixes update overlays without moving the camera. Source fixture screens do not request permission or start sensors. See `20_CURRENT_LOCATION.md`.
+
+## Elevation generation presentation — 2026-10-09
+
+`ElevationProgressViewModel` is scoped to the viewer navigation entry and observes durable generation jobs independently of rendering. `ElevationReliefDialogViewModel` uses a separate dialog ViewModelStore, one immutable settings/submission state, and a Channel-backed successful-submission event. It independently validates manual meter ranges and finite palette positions in [0, 1]. Two independent palette handles select minimum/maximum shades, may cross or coincide, and preserve positions when changing presets. The dialog previews the selected gradient and loads legacy reversal as endpoint positions; new submissions persist explicit positions. Closing its store does not cancel an accepted Generate operation or already scheduled background generation. `ViewerViewModel` retains dialog visibility and reloads raster sessions on completion, using existing camera retention. See `21_ELEVATION_COLOR_LAYERS.md`; source changes are not runtime verified.

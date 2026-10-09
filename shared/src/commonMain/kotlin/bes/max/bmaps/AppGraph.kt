@@ -17,5 +17,6 @@ internal interface AppGraph : ViewModelGraph {
     val packageRepository: bes.max.bmaps.domain.mapbuilder.PackageRepository
     val packageBuildStorage: bes.max.bmaps.domain.mapbuilder.PackageBuildStorage
     val downloadExecutor: bes.max.bmaps.domain.mapbuilder.DownloadExecutor
+    val elevationGenerationScheduler: bes.max.bmaps.domain.mapbuilder.ElevationGenerationScheduler
     val downloadScheduler: bes.max.bmaps.domain.mapbuilder.DownloadScheduler
 }

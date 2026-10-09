@@ -39,7 +39,17 @@ internal object PackageManifestCodec {
             require(layer.tileWidth > 0 && layer.tileHeight == layer.tileWidth)
             require(layer.renderOrder >= 0)
             require(layer.opacity.isFinite() && layer.opacity in 0.0..1.0)
-            require(layer.tiles.relativePath == if (index == 0) "map_data.mbtiles" else "layers/${layer.id.value}.mbtiles")
+            if (layer.elevationRelief == null) {
+                require(layer.tiles.relativePath == if (index == 0) "map_data.mbtiles" else "layers/${layer.id.value}.mbtiles")
+            } else {
+                require(index > 0 && layer.id.value == "elevation-relief" && layer.source == null)
+                require(layer.tiles.relativePath.startsWith("layers/elevation-relief-") && layer.tiles.relativePath.endsWith(".mbtiles"))
+                require(layer.content.rasterFormats == setOf(RasterTileFormat.PNG))
+                val style = layer.elevationRelief
+                require(style.options.valid() && style.minimumMeters.isFinite() && style.maximumMeters.isFinite() && style.minimumMeters < style.maximumMeters && (style.maximumMeters - style.minimumMeters).isFinite())
+                val base = manifest.layers.first()
+                require(layer.zoomRange == base.zoomRange && layer.zoomLevels == base.zoomLevels && layer.tileWidth == base.tileWidth)
+            }
             val coverage = PackageTileCoverage(layer.bounds, layer.zoomRange, layer.zoomLevels)
             require(layer.tileCount == null || layer.tileCount == coverage.count)
         }

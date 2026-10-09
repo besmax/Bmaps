@@ -64,9 +64,13 @@ class AndroidDownloadScheduler(private val context: Context, private val storage
 
 @Inject
 @SingleIn(AppScope::class)
-class MapDownloadWorkerFactory(private val runner: DownloadRunner, private val storage: PackageBuildStorage) : WorkerFactory() {
+class MapDownloadWorkerFactory(private val runner: DownloadRunner, private val storage: PackageBuildStorage, private val elevation: ElevationLayerGenerator) : WorkerFactory() {
     override fun createWorker(context: Context, workerClassName: String, parameters: WorkerParameters): ListenableWorker? =
-        if (workerClassName == MapDownloadWorker::class.java.name) MapDownloadWorker(context, parameters, runner, storage) else null
+        when (workerClassName) {
+            MapDownloadWorker::class.java.name -> MapDownloadWorker(context, parameters, runner, storage)
+            ElevationGenerationWorker::class.java.name -> ElevationGenerationWorker(context, parameters, elevation)
+            else -> null
+        }
 }
 
 class MapDownloadWorker(

@@ -20,11 +20,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.io.bytestring.ByteString
 
 internal class LocalOpenedPackage(
-    override val manifest: PackageManifest,
+    initialManifest: PackageManifest,
     private val paths: Map<LayerId, String>,
     private val elevationPath: String?,
     private val demReaders: DemReaderFactory,
 ) : OpenedPackage {
+    override var manifest: PackageManifest = initialManifest
+        private set
     private val lock = Mutex()
     private val sources = mutableListOf<LocalTileSource>()
     private var dem: DemReader? = null
@@ -38,12 +40,27 @@ internal class LocalOpenedPackage(
         val layer = manifest.layers.firstOrNull { it.id == layerId }
             ?: return@withLock PackageResult.Failure(PackageFailure.NotFound)
         try {
-            val source = LocalTileSource(MbTiles.open(checkNotNull(paths[layerId])), layer)
+            val path = if (layer.elevationRelief != null) {
+                val base = checkNotNull(paths[manifest.layers.first().id])
+                base.substringBeforeLast('/') + "/" + layer.tiles.relativePath
+            } else checkNotNull(paths[layerId])
+            val source = LocalTileSource(MbTiles.open(path), layer)
             sources.removeAll { it.closed }
             sources.add(source)
             PackageResult.Success(source)
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { PackageResult.Failure(PackageFailure.Io) }
+    }
+
+    internal suspend fun replaceRelief(layer: PackageLayer) = lock.withLock {
+        if (!closed) {
+            manifest = manifest.copy(layers = if (manifest.layers.none { it.id == layer.id }) manifest.layers + layer
+                else manifest.layers.map { if (it.id == layer.id) layer else it })
+        }
+    }
+
+    internal suspend fun retainedReliefPaths(): List<String> = lock.withLock {
+        sources.filter { !it.closed && it.layer.elevationRelief != null }.map { it.layer.tiles.relativePath }
     }
 
     override suspend fun elevation(latitude: Double, longitude: Double): PackageElevation = lock.withLock {
@@ -132,7 +149,7 @@ internal class LocalOpenedPackage(
     }
 }
 
-private class LocalTileSource(private val database: MbTiles, private val layer: PackageLayer) : TileSource {
+private class LocalTileSource(private val database: MbTiles, val layer: PackageLayer) : TileSource {
     var closed = false
         private set
 

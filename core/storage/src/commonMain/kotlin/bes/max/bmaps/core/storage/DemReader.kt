@@ -14,6 +14,7 @@ import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -100,6 +101,44 @@ class DemReader internal constructor(
         }
     }
 
+    suspend fun readRow(columns: IntArray, row: Int): DoubleArray = withContext(Dispatchers.IO) {
+        require(columns.size in 1..8192)
+        mutex.withLock {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            ensureOpen()
+            handle.samples(columns, row).also { kotlinx.coroutines.currentCoroutineContext().ensureActive() }
+        }
+    }
+
+    suspend fun enableRasterCache() = withContext(Dispatchers.IO) {
+        mutex.withLock { ensureOpen(); handle.enableCache() }
+    }
+
+    suspend fun readGrid(columns: IntArray, rows: IntArray): DoubleArray = withContext(Dispatchers.IO) {
+        require(columns.size in 1..8192 && rows.size in 1..1024)
+        require(columns.size.toLong() * rows.size <= 131072)
+        mutex.withLock {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            ensureOpen()
+            handle.grid(columns, rows).also { kotlinx.coroutines.currentCoroutineContext().ensureActive() }
+        }
+    }
+
+    suspend fun rangeChunk(firstBlock: Long): DemRangeChunk = withContext(Dispatchers.IO) {
+        require(firstBlock in 0..UInt.MAX_VALUE.toLong())
+        mutex.withLock {
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            ensureOpen()
+            val values = handle.range(firstBlock)
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            DemRangeChunk(values[0].toLong(), values[1].toLong(), values[2], values[3], values[4].toLong())
+        }
+    }
+
+    suspend fun metrics(): DoubleArray = withContext(Dispatchers.IO) {
+        mutex.withLock { ensureOpen(); handle.metrics() }
+    }
+
     suspend fun close() = withContext(NonCancellable + Dispatchers.IO) {
         mutex.withLock {
             if (!closed) {
@@ -114,9 +153,20 @@ class DemReader internal constructor(
     }
 }
 
+data class DemRangeChunk(val nextBlock: Long, val totalBlocks: Long, val minimum: Double, val maximum: Double, val validSamples: Long)
+
 internal interface NativeDemHandle {
     fun metadata(): DemMetadata
     fun sample(column: Int, row: Int): DemSample
+    fun samples(columns: IntArray, row: Int): DoubleArray = DoubleArray(columns.size) {
+        (sample(columns[it], row) as? DemSample.Value)?.rawValue ?: Double.NaN
+    }
+    fun enableCache() {}
+    fun grid(columns: IntArray, rows: IntArray): DoubleArray = DoubleArray(columns.size * rows.size).also { output ->
+        rows.forEachIndexed { index, row -> samples(columns, row).copyInto(output, index * columns.size) }
+    }
+    fun range(firstBlock: Long): DoubleArray = demFailure(3)
+    fun metrics(): DoubleArray = DoubleArray(5)
     fun close()
 }
 

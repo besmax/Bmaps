@@ -24,7 +24,7 @@ import androidx.compose.ui.semantics.contentDescription
 import bes.max.bmaps.domain.mapbuilder.PackageLayer
 
 @Composable
-internal fun ViewerLayersDialog(model: ViewerViewModel, state: ViewerState) {
+internal fun ViewerLayersDialog(model: ViewerViewModel, state: ViewerState, progress: ElevationProgressState, onCancelGeneration: () -> Unit) {
     AlertDialog(
         onDismissRequest = model::dismissLayers,
         title = { Text(stringResource(Res.string.layers_title)) },
@@ -34,6 +34,12 @@ internal fun ViewerLayersDialog(model: ViewerViewModel, state: ViewerState) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(stringResource(Res.string.layers_hint))
+                if (state.manifest?.elevation != null) {
+                    TextButton(model::showReliefSettings, enabled = !state.busy && progress.job?.active != true) {
+                        Text(stringResource(if (state.manifest.layers.any { it.elevationRelief != null }) Res.string.relief_regenerate else Res.string.relief_create))
+                    }
+                    ElevationGenerationControls(progress.job, progress.error, onCancelGeneration)
+                }
                 ViewerLevelSelector(model, state)
                 if (state.regionCount > 1) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     repeat(state.regionCount) { region ->
@@ -95,7 +101,7 @@ private fun ViewerLayerAppearance(
     index: Int,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(layer.name, Modifier.weight(1f))
+        Text(if (layer.elevationRelief != null) stringResource(Res.string.relief_title) else layer.name, Modifier.weight(1f))
         Checkbox(
             layer.visible,
             {
@@ -121,6 +127,11 @@ private fun ViewerLayerAppearance(
             onClick = { model.moveLayer(layer.id, 1) },
             enabled = !state.busy && index < state.layerDraft.lastIndex
         ) { Text(stringResource(Res.string.layer_up)) }
+    }
+    layer.elevationRelief?.let { style ->
+        ReliefColorScale(style)
+        Text(stringResource(Res.string.relief_legend, style.minimumMeters.toString(), style.maximumMeters.toString()))
+        Text(stringResource(Res.string.relief_layer_size, (layer.tiles.sizeBytes / 1_000_000.0).toString()))
     }
     layer.attribution.forEach {
         Text(

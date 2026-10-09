@@ -86,3 +86,7 @@ When a new module is required:
 1. Identify the correct layer (`feature`, `domain`, `core`).
 2. Create the directory structure using the `build-logic` convention plugins.
 3. Update this `3_MODULES.md` file immediately with the new module's name, responsibility, and constraints.
+
+## Generated elevation layers — 2026-10-09
+
+No new module is introduced. `domain:map-builder` owns generation contracts/orchestration, durable job state, platform scheduling, final package commit and size updates. `core:storage` owns batch DEM/native access and job-file infrastructure; `core:map-engine` owns native PNG encoding. `feature:viewer` owns progress and a separately scoped settings ViewModel. `shared` only wires scheduler startup and the Android worker factory. See `21_ELEVATION_COLOR_LAYERS.md` for source state and pending compilation/acceptance.

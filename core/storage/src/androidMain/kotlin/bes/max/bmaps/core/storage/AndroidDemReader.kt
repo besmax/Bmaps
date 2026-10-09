@@ -27,6 +27,28 @@ internal actual fun openNativeDem(path: String): NativeDemHandle {
             return demSample(status, value[0])
         }
 
+        override fun samples(columns: IntArray, row: Int): DoubleArray {
+            val values = DoubleArray(columns.size)
+            val status = NativeDem.samples(pointer, columns, row, values)
+            if (status != 0) demFailure(status)
+            return values
+        }
+
+        override fun enableCache() = NativeDem.enableCache(pointer)
+        override fun metrics(): DoubleArray = NativeDem.metrics(pointer)
+        override fun grid(columns: IntArray, rows: IntArray): DoubleArray {
+            val values = DoubleArray(columns.size * rows.size)
+            val status = NativeDem.grid(pointer, columns, rows, values)
+            if (status != 0) demFailure(status)
+            return values
+        }
+        override fun range(firstBlock: Long): DoubleArray {
+            val values = DoubleArray(5)
+            val status = NativeDem.range(pointer, firstBlock, values)
+            if (status != 0) demFailure(status)
+            return values
+        }
+
         override fun close() = NativeDem.close(pointer)
     }
 }

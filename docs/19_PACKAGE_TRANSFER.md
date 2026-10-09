@@ -79,3 +79,7 @@ Suggested owner-run checks:
 Native acceptance still required: export Android → import iOS and the reverse, reopen offline, compare tile samples and every layer setting, edit/read annotations, and compare known valid DEM samples. Exercise real JPEG and normalized-view MBTiles, unsupported files, low storage, cancellation during extraction/validation, process termination before/after promotion, picker cancellation, cancelled shares, repeat import/delete, and 24-hour temporary-file cleanup. Confirm iPad popovers, Android URI grants, large-file memory behavior, and actual Gradle task names in the installed toolchain.
 
 Implementation references: [SQLite snapshot semantics](https://www.sqlite.org/lang_vacuum.html), [Android file URI grants](https://developer.android.com/training/secure-file-sharing/share-file), and [Apple document picker](https://developer.apple.com/documentation/uikit/uidocumentpickerviewcontroller).
+
+## Generated elevation layer transfer — 2026-10-09
+
+A generated elevation layer is a normal manifest raster asset, included in SQLite snapshots, byte-size/hash accounting, export payloads, import validation, and package identity rebinding. Its optional palette/range metadata and visibility/opacity/order survive transfer. Only the currently referenced version is exported; private generation job/provisional files are excluded. Imported maps include the generated layer in their actual stored size. The new storage transfer scenario is added but not executed. See `21_ELEVATION_COLOR_LAYERS.md`.

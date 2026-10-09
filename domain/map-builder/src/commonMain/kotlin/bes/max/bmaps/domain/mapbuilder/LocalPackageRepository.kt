@@ -79,6 +79,78 @@ class LocalPackageRepository(
         }
     }
 
+    internal suspend fun reliefInput(id: PackageId): PackageResult<Pair<PackageManifest, String>> = operation {
+        val record = records.get(id.value) ?: fail(PackageFailure.NotFound)
+        if (record.state != PackageState.READY.name) fail(PackageFailure.NotReady)
+        storage.access {
+            val manifest = readManifest(id, false)
+            val elevation = manifest.elevation ?: fail(PackageFailure.UnsupportedContent)
+            if (manifest.elevationDataset == bes.max.bmaps.domain.providers.ElevationDataset.NONE) fail(PackageFailure.UnsupportedContent)
+            if (manifest.layers.any { it.id.value == "elevation-relief" && it.elevationRelief == null }) fail(PackageFailure.Conflict)
+            if (manifest.layers.none { it.elevationRelief != null } && manifest.layers.size >= 32) fail(PackageFailure.Conflict)
+            manifest to asset(id.value, false, elevation.relativePath).toString()
+        }
+    }
+
+    internal suspend fun commitRelief(job: ElevationGenerationJob): PackageResult<Unit> = operation {
+        val record = records.get(job.packageId.value) ?: fail(PackageFailure.NotFound)
+        if (record.state != PackageState.READY.name) fail(PackageFailure.NotReady)
+        storage.access {
+            val currentJob = readElevationJob(job.packageId.value)?.let { json.decodeFromString<ElevationGenerationJob>(it) }
+            if (currentJob?.token != job.token || !currentJob.active) fail(PackageFailure.Conflict)
+            val manifest = readManifest(job.packageId, false)
+            if (manifest.layers.any { it.tiles.relativePath == "layers/elevation-relief-${job.token}.mbtiles" }) {
+                indexFinal(record)
+                writeElevationJob(job.packageId.value, json.encodeToString(job.copy(state = ElevationGenerationState.COMPLETED)))
+                return@access
+            }
+            val base = manifest.layers.first()
+            val previous = manifest.layers.singleOrNull { it.elevationRelief != null }
+            if (previous == null && manifest.layers.size >= 32) fail(PackageFailure.Conflict)
+            val relativePath = "layers/elevation-relief-${job.token}.mbtiles"
+            val database = MbTiles.open(elevationTilesPath(job.packageId.value).toString())
+            try {
+                val coverage = coverage(base)
+                database.verify { coverage.contains(TileKey(it.zoom, it.column, it.row)) }
+                if (database.counts() != TileCounts(coverage.count, 0)) fail(PackageFailure.CorruptData)
+                require(database.metadata()["bmaps_package_id"] == job.packageId.value)
+            } finally { database.close() }
+            kotlinx.coroutines.currentCoroutineContext().ensureActive()
+            withContext(NonCancellable) {
+                installElevationTiles(job.packageId.value, relativePath)
+                val bytes = assetSize(job.packageId.value, false, relativePath)
+                if (bytes > manifest.sizePolicy.effectiveLayerLimit) throw StorageLimitExceeded(manifest.sizePolicy.effectiveLayerLimit, bytes)
+                val layer = base.copy(id = LayerId("elevation-relief"), name = "Elevation", source = null,
+                    tiles = PackageAsset(relativePath, bytes), content = TileContentDescriptor(rasterFormats = setOf(RasterTileFormat.PNG)),
+                    attribution = listOf(bes.max.bmaps.domain.providers.Attribution("OpenTopography · ${manifest.elevationDataset}", "https://opentopography.org/")), visible = previous?.visible ?: true,
+                    opacity = previous?.opacity ?: 0.5, renderOrder = previous?.renderOrder ?: (manifest.layers.maxOf { it.renderOrder } + 1),
+                    tileCount = coverage(base).count, elevationRelief = checkNotNull(job.style))
+                val updated = manifest.copy(updatedAtEpochMillis = Clock.System.now().toEpochMilliseconds(),
+                    layers = if (previous == null) manifest.layers + layer else manifest.layers.map { if (it.id == previous.id) layer else it })
+                val encoded = PackageManifestCodec.encode(updated)
+                write(job.packageId.value, "config.json", Buffer().apply { write(encoded.encodeToByteArray()) }, MANIFEST_RESERVE, Long.MAX_VALUE, staged = false)
+                sessions[job.packageId].orEmpty().forEach { it.replaceRelief(layer) }
+                cleanupReliefAssets(updated)
+                val totalBytes = size(job.packageId.value, false)
+                val updatedRecord = record.copy(manifestJson = encoded, sizeBytes = totalBytes, updatedAtEpochMillis = updated.updatedAtEpochMillis)
+                val download = records.job(job.packageId.value)
+                if (download == null) records.putPackage(updatedRecord) else records.checkpoint(updatedRecord, download.copy(packageBytes = totalBytes))
+                writeElevationJob(job.packageId.value, json.encodeToString(job.copy(state = ElevationGenerationState.COMPLETED)))
+            }
+        }
+    }
+
+    private suspend fun retainedReliefAssets(id: PackageId): Set<String> = buildSet {
+        sessions[id].orEmpty().forEach { addAll(it.retainedReliefPaths()) }
+    }
+
+    private suspend fun PackageFiles.cleanupReliefAssets(manifest: PackageManifest) {
+        val retained = retainedReliefAssets(manifest.id) + PackageManifestCodec.assets(manifest).map { it.relativePath }
+        relativeFiles(manifest.id.value, false).filter {
+            it.startsWith("layers/elevation-relief-") && it.endsWith(".mbtiles") && it !in retained
+        }.forEach { deleteAsset(manifest.id.value, false, it) }
+    }
+
     override suspend fun availableBytes(): PackageResult<Long> = operation { storage.access { availableBytes() } }
 
     override fun observe(query: PackageQuery): Flow<PackageResult<PackagePage>> = flow<PackageResult<PackagePage>> {
@@ -336,6 +408,12 @@ class LocalPackageRepository(
             try {
                 val manifest = readManifest(id, false)
                 verify(manifest, false)
+                val actualBytes = size(id.value, false)
+                if (actualBytes != record.sizeBytes) {
+                    val download = records.job(id.value)
+                    val updatedRecord = record.copy(sizeBytes = actualBytes, manifestJson = PackageManifestCodec.encode(manifest), updatedAtEpochMillis = manifest.updatedAtEpochMillis)
+                    if (download == null) records.putPackage(updatedRecord) else records.checkpoint(updatedRecord, download.copy(packageBytes = actualBytes))
+                }
                 LocalOpenedPackage(manifest, manifest.layers.associate {
                     it.id to asset(id.value, false, it.tiles.relativePath).toString()
                 }, manifest.elevation?.let { asset(id.value, false, it.relativePath).toString() }, demReaders).also {
@@ -472,7 +550,7 @@ class LocalPackageRepository(
         checkComponent(id.value)
         records.get(id.value)?.let { records.putPackage(it.copy(state = PackageState.DELETING.name)) }
         closeSessions(id)
-        storage.access { delete(id.value, true); delete(id.value, false) }
+        storage.access { delete(id.value, true); delete(id.value, false); deleteElevationJob(id.value) }
         records.delete(id.value)
     }
 
@@ -488,7 +566,7 @@ class LocalPackageRepository(
                 val id = PackageId(record.id)
                 if (record.state == PackageState.DELETING.name) {
                     closeSessions(id)
-                    delete(record.id, true); delete(record.id, false)
+                    delete(record.id, true); delete(record.id, false); deleteElevationJob(record.id)
                     records.delete(record.id)
                     continue
                 }
@@ -548,7 +626,8 @@ class LocalPackageRepository(
         val job = records.job(record.id)
         if (job == null) records.putPackage(ready) else {
             val counts = counts(manifest, false)
-            if (counts.downloaded != job.totalTiles || counts.failed != 0L) fail(PackageFailure.CorruptData)
+            val generatedTiles = manifest.layers.filter { it.elevationRelief != null }.sumOf { it.tileCount ?: 0 }
+            if (counts.downloaded != job.totalTiles + generatedTiles || counts.failed != 0L) fail(PackageFailure.CorruptData)
             records.checkpoint(ready, job.copy(state = BuildJobState.COMPLETED.name,
                 completedTiles = counts.downloaded, failedTiles = 0, packageBytes = bytes, failure = null))
         }
@@ -559,7 +638,8 @@ class LocalPackageRepository(
             fail(PackageFailure.CorruptData)
         }
         checkLayerSizes(manifest, staged)
-        if (relativeFiles(manifest.id.value, staged) !=
+        val retained = if (staged) emptySet() else retainedReliefAssets(manifest.id) - PackageManifestCodec.assets(manifest).map { it.relativePath }.toSet()
+        if (relativeFiles(manifest.id.value, staged) - retained !=
             PackageManifestCodec.assets(manifest).map { it.relativePath }.toSet() + "config.json") fail(PackageFailure.CorruptData)
         for (asset in PackageManifestCodec.assets(manifest)) {
             if (assetSize(manifest.id.value, staged, asset.relativePath) != asset.sizeBytes) fail(PackageFailure.CorruptData)
@@ -605,7 +685,9 @@ class LocalPackageRepository(
     private suspend fun PackageFiles.readManifest(id: PackageId, staged: Boolean): PackageManifest {
         val manifest = PackageManifestCodec.decode(read(id.value, staged, "config.json", MANIFEST_RESERVE.toInt()).decodeToString())
         require(manifest.id == id)
-        return if (staged) manifest else synchronizeAnnotations(manifest)
+        if (staged) return manifest
+        cleanupReliefAssets(manifest)
+        return synchronizeAnnotations(manifest)
     }
 
     private suspend fun building(id: PackageId, allowFinalizing: Boolean = false): PackageRecord {
@@ -638,8 +720,8 @@ class LocalPackageRepository(
         return PackageSummary(PackageId(record.id), record.name,
             manifest?.bounds,
             PackageState.valueOf(record.state), record.sizeBytes, record.updatedAtEpochMillis, record.hasElevationData,
-            job?.totalTiles ?: manifest?.layers?.sumOf { it.tileCount ?: 0 } ?: 0,
-            job?.completedTiles ?: manifest?.layers?.sumOf { it.tileCount ?: 0 } ?: 0, job?.failedTiles ?: 0,
+            if (record.state == PackageState.READY.name) manifest?.layers?.sumOf { it.tileCount ?: 0 } ?: 0 else job?.totalTiles ?: 0,
+            if (record.state == PackageState.READY.name) manifest?.layers?.sumOf { it.tileCount ?: 0 } ?: 0 else job?.completedTiles ?: 0, job?.failedTiles ?: 0,
             favourite = preferences?.favourite ?: false, avatarKey = preferences?.avatar ?: "map",
             zoomLevels = manifest?.layers?.flatMap { it.zoomLevels.ifEmpty { (it.zoomRange.min..it.zoomRange.max).toSet() } }?.toSet().orEmpty())
     }

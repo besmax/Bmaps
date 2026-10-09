@@ -69,4 +69,30 @@ class DemReaderTest {
         assertEquals(DemFailure.CLOSED, assertFailsWith<DemReadException> { reader.sampleCell(0, 0) }.reason)
         assertEquals(2, reads)
     }
+    @Test
+    fun gridReadsAreBoundedAndRespectReaderOwnership() = runTest {
+        var grids = 0
+        var cacheEnabled = false
+        val handle = object : NativeDemHandle {
+            override fun metadata() = this@DemReaderTest.metadata()
+            override fun sample(column: Int, row: Int) = DemSample.Value((row * 7 + column).toDouble())
+            override fun grid(columns: IntArray, rows: IntArray): DoubleArray {
+                grids++
+                return super.grid(columns, rows)
+            }
+            override fun enableCache() { cacheEnabled = true }
+            override fun close() {}
+        }
+        val reader = DemReader(handle, handle.metadata())
+        reader.enableRasterCache()
+        assertEquals(true, cacheEnabled)
+        kotlin.test.assertContentEquals(doubleArrayOf(17.0, 14.0, 3.0, 0.0), reader.readGrid(intArrayOf(3, 0), intArrayOf(2, 0)))
+        assertFailsWith<IllegalArgumentException> { reader.readGrid(IntArray(8192), IntArray(17)) }
+        assertFailsWith<IllegalArgumentException> { reader.readGrid(IntArray(0), intArrayOf(0)) }
+        assertEquals(1, grids)
+        reader.close()
+        assertEquals(DemFailure.CLOSED, assertFailsWith<DemReadException> { reader.readGrid(intArrayOf(0), intArrayOf(0)) }.reason)
+        assertEquals(1, grids)
+    }
+
 }

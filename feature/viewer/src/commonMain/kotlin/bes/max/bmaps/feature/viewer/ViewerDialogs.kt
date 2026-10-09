@@ -29,9 +29,14 @@ internal fun ViewerDialogs(
     state: ViewerState,
     annotations: AnnotationEditorViewModel,
     annotationState: AnnotationEditorState,
+    progress: ElevationProgressState,
+    onCancelGeneration: () -> Unit,
 ) {
     if (annotationState.clusterMembers.isNotEmpty()) ViewerClusterDialog(annotations, annotationState)
-    if (state.layersVisible) ViewerLayersDialog(model, state)
+    if (state.layersVisible) ViewerLayersDialog(model, state, progress, onCancelGeneration)
+    if (state.reliefDialogVisible) state.manifest?.let { manifest ->
+        ElevationReliefDialog(manifest.id, manifest.layers.firstOrNull { it.elevationRelief != null }?.elevationRelief, model::dismissReliefSettings)
+    }
     if (state.attributionVisible) ViewerAttributionDialog(model, state)
     if (state.details) ViewerDetailsDialog(model, state)
 }

@@ -5,6 +5,7 @@
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>bes.max.bmaps.downloads</string>
+		<string>bes.max.bmaps.elevation-generation</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Bmaps uses your location to show your position on maps and center the map builder near you.</string>

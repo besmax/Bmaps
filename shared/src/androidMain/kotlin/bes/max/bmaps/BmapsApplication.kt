@@ -26,6 +26,7 @@ class BmapsApplication : Application(), androidx.work.Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         graph.downloadScheduler.initialize()
+        graph.elevationGenerationScheduler.initialize()
     }
 }
 

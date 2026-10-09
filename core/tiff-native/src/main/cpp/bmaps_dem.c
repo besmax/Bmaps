@@ -25,6 +25,8 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 #define BLOCK_LIMIT (8 * 1024 * 1024)
 #define LIBRARY_LIMIT (32 * 1024 * 1024)
+#define CACHE_LIMIT (16 * 1024 * 1024)
+#define CACHE_SLOTS 8
 #define MODEL_SCALE 33550
 #define MODEL_TIEPOINT 33922
 #define MODEL_TRANSFORM 34264
@@ -33,14 +35,23 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 #define GDAL_NODATA 42113
 #define GDAL_METADATA 42112
 
+struct cached_dem_block {
+    unsigned char *data;
+    uint32_t block;
+    uint64_t used;
+    int valid;
+};
+
 struct bmaps_dem {
     TIFF *tiff;
-    uint32_t width, height, block_width, block_height, cached_block;
+    uint32_t width, height, block_width, block_height;
     uint16_t bits, format, compression;
-    int tiled, point, has_nodata, decode_error, cached;
+    int tiled, point, has_nodata, decode_error;
     double x, y, dx, dy, nodata;
     uint64_t block_bytes;
-    unsigned char *buffer;
+    struct cached_dem_block cache[CACHE_SLOTS];
+    unsigned int cache_slots;
+    uint64_t cache_clock, cache_hits, decoded_blocks, decoded_bytes, sampled_values, grid_calls;
     unsigned int logged_errors, logged_warnings;
 };
 
@@ -251,12 +262,7 @@ bmaps_dem *bmaps_dem_open(const char *path, int *status) {
         bmaps_dem_close(r);
         return NULL;
     }
-    r->buffer = malloc((size_t)r->block_bytes);
-    if (!r->buffer) {
-        *status = native_failure(r, BMAPS_DEM_LIMIT, "block_allocation", __LINE__);
-        bmaps_dem_close(r);
-        return NULL;
-    }
+    r->cache_slots = 1;
     return r;
 }
 
@@ -268,33 +274,51 @@ void bmaps_dem_metadata(const bmaps_dem *r, double *v) {
     v[12] = TIFFFindField(r->tiff, GDAL_METADATA, TIFF_ANY) != NULL;
 }
 
-#define READ_VALUE(type) do { type sample; memcpy(&sample, p, sizeof(sample)); *value = sample; } while (0)
-
-int bmaps_dem_sample(bmaps_dem *r, uint32_t column, uint32_t row, double *value) {
-    if (!r || column >= r->width || row >= r->height) return BMAPS_DEM_OUTSIDE;
-    uint32_t block = r->tiled ? TIFFComputeTile(r->tiff, column, row, 0, 0) : TIFFComputeStrip(r->tiff, row, 0);
+static int read_block(bmaps_dem *r, uint32_t block, const unsigned char **data) {
     uint32_t blocks = r->tiled ? TIFFNumberOfTiles(r->tiff) : TIFFNumberOfStrips(r->tiff);
     if (block >= blocks) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
-    if (!r->cached || r->cached_block != block) {
-        uint64_t *byte_counts = NULL;
-        r->cached = 0;
-        r->decode_error = 0;
-        if (!TIFFGetField(r->tiff, r->tiled ? TIFFTAG_TILEBYTECOUNTS : TIFFTAG_STRIPBYTECOUNTS, &byte_counts) ||
-            !byte_counts || !byte_counts[block]) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
-        if (byte_counts[block] > BLOCK_LIMIT) return native_failure(r, BMAPS_DEM_LIMIT, __func__, __LINE__);
-        uint64_t expected = r->block_bytes;
-        if (!r->tiled) {
-            uint32_t remaining = r->height - (row / r->block_height) * r->block_height;
-            if (remaining < r->block_height) expected = (uint64_t)remaining * r->width * (r->bits / 8);
+    struct cached_dem_block *entry = NULL;
+    for (unsigned int i = 0; i < r->cache_slots; ++i) {
+        if (r->cache[i].valid && r->cache[i].block == block) {
+            r->cache[i].used = ++r->cache_clock;
+            r->cache_hits++;
+            *data = r->cache[i].data;
+            return BMAPS_DEM_OK;
         }
-        tmsize_t read = r->tiled ? TIFFReadEncodedTile(r->tiff, block, r->buffer, (tmsize_t)expected) :
-            TIFFReadEncodedStrip(r->tiff, block, r->buffer, (tmsize_t)expected);
-        if (read < 0 || (uint64_t)read != expected || r->decode_error) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
-        r->cached = 1;
-        r->cached_block = block;
+        if (!entry || (!r->cache[i].valid && entry->valid) ||
+            (r->cache[i].valid == entry->valid && r->cache[i].used < entry->used)) entry = &r->cache[i];
     }
-    uint64_t index = (uint64_t)(row % r->block_height) * r->block_width + column % r->block_width;
-    const unsigned char *p = r->buffer + index * (r->bits / 8);
+    entry->valid = 0;
+    r->decode_error = 0;
+    uint64_t *byte_counts = NULL;
+    if (!TIFFGetField(r->tiff, r->tiled ? TIFFTAG_TILEBYTECOUNTS : TIFFTAG_STRIPBYTECOUNTS, &byte_counts) ||
+        !byte_counts || !byte_counts[block]) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
+    if (byte_counts[block] > BLOCK_LIMIT) return native_failure(r, BMAPS_DEM_LIMIT, __func__, __LINE__);
+    if (!entry->data) {
+        entry->data = malloc((size_t)r->block_bytes);
+        if (!entry->data) return native_failure(r, BMAPS_DEM_LIMIT, __func__, __LINE__);
+    }
+    uint64_t expected = r->block_bytes;
+    if (!r->tiled) {
+        uint32_t first_row = block * r->block_height;
+        uint32_t remaining = r->height - first_row;
+        if (remaining < r->block_height) expected = (uint64_t)remaining * r->width * (r->bits / 8);
+    }
+    tmsize_t read = r->tiled ? TIFFReadEncodedTile(r->tiff, block, entry->data, (tmsize_t)expected) :
+        TIFFReadEncodedStrip(r->tiff, block, entry->data, (tmsize_t)expected);
+    if (read < 0 || (uint64_t)read != expected || r->decode_error) return native_failure(r, BMAPS_DEM_INVALID, __func__, __LINE__);
+    entry->valid = 1;
+    entry->block = block;
+    entry->used = ++r->cache_clock;
+    r->decoded_blocks++;
+    r->decoded_bytes += expected;
+    *data = entry->data;
+    return BMAPS_DEM_OK;
+}
+
+#define READ_VALUE(type) do { type sample; memcpy(&sample, p, sizeof(sample)); *value = sample; } while (0)
+
+static int read_value(bmaps_dem *r, const unsigned char *p, double *value) {
     if (r->format == SAMPLEFORMAT_IEEEFP) {
         if (r->bits == 32) READ_VALUE(float); else READ_VALUE(double);
     } else if (r->format == SAMPLEFORMAT_INT) {
@@ -304,13 +328,129 @@ int bmaps_dem_sample(bmaps_dem *r, uint32_t column, uint32_t row, double *value)
         if (r->bits == 8) READ_VALUE(uint8_t);
         else if (r->bits == 16) READ_VALUE(uint16_t); else READ_VALUE(uint32_t);
     }
+    r->sampled_values++;
     if (!isfinite(*value) || (r->has_nodata && *value == r->nodata)) return BMAPS_DEM_NO_DATA;
+    return BMAPS_DEM_OK;
+}
+
+int bmaps_dem_sample(bmaps_dem *r, uint32_t column, uint32_t row, double *value) {
+    if (!r || !value || column >= r->width || row >= r->height) return BMAPS_DEM_OUTSIDE;
+    uint32_t block = r->tiled ? TIFFComputeTile(r->tiff, column, row, 0, 0) : TIFFComputeStrip(r->tiff, row, 0);
+    const unsigned char *data = NULL;
+    int status = read_block(r, block, &data);
+    if (status != BMAPS_DEM_OK) return status;
+    uint64_t index = (uint64_t)(row % r->block_height) * r->block_width + column % r->block_width;
+    return read_value(r, data + index * (r->bits / 8), value);
+}
+
+void bmaps_dem_enable_cache(bmaps_dem *r) {
+    if (!r) return;
+    uint64_t slots = CACHE_LIMIT / r->block_bytes;
+    r->cache_slots = (unsigned int)(slots < CACHE_SLOTS ? slots : CACHE_SLOTS);
+}
+
+void bmaps_dem_metrics(const bmaps_dem *r, double *values) {
+    values[0] = (double)r->cache_hits;
+    values[1] = (double)r->decoded_blocks;
+    values[2] = (double)r->decoded_bytes;
+    values[3] = (double)r->sampled_values;
+    values[4] = (double)r->grid_calls;
+}
+
+struct grid_sample {
+    uint32_t block;
+    uint32_t output;
+    uint64_t offset;
+};
+
+static int compare_grid_samples(const void *left, const void *right) {
+    const struct grid_sample *a = left, *b = right;
+    return (a->block > b->block) - (a->block < b->block);
+}
+
+int bmaps_dem_grid(bmaps_dem *r, const int32_t *columns, uint32_t column_count,
+        const int32_t *rows, uint32_t row_count, double *values) {
+    if (!r || !columns || !rows || !values || !column_count || !row_count || column_count > 8192 ||
+        row_count > 1024 || (uint64_t)column_count * row_count > 131072) return BMAPS_DEM_INVALID;
+    uint32_t size = column_count * row_count, count = 0;
+    struct grid_sample *samples = malloc((size_t)size * sizeof(*samples));
+    if (!samples) return BMAPS_DEM_LIMIT;
+    r->grid_calls++;
+    uint64_t across = ((uint64_t)r->width + r->block_width - 1) / r->block_width;
+    for (uint32_t row = 0; row < row_count; ++row) for (uint32_t column = 0; column < column_count; ++column) {
+        uint32_t output = row * column_count + column;
+        uint32_t x = (uint32_t)columns[column], y = (uint32_t)rows[row];
+        values[output] = NAN;
+        if (x >= r->width || y >= r->height) continue;
+        samples[count].block = r->tiled ? (uint32_t)((y / r->block_height) * across + x / r->block_width) : y / r->block_height;
+        samples[count].output = output;
+        samples[count].offset = ((uint64_t)(y % r->block_height) * r->block_width + x % r->block_width) * (r->bits / 8);
+        count++;
+    }
+    qsort(samples, count, sizeof(*samples), compare_grid_samples);
+    const unsigned char *data = NULL;
+    uint32_t block = UINT32_MAX;
+    int status = BMAPS_DEM_OK;
+    for (uint32_t index = 0; index < count; ++index) {
+        if (!data || block != samples[index].block) {
+            block = samples[index].block;
+            status = read_block(r, block, &data);
+            if (status != BMAPS_DEM_OK) break;
+        }
+        double sample = NAN;
+        if (read_value(r, data + samples[index].offset, &sample) == BMAPS_DEM_OK) values[samples[index].output] = sample;
+    }
+    free(samples);
+    return status;
+}
+
+int bmaps_dem_range(bmaps_dem *r, uint32_t first_block, double *values) {
+    if (!r || !values) return BMAPS_DEM_INVALID;
+    uint32_t blocks = r->tiled ? TIFFNumberOfTiles(r->tiff) : TIFFNumberOfStrips(r->tiff);
+    if (first_block >= blocks) return BMAPS_DEM_INVALID;
+    uint64_t count = 0;
+    double minimum = INFINITY, maximum = -INFINITY;
+    uint32_t cursor = first_block;
+    uint64_t work_bytes = 0;
+    while (cursor < blocks && work_bytes + r->block_bytes <= CACHE_LIMIT && cursor - first_block < 8) {
+        const unsigned char *data = NULL;
+        int status = read_block(r, cursor, &data);
+        if (status != BMAPS_DEM_OK) return status;
+        uint64_t across = ((uint64_t)r->width + r->block_width - 1) / r->block_width;
+        uint32_t first_column = r->tiled ? (uint32_t)((cursor % across) * r->block_width) : 0;
+        uint32_t first_row = r->tiled ? (uint32_t)((cursor / across) * r->block_height) : cursor * r->block_height;
+        uint32_t columns = r->width - first_column < r->block_width ? r->width - first_column : r->block_width;
+        uint32_t rows = r->height - first_row < r->block_height ? r->height - first_row : r->block_height;
+        for (uint32_t row = 0; row < rows; ++row) for (uint32_t column = 0; column < columns; ++column) {
+            uint64_t index = (uint64_t)row * r->block_width + column;
+            double sample = NAN;
+            if (read_value(r, data + index * (r->bits / 8), &sample) == BMAPS_DEM_OK) {
+                if (sample < minimum) minimum = sample;
+                if (sample > maximum) maximum = sample;
+                count++;
+            }
+        }
+        work_bytes += r->block_bytes;
+        cursor++;
+    }
+    values[0] = cursor; values[1] = blocks; values[2] = minimum; values[3] = maximum; values[4] = (double)count;
+    return BMAPS_DEM_OK;
+}
+
+int bmaps_dem_samples(bmaps_dem *r, const int32_t *columns, uint32_t count, int32_t row, double *values) {
+    if (!r || !columns || !values || !count || count > 8192) return BMAPS_DEM_INVALID;
+    for (uint32_t i = 0; i < count; ++i) {
+        double value = NAN;
+        int status = bmaps_dem_sample(r, (uint32_t)columns[i], (uint32_t)row, &value);
+        if (status != BMAPS_DEM_OK && status != BMAPS_DEM_NO_DATA && status != BMAPS_DEM_OUTSIDE) return status;
+        values[i] = status == BMAPS_DEM_OK ? value : NAN;
+    }
     return BMAPS_DEM_OK;
 }
 
 void bmaps_dem_close(bmaps_dem *r) {
     if (!r) return;
     if (r->tiff) TIFFClose(r->tiff);
-    free(r->buffer);
+    for (unsigned int i = 0; i < CACHE_SLOTS; ++i) free(r->cache[i].data);
     free(r);
 }

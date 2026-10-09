@@ -16,5 +16,10 @@ public final class NativeDem {
     public static native int open(byte[] path, long[] handle);
     public static native double[] metadata(long handle);
     public static native int sample(long handle, int column, int row, double[] value);
+    public static native int samples(long handle, int[] columns, int row, double[] values);
+    public static native void enableCache(long handle);
+    public static native double[] metrics(long handle);
+    public static native int grid(long handle, int[] columns, int[] rows, double[] values);
+    public static native int range(long handle, long firstBlock, double[] values);
     public static native void close(long handle);
 }

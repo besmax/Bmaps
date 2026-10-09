@@ -58,6 +58,71 @@ JNIEXPORT jint JNICALL Java_bes_max_bmaps_core_tiff_NativeDem_sample(JNIEnv *env
     return status;
 }
 
+JNIEXPORT jint JNICALL Java_bes_max_bmaps_core_tiff_NativeDem_samples(JNIEnv *env, jclass type,
+        jlong handle, jintArray columns, jint row, jdoubleArray output) {
+    (void)type;
+    if (!handle || !columns || !output) return BMAPS_DEM_INVALID;
+    jsize count = (*env)->GetArrayLength(env, columns);
+    if (count < 1 || count > 8192 || (*env)->GetArrayLength(env, output) != count) return BMAPS_DEM_INVALID;
+    int32_t *indices = malloc((size_t)count * sizeof(int32_t));
+    double *values = malloc((size_t)count * sizeof(double));
+    if (!indices || !values) { free(indices); free(values); return BMAPS_DEM_LIMIT; }
+    (*env)->GetIntArrayRegion(env, columns, 0, count, (jint *)indices);
+    int status = BMAPS_DEM_INVALID;
+    if (!(*env)->ExceptionCheck(env)) {
+        status = bmaps_dem_samples((bmaps_dem *)(uintptr_t)handle, indices, (uint32_t)count, row, values);
+        if (status == BMAPS_DEM_OK) (*env)->SetDoubleArrayRegion(env, output, 0, count, values);
+    }
+    free(indices); free(values);
+    return status;
+}
+
+JNIEXPORT void JNICALL Java_bes_max_bmaps_core_tiff_NativeDem_enableCache(JNIEnv *env, jclass type, jlong handle) {
+    (void)env; (void)type;
+    if (handle) bmaps_dem_enable_cache((bmaps_dem *)(uintptr_t)handle);
+}
+
+JNIEXPORT jdoubleArray JNICALL Java_bes_max_bmaps_core_tiff_NativeDem_metrics(JNIEnv *env, jclass type, jlong handle) {
+    (void)type;
+    if (!handle) return NULL;
+    double values[5];
+    bmaps_dem_metrics((bmaps_dem *)(uintptr_t)handle, values);
+    jdoubleArray result = (*env)->NewDoubleArray(env, 5);
+    if (result) (*env)->SetDoubleArrayRegion(env, result, 0, 5, values);
+    return result;
+}
+
+JNIEXPORT jint JNICALL Java_bes_max_bmaps_core_tiff_NativeDem_range(JNIEnv *env, jclass type,
+        jlong handle, jlong first_block, jdoubleArray output) {
+    (void)type;
+    if (!handle || !output || first_block < 0 || first_block > UINT32_MAX || (*env)->GetArrayLength(env, output) != 5) return BMAPS_DEM_INVALID;
+    double values[5];
+    int status = bmaps_dem_range((bmaps_dem *)(uintptr_t)handle, (uint32_t)first_block, values);
+    if (status == BMAPS_DEM_OK) (*env)->SetDoubleArrayRegion(env, output, 0, 5, values);
+    return status;
+}
+
+JNIEXPORT jint JNICALL Java_bes_max_bmaps_core_tiff_NativeDem_grid(JNIEnv *env, jclass type,
+        jlong handle, jintArray columns, jintArray rows, jdoubleArray output) {
+    (void)type;
+    if (!handle || !columns || !rows || !output) return BMAPS_DEM_INVALID;
+    jsize width = (*env)->GetArrayLength(env, columns), height = (*env)->GetArrayLength(env, rows);
+    if (width < 1 || width > 8192 || height < 1 || height > 1024 || (int64_t)width * height > 131072 ||
+        (*env)->GetArrayLength(env, output) != width * height) return BMAPS_DEM_INVALID;
+    int32_t *x = malloc((size_t)width * sizeof(int32_t)), *y = malloc((size_t)height * sizeof(int32_t));
+    double *values = malloc((size_t)width * height * sizeof(double));
+    if (!x || !y || !values) { free(x); free(y); free(values); return BMAPS_DEM_LIMIT; }
+    (*env)->GetIntArrayRegion(env, columns, 0, width, (jint *)x);
+    if (!(*env)->ExceptionCheck(env)) (*env)->GetIntArrayRegion(env, rows, 0, height, (jint *)y);
+    int status = BMAPS_DEM_INVALID;
+    if (!(*env)->ExceptionCheck(env)) {
+        status = bmaps_dem_grid((bmaps_dem *)(uintptr_t)handle, x, width, y, height, values);
+        if (status == BMAPS_DEM_OK) (*env)->SetDoubleArrayRegion(env, output, 0, width * height, values);
+    }
+    free(x); free(y); free(values);
+    return status;
+}
+
 JNIEXPORT void JNICALL Java_bes_max_bmaps_core_tiff_NativeDem_close(JNIEnv *env, jclass type, jlong handle) {
     (void)env; (void)type;
     bmaps_dem_close((bmaps_dem *)(uintptr_t)handle);

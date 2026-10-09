@@ -28,6 +28,12 @@ enum bmaps_dem_status {
 bmaps_dem *bmaps_dem_open(const char *path, int *status);
 void bmaps_dem_metadata(const bmaps_dem *reader, double *values);
 int bmaps_dem_sample(bmaps_dem *reader, uint32_t column, uint32_t row, double *value);
+int bmaps_dem_samples(bmaps_dem *reader, const int32_t *columns, uint32_t count, int32_t row, double *values);
+void bmaps_dem_enable_cache(bmaps_dem *reader);
+void bmaps_dem_metrics(const bmaps_dem *reader, double *values);
+int bmaps_dem_grid(bmaps_dem *reader, const int32_t *columns, uint32_t column_count,
+    const int32_t *rows, uint32_t row_count, double *values);
+int bmaps_dem_range(bmaps_dem *reader, uint32_t first_block, double *values);
 void bmaps_dem_close(bmaps_dem *reader);
 
 #endif

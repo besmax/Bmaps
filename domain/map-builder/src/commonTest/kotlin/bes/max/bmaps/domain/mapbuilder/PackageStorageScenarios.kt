@@ -426,6 +426,82 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
         } finally { db.close() }
     }
 
+    suspend fun generatedElevationLayerReplacementAndSizeAccounting() = fixture { root ->
+        var db = database(Path(root, "catalog.db").toString())
+        val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
+        var repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
+        val (baseRequest, baseManifest) = fixtureRequest(ZoomRange(0, 0))
+        val request = baseRequest.copy(elevationDataset = ElevationDataset.COP30)
+        val manifest = baseManifest.copy(elevationDataset = ElevationDataset.COP30)
+        val id = request.packageId
+        val png = encodeRasterPng(256, IntArray(256 * 256) { 0xff55aa33.toInt() })
+        val dem = byteArrayOf(73, 73, 42, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        val style = ElevationReliefStyle(ElevationReliefOptions(), -10.0, 100.0)
+        suspend fun readyJob(token: String, selectedStyle: ElevationReliefStyle = style): ElevationGenerationJob {
+            val job = ElevationGenerationJob(id, token, selectedStyle.options, completedTiles = 1, totalTiles = 1, style = selectedStyle)
+            files.access {
+                writeElevationJob(id.value, PackageManifestCodec.json.encodeToString(job))
+                clearElevationTiles(id.value)
+                val database = MbTiles.create(Path(elevationJobDirectory(id.value), "tiles.mbtiles").toString(), mapOf("bmaps_package_id" to id.value, "format" to "png"))
+                try { database.write(listOf(TileWrite(TileAddress(0, 0, 0), png)), emptyList(), PackageSizePolicy.MAX_LAYER_BYTES) }
+                finally { database.close() }
+            }
+            return job
+        }
+        try {
+            repository.prepare(request, manifest).success()
+            repository.write(id, manifest.layers.single().id, listOf(DownloadedTile(TileKey(0, 0, 0), ByteString(png))), emptyList(), png.size.toLong()).success()
+            repository.beginElevation(id).success()
+            repository.appendElevation(id, dem, dem.size).success()
+            repository.finishElevation(id).success()
+            repository.finalize(id).success()
+            val before = repository.observe(id).first().success().sizeBytes
+            val rangeCache = """{"version":1,"digest":"fixture","minimum":-10.0,"maximum":100.0}"""
+            files.access { writeElevationRange(id.value, rangeCache) }
+            assertEquals(before, files.access { size(id.value, false) })
+            repository.commitRelief(readyJob("first")).success()
+            assertEquals(rangeCache, files.access { readElevationRange(id.value) })
+            val first = repository.open(id).success()
+            val oldPath = first.manifest.layers.last().tiles.relativePath
+            val oldSource = first.openTiles(LayerId("elevation-relief")).success()
+            assertTrue(repository.observe(id).first().success().sizeBytes > before)
+            repository.setLayerPresentation(id, listOf(LayerPresentation(LayerId("base"), true, 1.0, 1), LayerPresentation(LayerId("elevation-relief"), false, 0.3, 0))).success()
+            val secondStyle = style.copy(options = style.options.copy(palette = ElevationPalette.BLUE))
+            repository.commitRelief(readyJob("second", secondStyle)).success()
+            assertIs<TileReadResult.Available>(oldSource.read(TileKey(0, 0, 0)))
+            val second = repository.open(id).success()
+            val generated = second.manifest.layers.last()
+            assertEquals(secondStyle, generated.elevationRelief)
+            assertFalse(generated.visible)
+            assertEquals(0.3, generated.opacity)
+            assertEquals(0, generated.renderOrder)
+            assertTrue(files.access { oldPath in relativeFiles(id.value, false) })
+            first.close(); second.close()
+            val clean = repository.open(id).success()
+            assertFalse(files.access { oldPath in relativeFiles(id.value, false) })
+            assertEquals(files.access { size(id.value, false) }, repository.observe(id).first().success().sizeBytes)
+            clean.close()
+            val cancelled = readyJob("cancelled").copy(state = ElevationGenerationState.CANCELLED)
+            files.access { writeElevationJob(id.value, PackageManifestCodec.json.encodeToString(cancelled)) }
+            assertIs<PackageResult.Failure>(repository.commitRelief(cancelled))
+            assertEquals(secondStyle, repository.open(id).success().also { it.close() }.manifest.layers.last().elevationRelief)
+            db.close()
+            db = database(Path(root, "catalog.db").toString())
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
+            repository.reconcile().success()
+            assertEquals(PackageState.READY, repository.observe(id).first().success().state)
+            val archive = Buffer()
+            repository.exportPackage(id, archive).success()
+            val imported = repository.importPackage(archive).success()
+            val transferred = repository.open(imported).success()
+            assertEquals(secondStyle, transferred.manifest.layers.last().elevationRelief)
+            transferred.close()
+            repository.delete(id).success()
+            assertNull(files.access { readElevationJob(id.value) })
+            assertNull(files.access { readElevationRange(id.value) })
+        } finally { db.close() }
+    }
+
     private suspend fun fixture(block: suspend (Path) -> Unit) {
         val root = Path(SystemTemporaryDirectory, "bmaps-storage-${Random.nextLong().toULong()}")
         SystemFileSystem.createDirectories(root)
