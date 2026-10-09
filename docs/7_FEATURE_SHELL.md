@@ -12,6 +12,8 @@ Phase 2 introduced feature composition and preferences. Phase 6 replaces tab nav
 
 All four features apply `app.feature`. Dependencies come from the version catalog. Navigation Compose 2.9.2 is used with the existing Compose stack; MetroX artifacts match the Metro plugin version. The Android UI test convention configures both host and device tests using the same navigation scenario.
 
+Shell composition is in `bes.max.bmaps.feature.shell.navigation.ui`, shell state and events in `shell.navigation.presentation`, settings in `shell.settings.ui` / `shell.settings.presentation`, and licensing/version presentation in `shell.about.ui`. Common and platform app-version declarations use the same package. `shared` imports the UI entry points directly; Metro ViewModel contributions retain their existing visibility, annotations and scope. See `3_MODULES.md` for all feature packages.
+
 ## Graph and object lifetimes
 
 Android creates one `AndroidAppGraph` lazily on `BmapsApplication`, registered in the application manifest. Its factory receives application context, never activity context. Recreating an activity reuses the graph and the DataStore instance.

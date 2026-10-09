@@ -65,6 +65,20 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             repository.saveAnnotations(id, listOf(Annotation("point", AnnotationKind.MARKER,
                 listOf(GeographicCoordinate(0.0, 0.0))))).success()
             repository.open(id).success().close()
+            val records = db.packages()
+            val current = checkNotNull(records.get(id.value))
+            val completed = checkNotNull(records.job(id.value))
+            val actual = files.access { size(id.value, false) }
+            val baseOnly = files.access { assetSize(id.value, false, "map_data.mbtiles") }
+            assertTrue(actual > baseOnly + dem.size)
+            records.checkpoint(current.copy(sizeBytes = baseOnly), completed.copy(packageBytes = baseOnly))
+            val card = repository.observe(PackageQuery()).first().success().items.single { it.id == id }
+            assertEquals(actual, card.sizeBytes)
+            assertEquals(actual, records.get(id.value)?.sizeBytes)
+            assertEquals(actual, records.job(id.value)?.packageBytes)
+            assertEquals(current.updatedAtEpochMillis, records.get(id.value)?.updatedAtEpochMillis)
+            records.checkpoint(current.copy(sizeBytes = baseOnly), completed.copy(packageBytes = baseOnly))
+            assertEquals(actual, repository.observe(id).first().success().sizeBytes)
         } finally { db.close() }
     }
 
@@ -485,6 +499,13 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             val first = repository.open(id).success()
             val oldPath = first.manifest.layers.last().tiles.relativePath
             val oldSource = first.openTiles(LayerId("elevation-relief")).success()
+            val actual = files.access { size(id.value, false) }
+            val records = db.packages()
+            val current = checkNotNull(records.get(id.value))
+            val completed = checkNotNull(records.job(id.value))
+            val baseOnly = files.access { assetSize(id.value, false, "map_data.mbtiles") }
+            records.checkpoint(current.copy(sizeBytes = baseOnly), completed.copy(packageBytes = baseOnly))
+            assertEquals(actual, repository.observe(PackageQuery()).first().success().items.single { it.id == id }.sizeBytes)
             assertTrue(repository.observe(id).first().success().sizeBytes > before)
             repository.setLayerPresentation(id, listOf(LayerPresentation(LayerId("base"), true, 1.0, 1), LayerPresentation(LayerId("elevation-relief"), false, 0.3, 0))).success()
             val secondStyle = style.copy(options = style.options.copy(palette = ElevationPalette.BLUE))

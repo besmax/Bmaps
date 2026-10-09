@@ -724,13 +724,35 @@ class LocalPackageRepository(
         return size(manifest.id.value, staged)
     }
 
-    private suspend fun summary(record: PackageRecord): PackageSummary {
+    private suspend fun summary(snapshot: PackageRecord): PackageSummary = mutex.withLock {
+        val latest = records.get(snapshot.id)
+        var record = latest ?: snapshot
+        if (latest != null && record.state != PackageState.DELETING.name) {
+            val actualBytes = try {
+                storage.access {
+                    when {
+                        exists(record.id, false) -> size(record.id, false)
+                        exists(record.id, true) -> size(record.id, true)
+                        else -> null
+                    }
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { null }
+            if (actualBytes != null) {
+                val download = records.job(record.id)
+                if (actualBytes != record.sizeBytes || (download != null && download.packageBytes != actualBytes)) {
+                    record = record.copy(sizeBytes = actualBytes)
+                    if (download == null) records.putPackage(record)
+                    else records.checkpoint(record, download.copy(packageBytes = actualBytes))
+                }
+            }
+        }
         val manifest = record.manifestJson.takeIf { it.isNotEmpty() }?.let {
             runCatching { PackageManifestCodec.decode(it) }.getOrNull()
         }
         val job = records.job(record.id)
         val preferences = records.preferences(record.id)
-        return PackageSummary(PackageId(record.id), record.name,
+        PackageSummary(PackageId(record.id), record.name,
             manifest?.bounds,
             PackageState.valueOf(record.state), record.sizeBytes, record.updatedAtEpochMillis, record.hasElevationData,
             if (record.state == PackageState.READY.name) manifest?.layers?.sumOf { it.tileCount ?: 0 } ?: 0 else job?.totalTiles ?: 0,

@@ -12,7 +12,7 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Task area | Relevant documentation |
 | --- | --- |
 | Product scope and requirements | `docs/1_VISION_AND_PRODUCT.md` |
-| Architecture, dependencies, module creation or ownership | `docs/2_ARCHITECTURE.md`, `docs/3_MODULES.md` |
+| Architecture, dependencies, module creation or ownership, feature package organization | `docs/2_ARCHITECTURE.md`, `docs/3_MODULES.md` |
 | UI state, ViewModels and events | `docs/4_STATE_AND_UI.md` |
 | Phase work, current status and acceptance criteria | `docs/5_IMPLEMENTATION_PLAN.md` |
 | Domain contracts and package format | `docs/6_CONTRACTS_AND_PACKAGE_FORMAT.md` |
@@ -20,7 +20,7 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Providers, networking and credentials | `docs/8_PROVIDER_NETWORKING_AND_CREDENTIALS.md` |
 | Map rendering, camera control and coordinate transformations | `docs/9_MAP_ENGINE.md` |
 | Visual design and styling | `docs/10_BMAPS_DESIGN.md` |
-| Package storage, MBTiles and reconciliation | `docs/11_PACKAGE_STORAGE.md` |
+| Package storage, MBTiles, disk-size accounting and reconciliation | `docs/11_PACKAGE_STORAGE.md` |
 | Download execution, scheduling, progress and restore | `docs/12_DOWNLOAD_PIPELINE.md` |
 | Library, package opening/deletion, offline viewer, adaptive control layout, immersive gestures and viewport retention | `docs/13_LIBRARY_AND_OFFLINE_VIEWER.md` |
 | Raster layer alignment, ordering, visibility, opacity and composition | `docs/14_RASTER_LAYER_COMPOSITION.md` |

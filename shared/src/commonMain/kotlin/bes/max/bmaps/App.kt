@@ -20,15 +20,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
-import bes.max.bmaps.feature.constructor.FullScreenMap
-import bes.max.bmaps.feature.constructor.MapSaveSettingsContent
-import bes.max.bmaps.feature.constructor.ConstructorScreen
-import bes.max.bmaps.feature.constructor.ProviderCredentialsContent
-import bes.max.bmaps.feature.library.LibraryScreen
-import bes.max.bmaps.feature.shell.AppShell
-import bes.max.bmaps.feature.shell.SettingsScreen
-import bes.max.bmaps.feature.shell.ShellDestination
-import bes.max.bmaps.feature.viewer.ViewerScreen
+import bes.max.bmaps.feature.constructor.map.ui.FullScreenMap
+import bes.max.bmaps.feature.constructor.download.ui.MapSaveSettingsContent
+import bes.max.bmaps.feature.constructor.map.ui.ConstructorScreen
+import bes.max.bmaps.feature.constructor.credentials.ui.ProviderCredentialsContent
+import bes.max.bmaps.feature.library.catalog.ui.LibraryScreen
+import bes.max.bmaps.feature.shell.navigation.ui.AppShell
+import bes.max.bmaps.feature.shell.settings.ui.SettingsScreen
+import bes.max.bmaps.feature.shell.navigation.ui.ShellDestination
+import bes.max.bmaps.feature.viewer.map.ui.ViewerScreen
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 
 @Composable

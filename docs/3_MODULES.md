@@ -25,6 +25,21 @@ Modules containing Compose Multiplatform screens, ViewModels, and presentation-l
 * **`feature:viewer`**
     * **Responsibility:** The offline map rendering screen. Phase 6 owns package sessions, regional raster configuration, exact-level selection, lifecycle viewport retention, details, and favourite/avatar editing. Depends on `domain:map-builder`, `core:map-engine`, `core:location`, `core:ui`, and `core:di`. Phase 7 owns raster layer composition. Phase 8 adds a separate annotation editor, kind-specific layer managers, SVG marker icons, Undo, GeoJSON controls, and presentation-only clustering for nearby markers, small lines, and polygons. Phase 9 adds a separate map-position ViewModel, saved coordinate formatting and package-owned DEM sampling for the bottom center readout.
 
+### Feature package organization
+
+Feature roots are `bes.max.bmaps.feature.<module>`. Packages always group code by capability, then by role: `ui` owns screens, dialogs, components and Compose effects; `presentation` owns ViewModels, their state/events, validation and presentation calculations. There are no root-level `ui` or `presentation` packages. Main map screens belong to `map`, the library list to `catalog`, and shell composition to `navigation`. State and event types remain next to their owning ViewModel. Create role subpackages only where code exists. Packages are organizational boundaries within the existing module; they do not introduce dependencies between features or change ViewModel ownership.
+
+| Module | Capability packages relative to the feature root |
+| --- | --- |
+| `constructor` | `map.ui`, `map.presentation`, `map.fixture`; `selection.ui`, `selection.presentation`; `download.ui`, `download.presentation`; `credentials.ui`, `credentials.presentation`; `location.ui` |
+| `library` | `catalog.ui`, `catalog.presentation`, `transfer.presentation` |
+| `shell` | `navigation.ui`, `navigation.presentation`; `settings.ui`, `settings.presentation`; `about.ui` |
+| `viewer` | `map.ui`, `map.presentation`; `annotations.ui`, `annotations.ui.icons`, `annotations.presentation`; `elevation.ui`, `elevation.presentation`; `position.ui`, `position.presentation`; `location.ui` |
+
+`map.fixture` contains the constructor's sample tile source; its Compose widget and ViewModel belong to `map.ui` and `map.presentation`. Viewer annotation icons retain the existing SVG catalog and rendering helpers in `annotations.ui.icons`. Platform notification-permission adapters share `constructor.download.ui` with their common declaration; app-version adapters share `shell.about.ui`. Tests use the package of the subject under test, importing other capabilities explicitly when needed. Generated Compose resource namespaces remain unchanged.
+
+The umbrella imports screen entry points from their owning UI packages: `constructor.map.ui.ConstructorScreen`, `constructor.map.ui.FullScreenMap`, `constructor.download.ui.MapSaveSettingsContent`, `constructor.credentials.ui.ProviderCredentialsContent`, `library.catalog.ui.LibraryScreen`, `shell.navigation.ui.AppShell`, `shell.settings.ui.SettingsScreen`, and `viewer.map.ui.ViewerScreen`.
+
 ## 3. Domain Layer (Business Logic & Contracts)
 Modules containing pure use cases, models, and interface contracts.
 * **`domain:providers`**
