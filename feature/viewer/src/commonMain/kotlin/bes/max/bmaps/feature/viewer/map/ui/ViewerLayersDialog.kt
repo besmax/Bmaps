@@ -13,6 +13,7 @@ import bes.max.bmaps.feature.viewer.elevation.ui.ElevationGenerationControls
 import bes.max.bmaps.feature.viewer.elevation.ui.ReliefColorScale
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerState
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerViewModel
+import bes.max.bmaps.feature.viewer.position.presentation.fixedDecimal
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -135,8 +136,8 @@ private fun ViewerLayerAppearance(
     }
     layer.elevationRelief?.let { style ->
         ReliefColorScale(style)
-        Text(stringResource(Res.string.relief_legend, style.minimumMeters.toString(), style.maximumMeters.toString()))
-        Text(stringResource(Res.string.relief_layer_size, (layer.tiles.sizeBytes / 1_000_000.0).toString()))
+        Text(stringResource(Res.string.relief_legend, fixedDecimal(style.minimumMeters, 1), fixedDecimal(style.maximumMeters, 1)))
+        Text(stringResource(Res.string.relief_layer_size, fixedDecimal(layer.tiles.sizeBytes / 1_000_000.0, 1)))
     }
     layer.attribution.forEach {
         Text(

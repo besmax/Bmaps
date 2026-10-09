@@ -25,7 +25,7 @@ The separate dialog defaults to a light-to-dark green palette, automatic elevati
 
 Submitting schedules generation and closes the settings dialog. Closing Layers or leaving the viewer does not cancel the job. Layers shows range scanning, tile progress, errors, and explicit Cancel generation. Generation itself never requires network access. The first generated layer is visible above the existing layers at 50% opacity. Regeneration preserves its stable ID, visibility, opacity, and render order. Save/Cancel in Layers retains the existing presentation semantics. Generating or regenerating a file is a separate durable operation, not an unsaved layer-presentation draft.
 
-The legend in the generated layer's row displays the color ramp and its resolved minimum/maximum in meters, together with the layer's disk size in decimal MB. The map remains usable during generation, with the previous layer retained during regeneration. The viewer refreshes its package session after completion while retaining its camera through the existing viewport conversion.
+The legend in the generated layer's row displays the color ramp and its resolved minimum/maximum in meters rounded to one decimal place, together with the layer's disk size in decimal MB also rounded to one decimal place. Formatting affects display only; stored elevations, byte counts and color mapping retain their full precision. The map remains usable during generation, with the previous layer retained during regeneration. The viewer refreshes its package session after completion while retaining its camera through the existing viewport conversion.
 
 ## Ownership
 
