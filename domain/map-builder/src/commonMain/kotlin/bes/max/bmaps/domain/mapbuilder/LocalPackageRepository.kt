@@ -604,6 +604,7 @@ class LocalPackageRepository(
                     }
                 } catch (error: Exception) {
                     if (error is CancellationException) throw error
+                    ElevationDiagnostics.error("package_reconcile package=${id.value} reason=${failureOf(error)}", error)
                     records.putPackage(record.copy(state = PackageState.CORRUPT.name))
                 }
             }
@@ -640,9 +641,10 @@ class LocalPackageRepository(
         if (job == null) records.putPackage(ready) else {
             val counts = counts(manifest, false)
             val generatedTiles = manifest.layers.filter { it.elevationRelief != null }.sumOf { it.tileCount ?: 0 }
-            if (counts.downloaded != job.totalTiles + generatedTiles || counts.failed != 0L) fail(PackageFailure.CorruptData)
+            val downloadedTiles = counts.downloaded - generatedTiles
+            if (downloadedTiles != job.totalTiles || counts.failed != 0L) fail(PackageFailure.CorruptData)
             records.checkpoint(ready, job.copy(state = BuildJobState.COMPLETED.name,
-                completedTiles = counts.downloaded, failedTiles = 0, packageBytes = bytes, failure = null))
+                completedTiles = downloadedTiles, failedTiles = 0, packageBytes = bytes, failure = null))
         }
     }
 
