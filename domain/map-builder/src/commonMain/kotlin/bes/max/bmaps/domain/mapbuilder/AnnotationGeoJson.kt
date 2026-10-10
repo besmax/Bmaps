@@ -10,12 +10,14 @@ package bes.max.bmaps.domain.mapbuilder
 
 import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import kotlinx.serialization.json.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 
 object AnnotationGeoJson {
     const val MAX_BYTES = 4_000_000
     const val MAX_FEATURES = 1000
     private val json = Json { encodeDefaults = true }
-    private val reserved = setOf("name", "description", "marker-color", "marker-symbol")
+    private val reserved = setOf("name", "description", "marker-color", "marker-symbol", "bmaps-elevations")
 
     fun encode(values: List<Annotation>): String {
         require(values.size <= MAX_FEATURES)
@@ -41,13 +43,13 @@ object AnnotationGeoJson {
     }
 
     internal fun feature(value: Annotation): JsonObject = buildJsonObject {
+        val indices = if (value.kind == AnnotationKind.POLYGON && annotationSignedArea(value.coordinates) < 0)
+            listOf(0) + value.coordinates.indices.drop(1).reversed() else value.coordinates.indices.toList()
         put("type", "Feature")
         put("id", value.id)
         put("geometry", buildJsonObject {
             fun coordinate(point: GeographicCoordinate) = JsonArray(listOf(JsonPrimitive(point.longitude), JsonPrimitive(point.latitude)))
-            val vertices = if (value.kind == AnnotationKind.POLYGON && annotationSignedArea(value.coordinates) < 0) {
-                value.coordinates.take(1) + value.coordinates.drop(1).reversed()
-            } else value.coordinates
+            val vertices = indices.map { value.coordinates[it] }
             val points = vertices.map(::coordinate)
             put("type", when (value.kind) { AnnotationKind.MARKER -> "Point"; AnnotationKind.LINE -> "LineString"; AnnotationKind.POLYGON -> "Polygon" })
             put("coordinates", when (value.kind) {
@@ -60,6 +62,9 @@ object AnnotationGeoJson {
             value.properties.filterKeys { it !in reserved }.forEach { (key, item) -> put(key, item) }
             put("name", value.name); put("description", value.description)
             put("marker-color", value.color); put("marker-symbol", value.icon)
+            put("bmaps-elevations", json.parseToJsonElement(json.encodeToString(
+                indices.map { value.elevations.getOrNull(it) }
+            )))
         })
     }
 
@@ -105,10 +110,15 @@ object AnnotationGeoJson {
         }
         val properties = feature["properties"].let { if (it == null || it == JsonNull) JsonObject(emptyMap()) else it.jsonObject }
         fun string(key: String, fallback: String): String = properties[key]?.let { require(it.jsonPrimitive.isString); it.jsonPrimitive.content } ?: fallback
+        val elevations = properties["bmaps-elevations"]?.let { encoded ->
+            json.decodeFromString<List<AnnotationElevation?>>(encoded.toString()).also {
+                require(it.size == coordinates.size)
+            }.takeIf { it.any { sample -> sample != null } }.orEmpty()
+        }.orEmpty()
         val id = feature["id"]?.let { require(it.jsonPrimitive.isString); it.jsonPrimitive.content }
         val value = Annotation(kind = kind, coordinates = coordinates, name = string("name", ""), description = string("description", ""),
             color = string("marker-color", "#E53935"), icon = string("marker-symbol", "place"),
-            properties = JsonObject(properties.filterKeys { it !in reserved }))
+            properties = JsonObject(properties.filterKeys { it !in reserved }), elevations = elevations)
         return (if (id == null) value else value.copy(id = id)).also { require(AnnotationValidation.error(it) == null) }
     }
 }

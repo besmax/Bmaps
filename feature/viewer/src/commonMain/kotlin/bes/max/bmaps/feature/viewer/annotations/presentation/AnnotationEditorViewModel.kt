@@ -66,6 +66,7 @@ internal data class AnnotationEditorState(
 class AnnotationEditorViewModel(
     private val repository: AnnotationRepository,
     private val preferences: UserPreferencesRepository,
+    private val elevations: AnnotationElevationResolver,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(AnnotationEditorState())
     internal val state = mutableState.asStateFlow()
@@ -413,14 +414,14 @@ class AnnotationEditorViewModel(
         if (state.value.busy || state.value.objectUi(id)?.moving != true || value.kind != AnnotationKind.MARKER) return
         val pyramid = mapPyramid ?: return
         val destination = pyramid.coordinateAt(point) ?: return
-        val moved = value.copy(coordinates = listOf(destination))
+        val moved = value.copy(coordinates = listOf(destination), elevations = emptyList())
         managers.first { it.kind == value.kind }.endMove(id)
         if (AnnotationValidation.error(moved) != null) {
             mutableState.update { it.copy(layers = managers.map { layer -> layer.state }, error = Res.string.annotations_invalid) }
             return
         }
         mutableState.update { it.copy(layers = managers.map { layer -> layer.state }) }
-        mutate { packageId -> repository.saveAnnotations(packageId, listOf(moved)) }
+        mutate { packageId -> repository.saveAnnotations(packageId, elevations.resolve(packageId, listOf(moved))) }
     }
 
     fun addPoint(point: GeographicCoordinate) {
@@ -435,7 +436,10 @@ class AnnotationEditorViewModel(
                 channel.trySend(Res.string.annotations_vertex_limit); return
             }
         }
-        change(draft.copy(coordinates = points))
+        val heights = points.mapIndexed { i, coordinate ->
+            draft.elevations.getOrNull(i).takeIf { draft.coordinates.getOrNull(i) == coordinate }
+        }
+        change(draft.copy(coordinates = points, elevations = heights.takeIf { it.any { height -> height != null } }.orEmpty()))
         mutableState.update { it.copy(replacingVertex = null) }
     }
 
@@ -481,7 +485,9 @@ class AnnotationEditorViewModel(
     }
 
     fun removeVertex(index: Int) {
-        state.value.draft?.let { value -> change(value.copy(coordinates = value.coordinates.filterIndexed { i, _ -> i != index })) }
+        state.value.draft?.let { value -> change(value.copy(coordinates = value.coordinates.filterIndexed { i, _ -> i != index },
+            elevations = value.elevations.filterIndexed { i, _ -> i != index }
+                .takeIf { it.any { height -> height != null } }.orEmpty())) }
     }
 
     fun replaceVertex(index: Int) {
@@ -511,7 +517,7 @@ class AnnotationEditorViewModel(
         if (AnnotationValidation.error(draft) != null) {
             mutableState.update { it.copy(error = Res.string.annotations_invalid) }; return
         }
-        mutate { id -> repository.saveAnnotations(id, listOf(draft)) }
+        mutate { id -> repository.saveAnnotations(id, elevations.resolve(id, listOf(draft))) }
     }
 
     fun confirmDelete(id: String, show: Boolean) {
@@ -609,7 +615,7 @@ class AnnotationEditorViewModel(
                 mutableState.update { it.copy(error = Res.string.annotations_geojson_error) }
                 return@mutate PackageResult.Failure(PackageFailure.CorruptData)
             }
-            repository.saveAnnotations(id, values)
+            repository.saveAnnotations(id, elevations.resolve(id, values))
         }
     }
 

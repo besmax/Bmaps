@@ -21,6 +21,9 @@ import kotlin.uuid.Uuid
 enum class AnnotationKind { MARKER, LINE, POLYGON }
 
 @Serializable
+data class AnnotationElevation(val meters: Double, val verticalReference: String)
+
+@Serializable
 data class Annotation(
     val id: String = Uuid.random().toString(),
     val kind: AnnotationKind,
@@ -30,6 +33,7 @@ data class Annotation(
     val color: String = "#E53935",
     val icon: String = "place",
     val properties: JsonObject = JsonObject(emptyMap()),
+    val elevations: List<AnnotationElevation?> = emptyList(),
 )
 
 data class AnnotationPage(val items: List<Annotation>, val nextCursor: String?)
@@ -46,6 +50,9 @@ object AnnotationValidation {
         if (value.id.isBlank() || value.id.length > 128 || value.name.length > 120 || value.description.length > 4000 ||
             !Regex("#[0-9a-fA-F]{6}").matches(value.color) || !Regex("[a-zA-Z0-9_-]{1,64}").matches(value.icon)) return "properties"
         val points = value.coordinates
+        if (value.elevations.isNotEmpty() && value.elevations.size != points.size ||
+            value.elevations.filterNotNull().any { !it.meters.isFinite() ||
+                it.verticalReference.isBlank() || it.verticalReference.length > 64 }) return "elevation"
         if (points.size > MAX_VERTICES || points.any { !it.latitude.isFinite() || !it.longitude.isFinite() ||
                 it.latitude !in -90.0..90.0 || it.longitude !in -180.0..180.0 }) return "coordinates"
         if (value.kind == AnnotationKind.MARKER) return if (points.size == 1) null else "point"

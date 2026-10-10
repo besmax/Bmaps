@@ -389,7 +389,8 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
                 val updated = current.copy(auxiliaryAssets = listOf(PackageAsset("assets/info.txt", 7)))
                 write(request.packageId.value, "config.json", Buffer().apply { write(PackageManifestCodec.encode(updated).encodeToByteArray()) }, 1_048_576, Long.MAX_VALUE, staged = false)
             }
-            val marker = Annotation("fresh", AnnotationKind.MARKER, listOf(GeographicCoordinate(1.0, 2.0)), name = "Recent edit")
+            val marker = Annotation("fresh", AnnotationKind.MARKER, listOf(GeographicCoordinate(1.0, 2.0)), name = "Recent edit",
+                elevations = listOf(AnnotationElevation(-7.5, "EGM2008")))
             repository.saveAnnotations(request.packageId, listOf(marker)).success()
             repository.setLayerPresentation(request.packageId, manifest.layers.mapIndexed { index, layer -> LayerPresentation(layer.id, index != 0, 0.4, 1 - index) }).success()
             val archive = Buffer()

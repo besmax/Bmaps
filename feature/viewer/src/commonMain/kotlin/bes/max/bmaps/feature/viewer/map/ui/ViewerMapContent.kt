@@ -8,6 +8,10 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.viewer.map.ui
 
+import bes.max.bmaps.feature.viewer.annotations.presentation.CalloutLocationViewModel
+import bes.max.bmaps.domain.mapbuilder.AnnotationKind
+import dev.zacsweers.metrox.viewmodel.metroViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationEditorState
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationEditorViewModel
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationHit
@@ -130,11 +134,31 @@ private fun ViewerObjectCallout(
 ) {
     val activeObject = annotationState.activeObject
     val activeObjectUi = annotationState.activeObjectUi
+    val locationModel = metroViewModel<CalloutLocationViewModel>()
+    val locationState by locationModel.state.collectAsStateWithLifecycle()
+    val coordinate = if (activeObject?.kind == AnnotationKind.MARKER)
+        activeObject.coordinates.firstOrNull() else activeObjectUi?.calloutCoordinate
+    val manifest = state.manifest
+    val storedElevation = activeObject?.let { value ->
+        val index = if (value.kind == AnnotationKind.MARKER) 0 else coordinate?.let(value.coordinates::indexOf) ?: -1
+        value.elevations.getOrNull(index)?.meters
+    }
+    LaunchedEffect(locationModel, manifest?.id, coordinate, manifest?.elevation, storedElevation) {
+        locationModel.select(manifest?.id, coordinate, manifest?.elevation != null && storedElevation == null)
+    }
+    DisposableEffect(locationModel) {
+        onDispose { locationModel.select(null, null, false) }
+    }
     MapObjectCallout(
         renderer = model.renderer,
         annotation = activeObject,
         position = activeObjectUi?.calloutCoordinate?.let { state.annotationPyramid?.positionOf(it) },
         camera = camera,
+        coordinate = coordinate,
+        coordinateFormat = locationState.format,
+        elevationMeters = storedElevation ?: locationState.elevationMeters.takeIf {
+            locationState.packageId == manifest?.id && locationState.coordinate == coordinate
+        },
         animated = animated,
         busy = annotationState.busy,
         moving = activeObjectUi?.moving == true,

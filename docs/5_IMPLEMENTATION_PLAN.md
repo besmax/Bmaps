@@ -448,3 +448,6 @@ Source UI changes show separate left-aligned latitude, longitude and height rows
 ## Temporary download-limit bypass and background estimates — 2026-10-10
 
 The historical 300 MB raster-layer policy is temporarily disabled at the shared effective-policy boundary, including existing jobs and maps. Physical-capacity and bounded tile/batch checks remain. Constructor settings asynchronously refine size from per-source/per-zoom spatial samples, show calculation progress, cancel stale work and submit the latest displayed estimate. Details, approximate overhead model and current verification are in `12_DOWNLOAD_PIPELINE.md`. Real-device render testing of larger maps and estimate accuracy remain pending; the owner will decide whether to restore the size ceiling after testing.
+
+
+Persisted annotation heights (2026-10-10): source now stores optional per-vertex meter heights and DEM vertical references, resolves missing heights before editor saves/moves/imports, invalidates moved-vertex heights, and preserves heights through stored features and GeoJSON/package transfer. Old objects remain readable with unknown heights. Regression scenarios are authored but not run; builds and manual/native validation remain with the owner. See `15_ANNOTATIONS_AND_GEOJSON.md` and `17_ELEVATION_READER.md`.

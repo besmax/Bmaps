@@ -30,7 +30,7 @@ class AnnotationEditorTest {
                 values = listOf(Annotation("pin", AnnotationKind.MARKER, listOf(GeographicCoordinate(0.0, 0.0))))
             }
             val preferences = MemoryPreferences()
-            val model = AnnotationEditorViewModel(repository, preferences)
+            val model = AnnotationEditorViewModel(repository, preferences, AnnotationElevationResolver { _, values -> values })
             owner.put("editor", model)
             model.open(PackageId("one")); runCurrent()
             assertTrue(model.state.value.catalogReady)
@@ -49,7 +49,7 @@ class AnnotationEditorTest {
             val repository = MemoryAnnotations().apply {
                 values = (0..1000).map { Annotation("p$it", AnnotationKind.MARKER, listOf(GeographicCoordinate(0.0, 0.0))) }
             }
-            val model = AnnotationEditorViewModel(repository, MemoryPreferences())
+            val model = AnnotationEditorViewModel(repository, MemoryPreferences(), AnnotationElevationResolver { _, values -> values })
             owner.put("editor", model)
             model.open(PackageId("one")); runCurrent()
             assertFalse(model.state.value.catalogReady)
@@ -66,7 +66,7 @@ class AnnotationEditorTest {
         val owner = ViewModelStore()
         try {
             val repository = MemoryAnnotations()
-            val model = AnnotationEditorViewModel(repository, MemoryPreferences())
+            val model = AnnotationEditorViewModel(repository, MemoryPreferences(), AnnotationElevationResolver { _, values -> values })
             owner.put("editor", model)
             model.open(PackageId("one")); runCurrent()
             model.start(AnnotationKind.POLYGON)
@@ -97,7 +97,7 @@ class AnnotationEditorTest {
         val owner = ViewModelStore()
         try {
             val repository = MemoryAnnotations()
-            val model = AnnotationEditorViewModel(repository, MemoryPreferences())
+            val model = AnnotationEditorViewModel(repository, MemoryPreferences(), AnnotationElevationResolver { _, values -> values })
             owner.put("editor", model)
             model.open(PackageId("one")); runCurrent()
             model.start(AnnotationKind.MARKER); model.addPoint(GeographicCoordinate(1.0, 2.0)); model.color("#43A047")
@@ -121,7 +121,7 @@ class AnnotationEditorTest {
         val owner = ViewModelStore()
         try {
             val repository = MemoryAnnotations()
-            val model = AnnotationEditorViewModel(repository, MemoryPreferences())
+            val model = AnnotationEditorViewModel(repository, MemoryPreferences(), AnnotationElevationResolver { _, values -> values })
             owner.put("editor", model)
             model.open(PackageId("one")); runCurrent()
             val text = """<gpx version="1.1"><wpt lat="1" lon="2"><name>Camp</name></wpt></gpx>"""
@@ -138,6 +138,34 @@ class AnnotationEditorTest {
             model.importAnnotations(); model.state.first { !it.busy }; runCurrent()
             assertEquals(before, repository.values)
             assertNotNull(model.state.value.error)
+        } finally { owner.clear(); runCurrent(); Dispatchers.resetMain() }
+    }
+
+    @Test fun movingDraftVertexInvalidatesOldHeightAndUndoRestoresIt() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val owner = ViewModelStore()
+        try {
+            val oldHeight = AnnotationElevation(15.0, "EGM96")
+            val marker = Annotation("pin", AnnotationKind.MARKER, listOf(GeographicCoordinate(1.0, 1.0)),
+                elevations = listOf(oldHeight))
+            val repository = MemoryAnnotations().apply { values = listOf(marker) }
+            var sampled = false
+            val model = AnnotationEditorViewModel(repository, MemoryPreferences(), AnnotationElevationResolver { _, values ->
+                assertNull(values.single().elevations.getOrNull(0))
+                sampled = true
+                values.map { it.copy(elevations = listOf(AnnotationElevation(27.0, "EGM2008"))) }
+            })
+            owner.put("editor", model)
+            model.open(PackageId("one")); runCurrent()
+            model.select(marker.id); model.edit(); model.replaceVertex(0)
+            model.addPoint(GeographicCoordinate(2.0, 2.0))
+            assertNull(model.state.value.draft?.elevations?.getOrNull(0))
+            model.undo()
+            assertEquals(oldHeight, model.state.value.draft?.elevations?.single())
+            model.replaceVertex(0); model.addPoint(GeographicCoordinate(2.0, 2.0))
+            model.save(); runCurrent()
+            assertTrue(sampled)
+            assertEquals(27.0, repository.values.single().elevations.single()?.meters)
         } finally { owner.clear(); runCurrent(); Dispatchers.resetMain() }
     }
 

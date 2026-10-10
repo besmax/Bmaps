@@ -29,6 +29,12 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import bes.max.bmaps.domain.mapbuilder.Annotation
 import bes.max.bmaps.domain.mapbuilder.AnnotationKind
+import bes.max.bmaps.core.mapengine.GeographicCoordinate
+import bes.max.bmaps.core.mapengine.ProjectedCoordinate
+import bes.max.bmaps.core.mapengine.CoordinateSystemId
+import bes.max.bmaps.core.datastore.CoordinateFormat
+import bes.max.bmaps.feature.viewer.position.presentation.formatCoordinateAxes
+import bes.max.bmaps.feature.viewer.position.presentation.fixedDecimal
 import bes.max.bmaps.core.mapengine.MapCameraSnapshot
 import bes.max.bmaps.core.mapengine.MapPoint
 import bes.max.bmaps.core.mapengine.RasterMapCallout
@@ -47,6 +53,8 @@ private data class CalloutContent(
     val layout: IntSize,
     val moving: Boolean,
     val error: StringResource?,
+    val coordinateAxes: Pair<String, String>?,
+    val elevationMeters: Double?,
 )
 
 @Composable
@@ -62,6 +70,9 @@ internal fun MapObjectCallout(
     onEdit: () -> Unit,
     onMove: () -> Unit,
     onDelete: () -> Unit,
+    coordinate: GeographicCoordinate? = null,
+    coordinateFormat: CoordinateFormat = CoordinateFormat.DECIMAL_DEGREES,
+    elevationMeters: Double? = null,
 ) {
     var size by remember { mutableStateOf(IntSize.Zero) }
     val anchor = if (camera != null && position != null) {
@@ -79,7 +90,11 @@ internal fun MapObjectCallout(
         anchor,
         camera.layout,
         moving,
-        error
+        error,
+        coordinate?.let {
+            formatCoordinateAxes(ProjectedCoordinate(it.longitude, it.latitude, CoordinateSystemId.Wgs84), coordinateFormat)
+        },
+        elevationMeters,
     ) else null
     var retained by remember(camera?.session) { mutableStateOf<CalloutContent?>(null) }
     SideEffect { if (current != null) retained = current }
@@ -117,7 +132,7 @@ internal fun MapObjectCallout(
                 Surface(
                     Modifier
                         .widthIn(max = maxWidth.coerceAtMost(200.dp))
-                        .heightIn(max = maxHeight.coerceAtMost(180.dp))
+                        .heightIn(max = maxHeight.coerceAtMost(260.dp))
                         .onSizeChanged { size = it },
                     shape = MaterialTheme.shapes.large,
                     tonalElevation = 6.dp,
@@ -146,6 +161,16 @@ internal fun MapObjectCallout(
                                     Text(stringResource(if (expanded) Res.string.viewer_show_less else Res.string.viewer_show_more))
                                 }
                             }
+                        }
+                        content.coordinateAxes?.let { (latitude, longitude) ->
+                            Text(stringResource(Res.string.position_latitude, latitude),
+                                style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(Res.string.position_longitude, longitude),
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                        content.elevationMeters?.let { meters ->
+                            Text(stringResource(Res.string.position_elevation_value, fixedDecimal(meters, 1)),
+                                style = MaterialTheme.typography.bodySmall)
                         }
                         if (content.moving) {
                             Text(

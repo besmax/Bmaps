@@ -38,6 +38,10 @@ Feature roots are `bes.max.bmaps.feature.<module>`. Packages always group code b
 
 `map.fixture` contains the constructor's sample tile source; its Compose widget and ViewModel belong to `map.ui` and `map.presentation`. Viewer annotation icons retain the existing SVG catalog and rendering helpers in `annotations.ui.icons`. Platform notification-permission adapters share `constructor.download.ui` with their common declaration; app-version adapters share `shell.about.ui`. Tests use the package of the subject under test, importing other capabilities explicitly when needed. Generated Compose resource namespaces remain unchanged.
 
+`domain:map-builder` also owns `AnnotationElevationResolver`, which fills unknown vertex heights from the package DEM before editor commits.
+
+`CalloutLocationViewModel` belongs to `viewer.annotations.presentation` and owns package-local height lookup and angular-format state for object callouts; callout UI stays in `viewer.annotations.ui`.
+
 The umbrella imports screen entry points from their owning UI packages: `constructor.map.ui.ConstructorScreen`, `constructor.map.ui.FullScreenMap`, `constructor.download.ui.MapSaveSettingsContent`, `constructor.credentials.ui.ProviderCredentialsContent`, `library.catalog.ui.LibraryScreen`, `shell.navigation.ui.AppShell`, `shell.settings.ui.SettingsScreen`, and `viewer.map.ui.ViewerScreen`.
 
 ## 3. Domain Layer (Business Logic & Contracts)

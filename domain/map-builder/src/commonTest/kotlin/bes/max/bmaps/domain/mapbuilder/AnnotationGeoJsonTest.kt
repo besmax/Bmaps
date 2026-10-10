@@ -79,5 +79,39 @@ class AnnotationGeoJsonTest {
         assertEquals(listOf(line), AnnotationGeoJson.decode(AnnotationGeoJson.encode(listOf(line))))
     }
 
+    @Test fun heightsRoundTripWithNullZeroAndNegativeValues() {
+        val value = Annotation("heights", AnnotationKind.LINE,
+            listOf(point(1.0, 1.0), point(2.0, 2.0), point(3.0, 3.0)),
+            elevations = listOf(AnnotationElevation(0.0, "EGM96"), null, AnnotationElevation(-12.5, "EGM2008")))
+        val encoded = AnnotationGeoJson.encode(listOf(value))
+        assertEquals(listOf(value), AnnotationGeoJson.decode(encoded))
+        val feature = Json.parseToJsonElement(encoded).jsonObject.getValue("features").jsonArray.single()
+        assertEquals(value, AnnotationGeoJson.decodeStoredFeature(feature.toString()))
+        assertEquals(JsonNull, feature.jsonObject.getValue("properties").jsonObject
+            .getValue("bmaps-elevations").jsonArray[1])
+    }
+
+    @Test fun polygonWindingKeepsHeightsAttachedToTheirVertices() {
+        val polygon = Annotation("clockwise", AnnotationKind.POLYGON,
+            listOf(point(0.0, 0.0), point(0.0, 2.0), point(2.0, 0.0)),
+            elevations = listOf(AnnotationElevation(1.0, "EGM96"), null, AnnotationElevation(3.0, "EGM96")))
+        val decoded = AnnotationGeoJson.decode(AnnotationGeoJson.encode(listOf(polygon))).single()
+        assertEquals(polygon.coordinates.zip(polygon.elevations).toMap(), decoded.coordinates.zip(decoded.elevations).toMap())
+    }
+
+    @Test fun legacyAndUnknownHeightsRemainNullAndInvalidHeightsAreRejected() {
+        val value = Annotation("unknown", AnnotationKind.MARKER, listOf(point(1.0, 1.0)))
+        val encoded = AnnotationGeoJson.feature(value)
+        assertEquals(JsonArray(listOf(JsonNull)), encoded.getValue("properties").jsonObject["bmaps-elevations"])
+        assertEquals(value, AnnotationGeoJson.decodeStoredFeature(encoded.toString()))
+        val malformed = encoded.toMutableMap().apply {
+            put("properties", JsonObject(encoded.getValue("properties").jsonObject.toMutableMap().apply {
+                put("bmaps-elevations", JsonArray(emptyList()))
+            }))
+        }
+        assertFails { AnnotationGeoJson.decodeStoredFeature(JsonObject(malformed).toString()) }
+        assertNotNull(AnnotationValidation.error(value.copy(elevations = listOf(AnnotationElevation(Double.NaN, "EGM96")))))
+    }
+
     private fun point(longitude: Double, latitude: Double) = GeographicCoordinate(latitude, longitude)
 }

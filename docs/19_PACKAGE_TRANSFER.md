@@ -83,3 +83,6 @@ Implementation references: [SQLite snapshot semantics](https://www.sqlite.org/la
 ## Generated elevation layer transfer — 2026-10-09
 
 A generated elevation layer is a normal manifest raster asset, included in SQLite snapshots, byte-size/hash accounting, export payloads, import validation, and package identity rebinding. Its optional palette/range metadata and visibility/opacity/order survive transfer. Only the currently referenced version is exported; private generation job/provisional files are excluded. Imported maps include the generated layer in their actual stored size. The new storage transfer scenario is added but not executed. See `21_ELEVATION_COLOR_LAYERS.md`.
+
+
+Persisted annotation heights (2026-10-10): complete-package transfer preserves vertex heights inside the copied `annotations.db` features. GeoJSON object export/import preserves the optional `bmaps-elevations` property, including null entries and vertical-reference metadata, with vertex/height reordering together for polygon winding. The existing native transfer scenario includes a saved negative EGM2008 height. Source/static checks only; execution remains with the owner. See `15_ANNOTATIONS_AND_GEOJSON.md`.
