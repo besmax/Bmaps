@@ -68,9 +68,10 @@ class MapSaveSettingsViewModel(private val estimator: DownloadSizeEstimator) : V
         bounds = area
         root = choice
         val available = (range.min..range.max).toList()
+        val defaultLevels = (13.coerceIn(range.min, range.max)..15.coerceIn(range.min, range.max)).toSet()
         mutableState.value = MapSaveSettingsState(previous?.name ?: defaultMapName(), available,
             previous?.levels?.intersect(available.toSet())?.takeIf { it.isNotEmpty() }
-                ?.let { (it.min()..it.max()).toSet() } ?: setOf(range.min),
+                ?.let { (it.min()..it.max()).toSet() } ?: if (previous == null) defaultLevels else setOf(range.min),
             layers = previous?.layers.orEmpty(), rootVisible = previous?.rootVisible ?: true,
             elevationDataset = previous?.elevationDataset ?: ElevationDataset.NONE)
         estimate()

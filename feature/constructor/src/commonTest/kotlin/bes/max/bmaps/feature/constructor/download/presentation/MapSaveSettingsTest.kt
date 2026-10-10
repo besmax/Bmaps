@@ -64,6 +64,7 @@ class MapSaveSettingsTest {
     @Test fun zoomRangeIncludesEveryLevelAndUpdatesEstimate() {
         val model = MapSaveSettingsViewModel(DownloadSizeEstimator { kotlinx.coroutines.flow.emptyFlow() })
         model.initialize(BoundingBox(-10.0, -10.0, 10.0, 10.0), ZoomRange(0, 4))
+        model.selectZoomRange(0, 0)
         val initialCount = assertNotNull(model.state.value.estimate).tileCount
         model.selectZoomRange(0, 4)
         assertEquals((0..4).toSet(), model.state.value.selectedLevels)
@@ -97,7 +98,7 @@ class MapSaveSettingsTest {
                     delay(1000)
                     emit(BuildEstimate(5, request.layers.first().zoomLevels.max() * 1000L))
                 } finally {
-                    if (request.layers.first().zoomLevels == setOf(0)) cancelled = true
+                    if (request.layers.first().zoomLevels == setOf(4)) cancelled = true
                 }
             } })
             val provider = BuiltInProviders.arcGis
