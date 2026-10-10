@@ -120,7 +120,7 @@ internal fun PackageManifest.replaceAssets(values: List<PackageAsset>): PackageM
 }
 
 internal suspend fun PackageFiles.readStandaloneMbTiles(source: RawSource, id: PackageId, displayName: String): PackageManifest {
-    write(id.value, "input.mbtiles", source, PackageSizePolicy.MAX_LAYER_BYTES, Long.MAX_VALUE)
+    write(id.value, "input.mbtiles", source, PackageSizePolicy().effectiveLayerLimit, Long.MAX_VALUE)
     val input = MbTiles.open(asset(id.value, true, "input.mbtiles").toString())
     try {
         val metadata = input.metadata()
@@ -149,7 +149,7 @@ internal suspend fun PackageFiles.readStandaloneMbTiles(source: RawSource, id: P
                 require(dimension == null || dimension == imageSize)
                 dimension = imageSize
                 requireCapacity(tile.bytes.size.toLong() * 3 + 1_048_576)
-                output.write(listOf(tile), emptyList(), PackageSizePolicy.MAX_LAYER_BYTES)
+                output.write(listOf(tile), emptyList(), PackageSizePolicy().effectiveLayerLimit)
                 count++
             }
             if (count != coverage.count || output.counts().downloaded != count) {

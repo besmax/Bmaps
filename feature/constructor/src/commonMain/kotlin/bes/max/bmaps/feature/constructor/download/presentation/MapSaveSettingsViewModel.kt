@@ -13,17 +13,17 @@ package bes.max.bmaps.feature.constructor.download.presentation
 import bes.max.bmaps.feature.constructor.map.presentation.MapChoice
 import bmaps.feature.constructor.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
+import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.ViewModel
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
 import bes.max.bmaps.domain.providers.ElevationDataset
-import bes.max.bmaps.domain.mapbuilder.BuildEstimate
-import bes.max.bmaps.domain.mapbuilder.TileAreaEstimate
-import bes.max.bmaps.domain.mapbuilder.supportsTileRequest
-import bes.max.bmaps.domain.mapbuilder.estimatedTileBytes
+import bes.max.bmaps.domain.mapbuilder.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,32 +36,37 @@ import kotlin.time.Clock
 data class AdditionalLayer(val id: String, val choice: MapChoice, val visible: Boolean = true)
 data class MapSaveSettings(val name: String, val bounds: BoundingBox, val levels: Set<Int>,
     val layers: List<AdditionalLayer> = emptyList(), val rootVisible: Boolean = true,
-    val elevationDataset: ElevationDataset = ElevationDataset.NONE)
+    val elevationDataset: ElevationDataset = ElevationDataset.NONE,
+    val sizeEstimate: BuildEstimate? = null)
 data class MapSaveSettingsState(
     val name: String = "", val availableLevels: List<Int> = emptyList(), val selectedLevels: Set<Int> = emptySet(),
     val estimate: BuildEstimate? = null, val error: StringResource? = null,
     val layers: List<AdditionalLayer> = emptyList(), val rootVisible: Boolean = true,
     val addingLayer: Boolean = false,
+    val estimating: Boolean = false,
     val elevationDataset: ElevationDataset = ElevationDataset.NONE,
 )
 
 @Inject
 @ViewModelKey
 @ContributesIntoMap(AppScope::class)
-class MapSaveSettingsViewModel : ViewModel() {
+class MapSaveSettingsViewModel(private val estimator: DownloadSizeEstimator) : ViewModel() {
     private val mutableState = MutableStateFlow(MapSaveSettingsState())
     val state = mutableState.asStateFlow()
     private val eventChannel = Channel<MapSaveSettings>(Channel.BUFFERED)
     val events = eventChannel.receiveAsFlow()
     private var bounds: BoundingBox? = null
+    private var root: MapChoice? = null
+    private var estimateJob: Job? = null
 
-    fun initialize(area: BoundingBox, range: ZoomRange, previous: MapSaveSettings? = null) {
+    fun initialize(area: BoundingBox, range: ZoomRange, previous: MapSaveSettings? = null, choice: MapChoice? = null) {
         if (bounds != null) return
         if (WebMercator.splitBounds(area) == null || range.min !in 0..52 || range.max !in range.min..52) {
             mutableState.value = state.value.copy(error = Res.string.unsupported_area_or_zoom)
             return
         }
         bounds = area
+        root = choice
         val available = (range.min..range.max).toList()
         mutableState.value = MapSaveSettingsState(previous?.name ?: defaultMapName(), available,
             previous?.levels?.intersect(available.toSet())?.takeIf { it.isNotEmpty() }
@@ -122,10 +127,11 @@ class MapSaveSettingsViewModel : ViewModel() {
             else -> null
         }
         mutableState.value = current.copy(error = error)
-        if (error == null) eventChannel.trySend(MapSaveSettings(name, area, current.selectedLevels.toSet(), current.layers, current.rootVisible, current.elevationDataset))
+        if (error == null) eventChannel.trySend(MapSaveSettings(name, area, current.selectedLevels.toSet(), current.layers, current.rootVisible, current.elevationDataset, current.estimate))
     }
     private fun estimate() {
         val area = bounds ?: return
+        estimateJob?.cancel()
         val single = TileAreaEstimate.estimate(area, state.value.selectedLevels, 32_000)
         mutableState.value = state.value.copy(estimate = single.let {
             val count = state.value.layers.size + 1
@@ -133,7 +139,33 @@ class MapSaveSettingsViewModel : ViewModel() {
             val demBytes = state.value.elevationDataset.estimatedTileBytes(area, state.value.selectedLevels)
             tiles.copy(estimatedPackageBytes = demBytes?.let { dem -> tiles.estimatedPackageBytes?.takeIf { it <= Long.MAX_VALUE - dem }?.plus(dem) },
                 estimatedLargestLayerBytes = single.estimatedPackageBytes)
-        })
+        }, estimating = root != null)
+        val choice = root ?: return
+        val snapshot = state.value
+        val settings = MapSaveSettings("estimate", area, snapshot.selectedLevels, snapshot.layers,
+            snapshot.rootVisible, snapshot.elevationDataset)
+        if (validateComposition(settings, choice) != null) {
+            mutableState.value = snapshot.copy(estimating = false)
+            return
+        }
+        val range = ZoomRange(snapshot.selectedLevels.min(), snapshot.selectedLevels.max())
+        val request = BuildRequest(PackageId("estimate"), snapshot.name, area,
+            (listOf(choice) + snapshot.layers.map { it.choice }).mapIndexed { index, source ->
+                BuildLayerRequest(LayerId(index.toString()), source.id, source.provider.configFor(source.style),
+                    range, zoomLevels = snapshot.selectedLevels)
+            }, elevationDataset = snapshot.elevationDataset)
+        estimateJob = viewModelScope.launch {
+            try {
+                delay(350)
+                estimator.estimates(request).catch { failure ->
+                    if (failure is CancellationException) throw failure
+                }.collect { result ->
+                    mutableState.value = state.value.copy(estimate = result)
+                }
+            } finally {
+                if (currentCoroutineContext().isActive) mutableState.value = state.value.copy(estimating = false)
+            }
+        }
     }
 }
 

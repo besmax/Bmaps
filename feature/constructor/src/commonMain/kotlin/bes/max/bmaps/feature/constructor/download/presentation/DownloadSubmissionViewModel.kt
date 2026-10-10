@@ -93,14 +93,11 @@ class DownloadSubmissionViewModel(
                     channel.send(DownloadSubmissionEvent.ElevationCredentials)
                     return@launch
                 }
-                val estimate = planner.estimate(submitting)
-                val estimated = (estimate as? PackageResult.Success)?.value
+                val estimated = settings.sizeEstimate ?: (planner.estimate(submitting) as? PackageResult.Success)?.value
                 val bytes = estimated?.estimatedPackageBytes
-                val layerBytes = estimated?.estimatedLargestLayerBytes
                 val capacity = (storage.availableBytes() as? PackageResult.Success)?.value
                 val failure = when {
-                    bytes == null || layerBytes == null -> Res.string.selection_estimate_unavailable
-                    layerBytes > submitting.sizePolicy.effectiveLayerLimit -> Res.string.package_size_limit_exceeded
+                    bytes == null -> Res.string.selection_estimate_unavailable
                     capacity == null -> Res.string.download_storage_unavailable
                     bytes > capacity / 2 -> Res.string.download_insufficient_storage
                     else -> null

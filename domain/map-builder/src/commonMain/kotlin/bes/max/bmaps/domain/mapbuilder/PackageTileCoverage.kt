@@ -49,6 +49,14 @@ internal class PackageTileCoverage(bounds: BoundingBox, range: ZoomRange, levels
         require(count > 0)
     }
 
+    fun sampleTiles(): List<TileKey> = rectangles.flatMap { rectangle ->
+        val columns = listOf(rectangle.columns.first, rectangle.columns.first +
+            (rectangle.columns.last - rectangle.columns.first) / 2, rectangle.columns.last).distinct()
+        val rows = listOf(rectangle.rows.first, rectangle.rows.first +
+            (rectangle.rows.last - rectangle.rows.first) / 2, rectangle.rows.last).distinct()
+        columns.flatMap { column -> rows.map { row -> TileKey(rectangle.zoom, column, row) } }
+    }
+
     fun contains(key: TileKey): Boolean = rectangles.any {
         key.level == it.zoom && key.column in it.columns && key.row in it.rows
     }

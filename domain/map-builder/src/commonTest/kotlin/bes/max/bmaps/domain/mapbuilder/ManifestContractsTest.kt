@@ -43,7 +43,8 @@ class ManifestContractsTest {
         val encoded = Json.encodeToString(oldPolicy)
         assertEquals("""{"maxLayerBytes":123456}""", encoded)
         assertEquals(PackageSizePolicy(), Json.decodeFromString<PackageSizePolicy>("{}"))
-        assertEquals(300_000_000L, PackageSizePolicy(Long.MAX_VALUE).effectiveLayerLimit)
+        assertEquals(Long.MAX_VALUE, PackageSizePolicy(Long.MAX_VALUE).effectiveLayerLimit)
+        assertEquals(Long.MAX_VALUE, oldPolicy.effectiveLayerLimit)
     }
 
     @Test

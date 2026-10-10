@@ -53,7 +53,7 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
         val bounds = selection.acceptedBounds ?: return@LaunchedEffect
         val choice = source ?: return@LaunchedEffect
         val limits = choice.provider.configFor(choice.style).levelLimits
-        model.initialize(bounds, ZoomRange(limits.levelMin, limits.levelMax ?: limits.levelMin), selection.settings)
+        model.initialize(bounds, ZoomRange(limits.levelMin, limits.levelMax ?: limits.levelMin), selection.settings, choice)
         submission.configure(choice)
     }
     val currentSource by rememberUpdatedState(source)
@@ -134,6 +134,11 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
                 TextButton(onClick = { model.showLayerPicker(true) }, enabled = !download.busy && state.layers.size < 31) { Text(stringResource(Res.string.layer_add)) }
                 Text(stringResource(Res.string.estimated_size_mb, formatMegabytes(state.estimate?.estimatedPackageBytes) ?: stringResource(Res.string.unavailable)),
                     style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.tertiary)
+                if (state.estimating) Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Text(stringResource(Res.string.download_estimating), style = MaterialTheme.typography.bodySmall)
+                }
                 Text(stringResource(Res.string.tile_count_estimate, state.estimate?.tileCount ?: 0), style = MaterialTheme.typography.bodySmall)
                 Text(stringResource(Res.string.elevation_title), style = MaterialTheme.typography.titleSmall)
                 ElevationDataset.entries.forEach { dataset ->
@@ -154,7 +159,6 @@ fun MapSaveSettingsContent(mapOwner: ViewModelStoreOwner, onStarted: () -> Unit,
                         Text(stringResource(Res.string.elevation_manage_key))
                     }
                 }
-                if ((state.estimate?.estimatedLargestLayerBytes ?: 0) > bes.max.bmaps.domain.mapbuilder.PackageSizePolicy.MAX_LAYER_BYTES) Text(stringResource(Res.string.package_size_limit_exceeded), color = MaterialTheme.colorScheme.error)
                 if (source?.provider?.capabilitiesFor(source.style)?.offlineDownload == OfflineDownloadPermission.PROHIBITED) {
                     Text(stringResource(Res.string.offline_download_prohibited), color = MaterialTheme.colorScheme.error)
                 }

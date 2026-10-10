@@ -17,6 +17,7 @@ import bes.max.bmaps.domain.providers.*
 import kotlin.random.Random
 import kotlin.test.*
 import kotlinx.coroutines.flow.first
+import kotlinx.io.readByteArray
 import kotlinx.io.Buffer
 import kotlinx.io.bytestring.ByteString
 import kotlinx.io.files.*
@@ -47,8 +48,8 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             val keys = PackageTileCoverage(request.bounds, ZoomRange(0, 1), emptySet()).tiles().toList()
             val baseId = manifest.layers.first().id
             val oversized = repository.write(id, baseId, listOf(tile(keys.first(), 300_000)), emptyList(), 300_000)
-            assertEquals(PackageFailure.SizeLimitExceeded(policy.maxLayerBytes, null), assertIs<PackageResult.Failure>(oversized).reason)
-            assertFalse(repository.contains(id, baseId, keys.first()).success())
+            assertIs<PackageResult.Success<Unit>>(oversized)
+            assertTrue(repository.contains(id, baseId, keys.first()).success())
             repository.setState(id, BuildJobState.RUNNING).success()
             for (layer in manifest.layers) {
                 repository.write(id, layer.id, keys.map { tile(it, 32_000) }, emptyList(), 160_000).success()
@@ -58,7 +59,7 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             db = database(Path(root, "catalog.db").toString())
             repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
             val opened = repository.open(id).success()
-            assertTrue(opened.manifest.layers.all { it.tiles.sizeBytes <= policy.maxLayerBytes })
+            assertTrue(opened.manifest.layers.any { it.tiles.sizeBytes > policy.maxLayerBytes })
             assertTrue(opened.manifest.layers.sumOf { it.tiles.sizeBytes } > policy.maxLayerBytes)
             assertEquals(300_000L, opened.manifest.elevation?.sizeBytes)
             opened.close()

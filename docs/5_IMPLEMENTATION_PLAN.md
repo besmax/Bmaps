@@ -443,3 +443,8 @@ The user reported valid downloaded maps becoming damaged after generating elevat
 ### Portrait center readout — 2026-10-09
 
 Source UI changes show separate left-aligned latitude, longitude and height rows in portrait, retaining saved coordinate formats and CRS and one decimal meter for height. EPSG:3857 uses X/Y meter labels; absent DEM shows `H: —` in portrait. Landscape retains the combined line and omits missing DEM. Loading/error labels and lookup/session behavior are preserved. Documentation, XML/resource references and source were statically checked; builds, tests and visual/device acceptance remain with the user.
+
+
+## Temporary download-limit bypass and background estimates — 2026-10-10
+
+The historical 300 MB raster-layer policy is temporarily disabled at the shared effective-policy boundary, including existing jobs and maps. Physical-capacity and bounded tile/batch checks remain. Constructor settings asynchronously refine size from per-source/per-zoom spatial samples, show calculation progress, cancel stale work and submit the latest displayed estimate. Details, approximate overhead model and current verification are in `12_DOWNLOAD_PIPELINE.md`. Real-device render testing of larger maps and estimate accuracy remain pending; the owner will decide whether to restore the size ceiling after testing.

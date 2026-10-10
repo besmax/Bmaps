@@ -30,9 +30,10 @@ data class PackageSizePolicy(
     @kotlinx.serialization.json.JsonNames("maxBytes")
     val maxLayerBytes: Long = MAX_LAYER_BYTES,
 ) {
-    val effectiveLayerLimit: Long get() = minOf(maxLayerBytes, MAX_LAYER_BYTES)
+    val effectiveLayerLimit: Long get() = if (ENFORCE_LAYER_SIZE_LIMIT) minOf(maxLayerBytes, MAX_LAYER_BYTES) else Long.MAX_VALUE
     companion object {
         const val MAX_LAYER_BYTES: Long = 300_000_000L
+        const val ENFORCE_LAYER_SIZE_LIMIT: Boolean = false
     }
 }
 

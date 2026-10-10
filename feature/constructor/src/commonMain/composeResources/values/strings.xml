@@ -124,4 +124,5 @@
     <string name="location_settings">Location settings</string>
     <string name="location_retry">Retry location</string>
     <string name="location_center_failed">Could not center the map on your location.</string>
+    <string name="download_estimating">Calculating size…</string>
 </resources>
