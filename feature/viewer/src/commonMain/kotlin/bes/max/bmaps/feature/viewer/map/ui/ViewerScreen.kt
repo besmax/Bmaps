@@ -10,7 +10,6 @@ package bes.max.bmaps.feature.viewer.map.ui
 
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationEditorViewModel
 import bes.max.bmaps.feature.viewer.elevation.presentation.ElevationProgressViewModel
-import bes.max.bmaps.feature.viewer.location.ui.LocationNotice
 import bes.max.bmaps.feature.viewer.location.ui.locationMessage
 import bes.max.bmaps.feature.viewer.position.presentation.MapPositionViewModel
 import bes.max.bmaps.feature.viewer.position.ui.MapCrosshair
@@ -30,9 +29,7 @@ import bes.max.bmaps.core.mapengine.currentLocationOverlays
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import kotlinx.coroutines.launch
 import bmaps.feature.viewer.generated.resources.*
-import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.stringResource
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 
@@ -81,9 +78,7 @@ fun ViewerScreen(
                     is LocationEvent.Center -> location.takeCenter(event)?.let {
                         model.centerLocation(GeographicCoordinate(it.latitude, it.longitude))
                     }
-                    is LocationEvent.Message -> if (!model.state.value.immersive) {
-                        launch { snackbar.showSnackbar(getString(locationMessage(event.status))) }
-                    }
+                    is LocationEvent.Message -> Unit
                 }
             }
         }
@@ -107,12 +102,11 @@ fun ViewerScreen(
                 Modifier.align(Alignment.BottomCenter),
                 singleLine = maxWidth > maxHeight,
             )
-            LocationNotice(locationState, locationAccess, location,
-                Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(horizontal = 80.dp, vertical = 16.dp).widthIn(max = 360.dp),
-                outsideCoverage = locationState.fix != null && state.manifest != null && coordinate == null,
-            )
             ViewerMapControls(model, state, annotations, onBack,
                 landscape = maxWidth > maxHeight,
+                locationUnavailable = locationState.status != LocationStatus.ACTIVE,
+                locationDescription = if (locationState.status != LocationStatus.ACTIVE)
+                    "$locationLabel: ${stringResource(locationMessage(locationState.status))}" else locationLabel,
                 onLocation = {
                     when (locationState.status) {
                         LocationStatus.PERMISSION_DENIED, LocationStatus.PRECISE_PERMISSION_REQUIRED -> locationAccess.requestPermission(openSettingsIfDenied = true)

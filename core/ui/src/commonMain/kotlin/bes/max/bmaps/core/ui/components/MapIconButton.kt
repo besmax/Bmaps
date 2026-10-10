@@ -15,6 +15,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.resources.DrawableResource
@@ -27,6 +28,7 @@ fun MapIconButton(
     contentDescription: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    iconTint: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     IconButton(
         onClick = onClick,
@@ -34,7 +36,7 @@ fun MapIconButton(
         enabled = enabled,
         colors = IconButtonDefaults.iconButtonColors().copy(
             containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f),
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            contentColor = iconTint,
         )
     ) {
         Icon(painterResource(iconResId), contentDescription, modifier = Modifier.size(20.dp))

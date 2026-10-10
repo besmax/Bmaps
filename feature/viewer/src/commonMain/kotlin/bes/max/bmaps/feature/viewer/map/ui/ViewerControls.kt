@@ -59,6 +59,8 @@ internal fun BoxScope.ViewerMapControls(
     onBack: () -> Unit,
     landscape: Boolean,
     onLocation: () -> Unit = {},
+    locationUnavailable: Boolean = false,
+    locationDescription: String? = null,
     onInteraction: () -> Unit = {},
 ) {
     MapIconButton(
@@ -94,8 +96,9 @@ internal fun BoxScope.ViewerMapControls(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             MapIconButton(
                 onClick = { annotations.cancelExpansion(); onLocation() },
-                iconResId = MapIcons.myLocation,
-                contentDescription = stringResource(Res.string.my_location),
+                iconResId = if (locationUnavailable) MapIcons.myLocationOff else MapIcons.myLocation,
+                iconTint = if (locationUnavailable) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                contentDescription = locationDescription ?: stringResource(Res.string.my_location),
                 enabled = state.manifest != null && state.error == null,
             )
             if (state.manifest?.layers.orEmpty().any { it.attribution.isNotEmpty() }) {
