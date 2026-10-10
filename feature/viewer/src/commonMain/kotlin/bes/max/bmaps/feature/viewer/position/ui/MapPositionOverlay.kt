@@ -60,6 +60,7 @@ internal fun MapPositionOverlay(
     singleLine: Boolean = false,
 ) {
     val displayCoordinate = state.displayCoordinate
+    val calculatingCoordinates = displayCoordinate == null && state.coordinateError == null && !state.preferenceError
     val coordinates = if (displayCoordinate != null && state.preferences != null)
         formatCoordinate(displayCoordinate, state.preferences.coordinateFormat) else null
     val coordinateAxes = if (!singleLine && displayCoordinate != null && state.preferences != null &&
@@ -89,7 +90,14 @@ internal fun MapPositionOverlay(
         modifier.wrapContentWidth(), shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f), tonalElevation = 3.dp
     ) {
-        if (singleLine) {
+        if (calculatingCoordinates) {
+            Text(
+                coordinateLabel,
+                Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+            )
+        } else if (singleLine) {
             Text(
                 listOfNotNull(coordinateLabel, elevationLabel).joinToString("  ·  "),
                 Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
