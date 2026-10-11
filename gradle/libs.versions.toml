@@ -38,8 +38,10 @@ navigation = "2.9.2"
 okio = "3.17.0"
 androidx-compose-test = "1.11.2"
 robolectric = "4.16.1"
+play-services-location = "21.4.0"
 
 [libraries]
+google-play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "play-services-location" }
 kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinxCollectionsImmutable" }
 xmlutil-core = { module = "io.github.pdvrieze.xmlutil:core", version.ref = "xmlutil" }
 proj-source = { module = "org.osgeo:proj", version.ref = "proj" }

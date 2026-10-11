@@ -35,6 +35,9 @@ import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @BindingContainer
 @ContributesTo(AppScope::class)
@@ -69,18 +72,31 @@ private class AndroidLocationService(private val context: Context) : LocationSer
             awaitClose {}
             return@callbackFlow
         }
-        val registered = mutableListOf<String>()
+        val registered = mutableMapOf<String, LocationListener>()
         val currentRequests = mutableListOf<CancellationSignal>()
-        var accepted: LocationFix? = null
-        var acceptedProvider: String? = null
+        val selector = LocationFixSelector()
+        var published: SelectedLocationFix? = null
         var permissionFailure = false
 
-        fun receive(location: Location, delivery: String) {
+        fun publishSelected(): LocationFix? {
+            val selected = selector.select(locationTimeMillis())
+            if (selected != null && selected != published) {
+                published = selected
+                locationDiagnostic("Position selected: provider=${selected.source}, ageMs=${locationTimeMillis() - selected.fix.timestampMillis}, accuracyM=${selected.fix.accuracyMeters}")
+                trySend(LocationState(LocationStatus.ACTIVE, selected.fix))
+            }
+            if (selected == null) published = null
+            return selected?.fix
+        }
+
+        fun receive(location: Location, delivery: String, provider: String) {
+            if (!isActive || !manager.isLocationEnabled) return
+            if (provider != "google-fused" && !manager.isProviderEnabled(provider)) return
             val wallTime = locationTimeMillis()
             val age = if (location.elapsedRealtimeNanos > 0) {
                 (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000
             } else wallTime - location.time
-            locationDiagnostic("Fix received: provider=${location.provider}, delivery=$delivery, ageMs=$age, accuracyM=${location.accuracy}")
+            locationDiagnostic("Fix received: provider=$provider, delivery=$delivery, ageMs=$age, accuracyM=${location.accuracy}")
             if (!location.hasAccuracy() || age !in -5_000L..30_000L) {
                 locationDiagnostic("Fix ignored: missing accuracy or expired acquisition time")
                 return
@@ -90,20 +106,16 @@ private class AndroidLocationService(private val context: Context) : LocationSer
                 location.speed.toDouble().takeIf { location.hasSpeed() && it.isFinite() && it >= 0 },
                 location.bearing.toDouble().takeIf { location.hasBearing() && it.isFinite() && it >= 0 && it < 360 },
             )
-            val preserveGpsAccuracy = acceptedProvider == LocationManager.GPS_PROVIDER &&
-                location.provider != LocationManager.GPS_PROVIDER
-            if (!shouldAcceptLocationFix(accepted, fix, preserveGpsAccuracy, wallTime)) {
-                locationDiagnostic("Fix ignored: invalid, expired, older, or worse than fresh GPS; previousProvider=$acceptedProvider, previousAgeMs=${accepted?.let { wallTime - it.timestampMillis }}, previousAccuracyM=${accepted?.accuracyMeters}")
+            if (!selector.record(provider, fix, wallTime)) {
+                locationDiagnostic("Fix ignored: invalid, expired, or superseded within provider=$provider")
                 return
             }
-            accepted = fix
-            acceptedProvider = location.provider
-            trySend(LocationState(LocationStatus.ACTIVE, fix))
+            publishSelected()
         }
 
         fun publishAvailability() {
             val enabled = candidates.filter { manager.isProviderEnabled(it) }
-            val fix = accepted?.takeIf { it.isFresh(locationTimeMillis()) }
+            val fix = if (manager.isLocationEnabled && enabled.isNotEmpty()) publishSelected() else null
             locationDiagnostic("Available providers: $enabled")
             trySend(when {
                 !manager.isLocationEnabled || enabled.isEmpty() -> LocationState(LocationStatus.DISABLED)
@@ -112,24 +124,28 @@ private class AndroidLocationService(private val context: Context) : LocationSer
             })
         }
 
-        val listener = object : LocationListener {
-            override fun onLocationChanged(location: Location) { receive(location, "update") }
-            override fun onProviderDisabled(provider: String) { publishAvailability() }
-            override fun onProviderEnabled(provider: String) { publishAvailability() }
-        }
         publishAvailability()
         for (provider in candidates) {
+            val listener = object : LocationListener {
+                override fun onLocationChanged(location: Location) { receive(location, "update", provider) }
+                override fun onProviderDisabled(disabledProvider: String) {
+                    selector.remove(provider)
+                    published = null
+                    publishAvailability()
+                }
+                override fun onProviderEnabled(enabledProvider: String) { publishAvailability() }
+            }
             try {
                 manager.requestLocationUpdates(provider, request.intervalMillis,
                     request.minimumDistanceMeters.toFloat(), listener, Looper.getMainLooper())
-                registered += provider
+                registered[provider] = listener
                 locationDiagnostic("Continuous updates registered: $provider")
                 if (manager.isProviderEnabled(provider)) {
-                    manager.getLastKnownLocation(provider)?.let { receive(it, "cache") }
+                    manager.getLastKnownLocation(provider)?.let { receive(it, "cache", provider) }
                     val cancellation = CancellationSignal()
                     currentRequests += cancellation
                     manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
-                        if (location != null) receive(location, "current")
+                        if (location != null) receive(location, "current", provider)
                         else locationDiagnostic("Current position request returned no fix: $provider")
                     }
                 }
@@ -140,13 +156,32 @@ private class AndroidLocationService(private val context: Context) : LocationSer
                 locationDiagnostic("Provider registration failed: $provider", error)
             }
         }
-        if (registered.isEmpty()) trySend(LocationState(
-            if (permissionFailure) LocationStatus.PERMISSION_DENIED else LocationStatus.UNAVAILABLE,
-        ))
+        fun publishRegistrationFailure() {
+            if (registered.isEmpty() && selector.select(locationTimeMillis()) == null) {
+                trySend(LocationState(
+                    if (permissionFailure) LocationStatus.PERMISSION_DENIED else LocationStatus.UNAVAILABLE,
+                ))
+            }
+        }
+        val google = GoogleFusedLocationSubscription(context,
+            onLocation = { location, delivery ->
+                if (isActive) receive(location, delivery, "google-fused")
+            },
+            onRegistrationFailure = { if (isActive) publishRegistrationFailure() },
+        )
+        if (!google.start(request)) publishRegistrationFailure()
+        val selectionRefresh = launch {
+            while (isActive) {
+                delay(1_000)
+                if (manager.isLocationEnabled) publishSelected()
+            }
+        }
         awaitClose {
+            selectionRefresh.cancel()
+            google.close()
             currentRequests.forEach { it.cancel() }
-            manager.removeUpdates(listener)
-            locationDiagnostic("Subscription stopped; released providers: $registered")
+            registered.values.forEach { manager.removeUpdates(it) }
+            locationDiagnostic("Subscription stopped; released providers: ${registered.keys}")
         }
     }
 }

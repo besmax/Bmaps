@@ -74,7 +74,7 @@ The viewer clusters nearby markers, small lines, and small polygons from a compl
 
 ## Current-location widget
 
-`core:location` provides an unscoped location widget ViewModel with one immutable state stream and Channel-backed events. Native updates attach only while the map entry is resumed. Map features consume Center events and own coverage checks, viewport changes, and the builder's single initial focus. Fresh fixes update overlays without moving the camera. Source fixture screens do not request permission or start sensors. See `20_CURRENT_LOCATION.md`.
+`core:location` provides an unscoped location widget ViewModel with one immutable state stream and Channel-backed events. Native updates attach only while the map entry is resumed. Map features consume Center events and own coverage checks, viewport changes, and the builder's single initial focus. Fresh fixes update overlays without moving the camera. The widget independently validates coordinates, reported accuracy, freshness, and replacement ordering; it permits an older measurement only within three seconds and only when accuracy strictly improves, supporting near-simultaneous multi-source corrections. Source fixture screens do not request permission or start sensors. See `20_CURRENT_LOCATION.md`.
 
 ## Elevation generation presentation — 2026-10-09
 

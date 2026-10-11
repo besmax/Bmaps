@@ -51,14 +51,14 @@ internal fun LocationFix.isValid() =
         longitude.isFinite() && longitude in -180.0..180.0 &&
         accuracyMeters.isFinite() && accuracyMeters >= 0
 
-internal fun shouldAcceptLocationFix(
+internal const val LOCATION_ACCURACY_WINDOW_MILLIS = 3_000L
+
+internal fun canReplaceLocationFix(
     current: LocationFix?,
     candidate: LocationFix,
-    preserveCurrentAccuracy: Boolean,
-    nowMillis: Long,
 ): Boolean {
-    if (!candidate.isValid() || !candidate.isFresh(nowMillis)) return false
     if (current == null) return true
-    if (candidate.timestampMillis < current.timestampMillis) return false
-    return !preserveCurrentAccuracy || !current.isFresh(nowMillis) || candidate.accuracyMeters <= current.accuracyMeters
+    return candidate.timestampMillis >= current.timestampMillis ||
+        (current.timestampMillis - candidate.timestampMillis <= LOCATION_ACCURACY_WINDOW_MILLIS &&
+            candidate.accuracyMeters < current.accuracyMeters)
 }

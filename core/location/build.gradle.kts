@@ -19,6 +19,7 @@ kotlin {
         api(libs.kotlinx.coroutines.core)
     }
     sourceSets.androidMain.dependencies {
+        implementation(libs.google.play.services.location)
         implementation(libs.androidx.activity.compose)
         implementation(libs.androidx.core.ktx)
     }

@@ -14,6 +14,7 @@ Existing third-party notices include:
 | Okio SHA-256 primitive | Catalog-pinned Okio artifact, Apache-2.0; upstream artifact notices retained. Transfer file IO uses kotlinx-io. |
 | XMLUtil core | [Upstream XMLUtil](https://github.com/pdvrieze/xmlutil), Apache-2.0; catalog-pinned artifact and upstream notices. Used for common GPX XML parsing. |
 | kotlinx.collections.immutable | JetBrains Kotlin immutable collections, Apache-2.0; catalog-pinned artifact and upstream notices retained. Used for immutable presentation state through `app.feature`. |
+| Google Play services location SDK | [Google SDK setup and terms](https://developers.google.com/android/guides/setup); catalog-pinned Android-only artifact and upstream notices retained. Used for optional fused positioning alongside native providers. |
 | Kotlin, Compose, MapComposeMP, and other dependencies | Their upstream licenses and artifact notices; versions are in `gradle/libs.versions.toml` |
 
 This is an ownership boundary and a navigation aid, not an exhaustive release dependency-license inventory. Review and bundle all required upstream notices for the actual artifacts shipped before release. Map/provider attribution remains separately required and is displayed by the map features.

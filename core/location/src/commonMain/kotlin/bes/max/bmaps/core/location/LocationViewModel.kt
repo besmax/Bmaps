@@ -101,7 +101,7 @@ class LocationViewModel(private val service: LocationService) : ViewModel() {
                                     locationDiagnostic("Fix rejected by presentation: ageMs=${locationTimeMillis() - fix.timestampMillis}")
                                     if (state.value.fix == null) publish(LocationState(LocationStatus.STALE))
                                 }
-                                fix.timestampMillis < (state.value.fix?.timestampMillis ?: Long.MIN_VALUE) -> {
+                                !canReplaceLocationFix(state.value.fix?.takeIf { fresh(it) }, fix) -> {
                                     locationDiagnostic("Fix ignored by presentation: out of order")
                                 }
                                 else -> {
