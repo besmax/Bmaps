@@ -102,7 +102,11 @@ fun LibraryScreen(
     }
     state.details?.let { details ->
         val map = state.maps.firstOrNull { it.id == details.id } ?: details
-        PackageDetailsDialog(map, map.id in state.busy, { model.avatar(map.id, it) }, { model.details(null) })
+        PackageDetailsDialog(
+            map,
+            map.id in state.busy,
+            { model.avatar(map.id, it) },
+            { model.details(null) })
     }
     state.deleteConfirmation?.let { id ->
         LibraryDeleteDialog(
@@ -153,10 +157,24 @@ private fun LibraryList(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            LibraryControls(state.search, state.filter, transferBusy, onImport, onCancelTransfer, onSearch, onFilter)
+            LibraryControls(
+                state.search,
+                state.filter,
+                transferBusy,
+                onImport,
+                onCancelTransfer,
+                onSearch,
+                onFilter
+            )
         }
         items(
-            state.progress.filter { it.state in setOf(BuildJobState.RUNNING, BuildJobState.QUEUED, BuildJobState.FINALIZING) },
+            state.progress.filter {
+                it.state in setOf(
+                    BuildJobState.RUNNING,
+                    BuildJobState.QUEUED,
+                    BuildJobState.FINALIZING
+                )
+            },
             key = { "progress-${it.jobId.value}" },
         ) { progress ->
             LibraryDownloadItem(
@@ -211,7 +229,10 @@ private fun LibraryEmptyItem(filtered: Boolean) {
 
 @Composable
 private fun LibraryMoreItem(loading: Boolean, onMore: () -> Unit) {
-    TextButton(onClick = onMore, enabled = !loading) { Text(stringResource(Res.string.library_more)) }
+    TextButton(
+        onClick = onMore,
+        enabled = !loading
+    ) { Text(stringResource(Res.string.library_more)) }
 }
 
 @Composable
@@ -239,7 +260,10 @@ private fun LibraryControls(
 
 @Composable
 private fun LibraryImportControls(busy: Boolean, onImport: () -> Unit, onCancel: () -> Unit) {
-    TextButton(onClick = onImport, enabled = !busy) { Text(stringResource(Res.string.transfer_import)) }
+    TextButton(
+        onClick = onImport,
+        enabled = !busy
+    ) { Text(stringResource(Res.string.transfer_import)) }
     if (busy) {
         LinearProgressIndicator(Modifier.fillMaxWidth())
         Text(stringResource(Res.string.transfer_working))
@@ -249,7 +273,10 @@ private fun LibraryImportControls(busy: Boolean, onImport: () -> Unit, onCancel:
 
 @Composable
 private fun LibraryFilters(selectedFilter: LibraryFilter, onFilter: (LibraryFilter) -> Unit) {
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         LibraryFilter.entries.forEach { filter ->
             LibraryFilterItem(filter, selectedFilter == filter) { onFilter(filter) }
         }
@@ -262,12 +289,16 @@ private fun LibraryFilterItem(filter: LibraryFilter, selected: Boolean, onClick:
         selected = selected,
         onClick = onClick,
         label = {
-            Text(stringResource(when (filter) {
-                LibraryFilter.ALL -> Res.string.library_all
-                LibraryFilter.FAVOURITES -> Res.string.library_favourites
-                LibraryFilter.READY -> Res.string.library_ready
-                LibraryFilter.INCOMPLETE -> Res.string.library_incomplete
-            }))
+            Text(
+                stringResource(
+                    when (filter) {
+                        LibraryFilter.ALL -> Res.string.library_all
+                        LibraryFilter.FAVOURITES -> Res.string.library_favourites
+                        LibraryFilter.READY -> Res.string.library_ready
+                        LibraryFilter.INCOMPLETE -> Res.string.library_incomplete
+                    }
+                )
+            )
         },
     )
 }
@@ -283,11 +314,15 @@ private fun LibraryDownloadItem(
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(packageName ?: stringResource(Res.string.library_downloading))
-            Text(stringResource(when (progress.state) {
-                BuildJobState.QUEUED -> Res.string.library_queued
-                BuildJobState.FINALIZING -> Res.string.library_finalizing
-                else -> if (progress.missingTiles == 0L) Res.string.library_finishing_assets else Res.string.library_downloading
-            }))
+            Text(
+                stringResource(
+                    when (progress.state) {
+                        BuildJobState.QUEUED -> Res.string.library_queued
+                        BuildJobState.FINALIZING -> Res.string.library_finalizing
+                        else -> if (progress.missingTiles == 0L) Res.string.library_finishing_assets else Res.string.library_downloading
+                    }
+                )
+            )
             LinearProgressIndicator(
                 progress = {
                     if (progress.totalTiles == 0L) 0f
@@ -295,10 +330,22 @@ private fun LibraryDownloadItem(
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text(stringResource(Res.string.library_tile_progress, progress.completedTiles, progress.totalTiles))
+            Text(
+                stringResource(
+                    Res.string.library_tile_progress,
+                    progress.completedTiles,
+                    progress.totalTiles
+                )
+            )
             Row {
-                TextButton(onClick = onPause, enabled = !busy) { Text(stringResource(Res.string.library_pause)) }
-                TextButton(onClick = onCancel, enabled = !busy) { Text(stringResource(Res.string.library_cancel)) }
+                TextButton(
+                    onClick = onPause,
+                    enabled = !busy
+                ) { Text(stringResource(Res.string.library_pause)) }
+                TextButton(
+                    onClick = onCancel,
+                    enabled = !busy
+                ) { Text(stringResource(Res.string.library_cancel)) }
             }
         }
     }
@@ -325,7 +372,10 @@ private fun LibraryMapItem(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             LibraryMapHeader(map)
-            Text(stringResource(stateLabel(map.state)), style = MaterialTheme.typography.labelMedium)
+            Text(
+                stringResource(stateLabel(map.state)),
+                style = MaterialTheme.typography.labelMedium
+            )
             Text(stringResource(Res.string.library_size, megabytes(map.sizeBytes)))
             Text(stringResource(if (map.hasElevationData) Res.string.library_elevation_present else Res.string.library_no_elevation))
             LibraryMapRecovery(map, failure, busy, onRestore, onCredentials)
@@ -337,8 +387,12 @@ private fun LibraryMapItem(
 @Composable
 private fun LibraryMapHeader(map: PackageSummary) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primaryContainer) {
-            val avatar = MapAvatar.entries.firstOrNull { it.storageKey == map.avatarKey } ?: MapAvatar.MAP
+        Surface(
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.primaryContainer
+        ) {
+            val avatar =
+                MapAvatar.entries.firstOrNull { it.storageKey == map.avatarKey } ?: MapAvatar.MAP
             Icon(
                 painterResource(avatarIcon(avatar)),
                 stringResource(avatarLabel(avatar)),
@@ -368,10 +422,17 @@ private fun LibraryMapRecovery(
             color = MaterialTheme.colorScheme.error,
         )
         failure?.let { Text(stringResource(failureLabel(it))) }
-        if (failure in setOf(PackageFailure.ElevationCredentialsRequired, PackageFailure.ElevationAccessDenied)) {
+        if (failure in setOf(
+                PackageFailure.ElevationCredentialsRequired,
+                PackageFailure.ElevationAccessDenied
+            )
+        ) {
             TextButton(onClick = onCredentials) { Text(stringResource(Res.string.library_elevation_replace_key)) }
         }
-        TextButton(onClick = onRestore, enabled = !busy) { Text(stringResource(Res.string.library_restore)) }
+        TextButton(
+            onClick = onRestore,
+            enabled = !busy
+        ) { Text(stringResource(Res.string.library_restore)) }
     } else if (map.state in setOf(PackageState.CORRUPT, PackageState.MISSING)) {
         Text(stringResource(Res.string.library_damaged), color = MaterialTheme.colorScheme.error)
     }
@@ -388,16 +449,35 @@ private fun LibraryMapActions(
     onDelete: () -> Unit,
 ) {
     Row(Modifier.horizontalScroll(rememberScrollState())) {
-        TextButton(onClick = onFavourite, enabled = !busy) {
-            Text(stringResource(if (map.favourite) Res.string.library_unfavourite else Res.string.library_favourite))
+        IconButton(onClick = onFavourite, enabled = !busy) {
+            Icon(
+                painter = painterResource(if (map.favourite) Res.drawable.ic_star else Res.drawable.ic_star_border),
+                contentDescription = stringResource(if (map.favourite) Res.string.library_unfavourite else Res.string.library_favourite)
+            )
         }
-        TextButton(onClick = onDetails) { Text(stringResource(Res.string.library_details)) }
+
+        IconButton(onClick = onDetails) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_info),
+                contentDescription = stringResource(Res.string.library_details)
+            )
+        }
+
         if (map.state == PackageState.READY) {
-            TextButton(onClick = onExport, enabled = !transferBusy && !busy) {
-                Text(stringResource(Res.string.transfer_share))
+            IconButton(onClick = onExport, enabled = !transferBusy && !busy) {
+                Icon(
+                    painter = painterResource(Res.drawable.ic_share),
+                    contentDescription =stringResource(Res.string.transfer_share)
+                )
             }
         }
-        TextButton(onClick = onDelete, enabled = !busy) { Text(stringResource(Res.string.library_delete)) }
+
+        IconButton(onClick = onDelete, enabled = !busy) {
+            Icon(
+                painter = painterResource(Res.drawable.ic_delete),
+                contentDescription = stringResource(Res.string.library_delete)
+            )
+        }
     }
 }
 
