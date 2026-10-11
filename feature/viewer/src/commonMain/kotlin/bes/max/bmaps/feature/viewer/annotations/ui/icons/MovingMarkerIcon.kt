@@ -67,6 +67,7 @@ internal fun MovingMarkerIcon(
     moving: Boolean,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    appearanceProgress: () -> Float = { 1f },
 ) {
     val asset by produceState<MarkerIconAsset?>(null, id) { value = MarkerIcons.asset(id) }
     val morph = remember(asset) { asset?.let(::prepareMarkerMorph) }
@@ -107,6 +108,8 @@ internal fun MovingMarkerIcon(
         withTransform({
             translate(center.x - anchor.x * iconScale, center.y - anchor.y * iconScale)
             scale(iconScale, iconScale, pivot = Offset.Zero)
+            val growth = appearanceProgress().coerceIn(0f, 1f)
+            scale(growth, growth, pivot = anchor)
         }) {
             if (morph != null) {
                 val body = (amount / 0.65f).coerceIn(0f, 1f)

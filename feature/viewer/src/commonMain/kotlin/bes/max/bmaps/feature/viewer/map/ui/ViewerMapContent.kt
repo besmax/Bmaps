@@ -24,6 +24,9 @@ import bes.max.bmaps.feature.viewer.annotations.ui.icons.MovingMarkerIcon
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerState
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerViewModel
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +55,16 @@ internal fun ViewerMapContent(
     location: CurrentLocationOverlays = CurrentLocationOverlays(),
     onLocationGesture: () -> Unit = {},
 ) {
+    val markerGrowth = remember { Animatable(1f) }
+    val placementVersion = annotationState.markerPlacementVersion
+    var lastPlacementVersion by remember { mutableLongStateOf(placementVersion) }
+    LaunchedEffect(placementVersion) {
+        if (placementVersion != lastPlacementVersion) {
+            markerGrowth.snapTo(0f)
+            lastPlacementVersion = placementVersion
+            markerGrowth.animateTo(1f, tween(320, easing = FastOutSlowInEasing))
+        }
+    }
     val renderData = annotationState.renderData()
     val fallback = remember(renderData, state.annotationPyramid) {
         annotationOverlays(annotationState, state.annotationPyramid)
@@ -68,7 +81,10 @@ internal fun ViewerMapContent(
     RasterMap(
         model.renderer,
         Modifier.fillMaxSize().then(viewerImmersiveGesture(state.immersive, model::toggleImmersive)),
-        overlays.markers.filterNot { state.immersive && overlays.targets[it.id] is AnnotationHit.Vertex } + location.markers,
+        overlays.markers.filterNot {
+            overlays.targets[it.id] is AnnotationHit.Vertex &&
+                (state.immersive || annotationState.draft?.kind == AnnotationKind.MARKER)
+        } + location.markers,
         overlays.paths + location.paths,
         handleOverlayClick,
         onGestureStart = {
@@ -84,7 +100,10 @@ internal fun ViewerMapContent(
         }
     ) { marker ->
         if (marker.id == CURRENT_LOCATION_MARKER) CurrentLocationMarker(marker.label)
-        else ViewerMarker(marker, overlays.targets[marker.id], annotationState, showSelection = !state.immersive) {
+        else ViewerMarker(
+            marker, overlays.targets[marker.id], annotationState, showSelection = !state.immersive,
+            placementProgress = { if (lastPlacementVersion == placementVersion) markerGrowth.value else 0f },
+        ) {
             handleOverlayClick(marker.id, marker.position)
         }
     }
@@ -99,6 +118,7 @@ private fun ViewerMarker(
     target: AnnotationHit?,
     annotationState: AnnotationEditorState,
     showSelection: Boolean,
+    placementProgress: () -> Float,
     onClick: () -> Unit,
 ) {
     val cluster = target as? AnnotationHit.Cluster
@@ -119,7 +139,13 @@ private fun ViewerMarker(
             onClick { onClick(); true }
         }, contentAlignment = Alignment.BottomCenter) {
             if (objectId != null) {
-                MovingMarkerIcon(marker.icon, marker.color, moving, isSelected, Modifier.fillMaxSize())
+                MovingMarkerIcon(
+                    marker.icon, marker.color, moving, isSelected, Modifier.fillMaxSize(),
+                    appearanceProgress = {
+                        if (annotationState.draft?.kind == AnnotationKind.MARKER && annotationState.draft?.id == objectId)
+                            placementProgress() else 1f
+                    },
+                )
             } else {
                 MarkerIcon(marker.icon, marker.color, label, Modifier.size(36.dp))
             }

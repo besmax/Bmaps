@@ -39,6 +39,7 @@ internal data class AnnotationEditorState(
     val layers: List<AnnotationLayerState> = AnnotationKind.entries.map { AnnotationLayerState(it) },
     val panel: Boolean = false,
     val draft: Annotation? = null,
+    val markerPlacementVersion: Long = 0,
     val history: List<Annotation> = emptyList(),
     val propertiesOpen: Boolean = false,
     val clusterMembers: List<Annotation> = emptyList(),
@@ -440,7 +441,11 @@ class AnnotationEditorViewModel(
             draft.elevations.getOrNull(i).takeIf { draft.coordinates.getOrNull(i) == coordinate }
         }
         change(draft.copy(coordinates = points, elevations = heights.takeIf { it.any { height -> height != null } }.orEmpty()))
-        mutableState.update { it.copy(replacingVertex = null) }
+        mutableState.update { it.copy(
+            replacingVertex = null,
+            markerPlacementVersion = if (draft.kind == AnnotationKind.MARKER && draft.coordinates != points)
+                it.markerPlacementVersion + 1 else it.markerPlacementVersion,
+        ) }
     }
 
     private fun change(value: Annotation) {
