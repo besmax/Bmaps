@@ -84,7 +84,7 @@ internal fun ViewerMapContent(
         }
     ) { marker ->
         if (marker.id == CURRENT_LOCATION_MARKER) CurrentLocationMarker(marker.label)
-        else ViewerMarker(marker, overlays.targets[marker.id], annotationState) {
+        else ViewerMarker(marker, overlays.targets[marker.id], annotationState, showSelection = !state.immersive) {
             handleOverlayClick(marker.id, marker.position)
         }
     }
@@ -98,6 +98,7 @@ private fun ViewerMarker(
     marker: MapMarker,
     target: AnnotationHit?,
     annotationState: AnnotationEditorState,
+    showSelection: Boolean,
     onClick: () -> Unit,
 ) {
     val cluster = target as? AnnotationHit.Cluster
@@ -106,16 +107,19 @@ private fun ViewerMarker(
     } else {
         val label = marker.label.ifBlank { stringResource(Res.string.annotations_place) }
         val objectId = (target as? AnnotationHit.Object)?.id
-        val moving = objectId?.let { annotationState.objectUi(it)?.moving } == true
+        val objectUi = objectId?.let { annotationState.objectUi(it) }
+        val moving = objectUi?.moving == true
+        val isSelected = showSelection && objectUi?.calloutOpen == true
         val moveHint = stringResource(Res.string.annotations_move_hint)
         Box(Modifier.size(width = 48.dp, height = if (objectId != null) 72.dp else 48.dp).clearAndSetSemantics {
             role = Role.Button
             contentDescription = label
+            selected = isSelected
             if (moving) stateDescription = moveHint
             onClick { onClick(); true }
         }, contentAlignment = Alignment.BottomCenter) {
             if (objectId != null) {
-                MovingMarkerIcon(marker.icon, marker.color, moving, Modifier.fillMaxSize())
+                MovingMarkerIcon(marker.icon, marker.color, moving, isSelected, Modifier.fillMaxSize())
             } else {
                 MarkerIcon(marker.icon, marker.color, label, Modifier.size(36.dp))
             }

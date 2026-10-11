@@ -24,6 +24,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.vector.PathNode
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -34,7 +38,17 @@ import kotlin.math.sin
 
 private data class MarkerCubic(val control1: Offset, val control2: Offset, val end: Offset)
 private data class MarkerContour(val start: Offset, val curves: List<MarkerCubic>)
-private data class MarkerMorph(val anchor: Offset, val contours: List<MarkerContour>)
+private data class MarkerSelectionContour(
+    val path: Path,
+    val length: Float,
+    val dashIntervals: FloatArray,
+    val strokeWidth: Float,
+)
+private data class MarkerMorph(
+    val anchor: Offset,
+    val contours: List<MarkerContour>,
+    val selectionContours: List<MarkerSelectionContour>,
+)
 
 private val CircleContour = MarkerContour(
     Offset(0f, -1f),
@@ -51,6 +65,7 @@ internal fun MovingMarkerIcon(
     id: String,
     color: Color,
     moving: Boolean,
+    selected: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val asset by produceState<MarkerIconAsset?>(null, id) { value = MarkerIcons.asset(id) }
@@ -65,6 +80,18 @@ internal fun MovingMarkerIcon(
         if (moving) rotation.animateTo(
             targetValue = rotation.value + 360f,
             animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing)),
+        )
+    }
+    val selectionAlpha = animateFloatAsState(
+        targetValue = if (selected && !moving) 1f else 0f,
+        animationSpec = tween(160),
+        label = "markerSelectionAlpha",
+    )
+    val selectionPhase = remember { Animatable(0f) }
+    LaunchedEffect(selected, moving) {
+        if (selected && !moving) selectionPhase.animateTo(
+            targetValue = selectionPhase.value + 1f,
+            animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)),
         )
     }
     val path = remember { Path().apply { fillType = PathFillType.EvenOdd } }
@@ -88,6 +115,26 @@ internal fun MovingMarkerIcon(
                 appendMorph(path, morph.contours[0], circleCenter, 4.8f - 0.9f * split, body)
                 appendMorph(path, morph.contours[1], circleCenter, 0f, body)
                 drawPath(path, color, alpha = 1f - 0.3f * split)
+                val highlightAlpha = selectionAlpha.value * (1f - amount)
+                if (highlightAlpha > 0f) {
+                    morph.selectionContours.forEach { contour ->
+                        drawPath(
+                            contour.path, Color.Black, alpha = highlightAlpha,
+                            style = Stroke(width = contour.strokeWidth, join = StrokeJoin.Round),
+                        )
+                        drawPath(
+                            contour.path, Color.White, alpha = highlightAlpha,
+                            style = Stroke(
+                                width = contour.strokeWidth,
+                                join = StrokeJoin.Round,
+                                pathEffect = PathEffect.dashPathEffect(
+                                    contour.dashIntervals,
+                                    phase = selectionPhase.value * contour.length,
+                                ),
+                            ),
+                        )
+                    }
+                }
             } else {
                 with(painter) {
                     draw(
@@ -128,7 +175,17 @@ private fun prepareMarkerMorph(asset: MarkerIconAsset): MarkerMorph? {
     val contours = cubicContours(asset.paths.single()) ?: return null
     if (contours.size != 2 || contours.any { it.curves.size != CircleContour.curves.size }) return null
     val anchor = contours.first().curves.maxBy { it.end.y }.end
-    return MarkerMorph(anchor, contours)
+    val selectionContours = contours.mapIndexed { index, contour ->
+        val selectionPath = Path().apply { appendMorph(this, contour, anchor, 0f, 0f) }
+        val measure = PathMeasure().apply { setPath(selectionPath, forceClosed = true) }
+        val dashPairs = if (index == 0) 10 else 4
+        val dashLength = measure.length / (dashPairs * 2)
+        MarkerSelectionContour(
+            selectionPath, measure.length, floatArrayOf(dashLength, dashLength),
+            strokeWidth = if (index == 0) 1.5f else 1f,
+        )
+    }
+    return MarkerMorph(anchor, contours, selectionContours)
 }
 
 private fun cubicContours(nodes: List<PathNode>): List<MarkerContour>? {
