@@ -20,9 +20,9 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Providers, networking and credentials | `docs/8_PROVIDER_NETWORKING_AND_CREDENTIALS.md` |
 | Map rendering, camera control and coordinate transformations | `docs/9_MAP_ENGINE.md` |
 | Visual design and styling | `docs/10_BMAPS_DESIGN.md` |
-| Package storage, MBTiles, disk-size accounting and reconciliation | `docs/11_PACKAGE_STORAGE.md` |
+| Package storage, MBTiles, disk-size accounting, cached verification, dirty-state recovery and reconciliation | `docs/11_PACKAGE_STORAGE.md` |
 | Download execution, scheduling, progress and restore | `docs/12_DOWNLOAD_PIPELINE.md` |
-| Library, package opening/deletion, offline viewer, adaptive control layout, immersive gestures and viewport retention | `docs/13_LIBRARY_AND_OFFLINE_VIEWER.md` |
+| Library, package opening/deletion, manual full verification and cancellation, offline viewer, adaptive control layout, immersive gestures and viewport retention | `docs/13_LIBRARY_AND_OFFLINE_VIEWER.md` |
 | Raster layer alignment, ordering, visibility, opacity and composition | `docs/14_RASTER_LAYER_COMPOSITION.md` |
 | Map annotations, marker icons, geometry editing, persisted vertex heights, GeoJSON and GPX import | `docs/15_ANNOTATIONS_AND_GEOJSON.md` |
 | Map object clustering, cluster interaction and expansion | `docs/15_ANNOTATIONS_AND_GEOJSON.md`, `docs/plans/MAP_OBJECT_CLUSTERING.md` (design proposal; verify current implementation in source) |

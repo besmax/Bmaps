@@ -27,7 +27,7 @@ data class LibraryState(
     val loading: Boolean = true, val error: StringResource? = null, val busy: Set<PackageId> = emptySet(),
     val pages: Int = 1, val hasMore: Boolean = false,
     val search: String = "", val filter: LibraryFilter = LibraryFilter.ALL,
-    val details: PackageId? = null, val deleteConfirmation: PackageId? = null,
+    val details: PackageSummary? = null, val deleteConfirmation: PackageId? = null,
 )
 
 enum class LibraryFilter { ALL, FAVOURITES, READY, INCOMPLETE }
@@ -97,7 +97,9 @@ class LibraryViewModel(
         mutableState.update { it.copy(filter = value, pages = 1, maps = emptyList(), hasMore = false) }
         refresh()
     }
-    fun details(id: PackageId?) { mutableState.update { it.copy(details = id) } }
+    fun details(id: PackageId?) { mutableState.update { current ->
+        current.copy(details = current.maps.firstOrNull { it.id == id })
+    } }
     fun confirmDelete(id: PackageId?) { mutableState.update { it.copy(deleteConfirmation = id) } }
     fun favourite(map: PackageSummary) = action(map.id) { packages.setFavourite(map.id, !map.favourite) }
     fun avatar(id: PackageId, avatar: MapAvatar) = action(id) { packages.setAvatar(id, avatar) }

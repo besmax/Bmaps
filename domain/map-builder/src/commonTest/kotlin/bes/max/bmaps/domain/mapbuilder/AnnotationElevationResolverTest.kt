@@ -72,6 +72,8 @@ class AnnotationElevationResolverTest {
     private fun repository(session: OpenedPackage) = object : PackageRepository {
         override fun observe(query: PackageQuery): Flow<PackageResult<PackagePage>> = error("Not used")
         override fun observe(id: PackageId): Flow<PackageResult<PackageSummary>> = error("Not used")
+        override suspend fun verifyFully(id: PackageId, onProgress: suspend (PackageVerificationProgress) -> Unit): PackageResult<Unit> =
+            PackageResult.Success(Unit)
         override suspend fun open(id: PackageId): PackageResult<OpenedPackage> = PackageResult.Success(session)
         override suspend fun delete(id: PackageId): PackageResult<Unit> = error("Not used")
         override suspend fun setLayerPresentation(id: PackageId, layers: List<LayerPresentation>): PackageResult<Unit> = error("Not used")

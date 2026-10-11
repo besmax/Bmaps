@@ -8,6 +8,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.domain.mapbuilder
 
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import bes.max.bmaps.core.database.*
 import bes.max.bmaps.core.mapengine.*
 import bes.max.bmaps.core.mbtiles.*
@@ -16,6 +17,11 @@ import bes.max.bmaps.core.storage.*
 import bes.max.bmaps.domain.providers.*
 import kotlin.random.Random
 import kotlin.test.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.first
 import kotlinx.io.readByteArray
 import kotlinx.io.Buffer
@@ -562,6 +568,111 @@ internal class PackageStorageScenarios(private val database: (String) -> Package
             assertNull(files.access { readElevationJob(id.value) })
             assertNull(files.access { readElevationRange(id.value) })
         } finally { db.close() }
+    }
+
+    suspend fun verifiedRestartSkipsTileScanAndManualVerificationFindsDamage() = fixture { root ->
+        val path = Path(root, "catalog.db").toString()
+        var db = database(path)
+        val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
+        var repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
+        val (request, manifest) = fixtureRequest(ZoomRange(0, 0))
+        val id = request.packageId
+        try {
+            createVerifiedMap(repository, request, manifest)
+            assertFalse(checkNotNull(db.packages().get(id.value)).needsVerification)
+            val bytes = files.access { size(id.value, false) }
+            changeStoredZoom(files, id, 1)
+            assertEquals(bytes, files.access { size(id.value, false) })
+            db.close()
+            db = database(path)
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
+            assertEquals(PackageState.READY, repository.observe(id).first().success().state)
+            repository.open(id).success().close()
+            val progress = mutableListOf<PackageVerificationProgress>()
+            val result = repository.verifyFully(id) { progress.add(it) }
+            assertEquals(PackageFailure.CorruptData, assertIs<PackageResult.Failure>(result).reason)
+            assertTrue(progress.any { it.stage == PackageVerificationStage.DATABASE })
+            assertTrue(progress.any { it.stage == PackageVerificationStage.TILES })
+            assertEquals(PackageState.CORRUPT, repository.observe(id).first().success().state)
+            assertTrue(checkNotNull(db.packages().get(id.value)).needsVerification)
+            changeStoredZoom(files, id, 0)
+            repository.verifyFully(id) { }.success()
+            assertEquals(PackageState.READY, repository.observe(id).first().success().state)
+            assertFalse(checkNotNull(db.packages().get(id.value)).needsVerification)
+        } finally { db.close() }
+    }
+
+    suspend fun dirtyReadyPackageIsDeeplyCheckedAndRecovered() = fixture { root ->
+        val path = Path(root, "catalog.db").toString()
+        var db = database(path)
+        val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
+        var repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
+        val (request, manifest) = fixtureRequest(ZoomRange(0, 0))
+        val id = request.packageId
+        try {
+            createVerifiedMap(repository, request, manifest)
+            val record = checkNotNull(db.packages().get(id.value))
+            db.packages().putPackage(record.copy(needsVerification = true))
+            changeStoredZoom(files, id, 1)
+            db.close()
+            db = database(path)
+            repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
+            assertEquals(PackageState.CORRUPT, repository.observe(id).first().success().state)
+            changeStoredZoom(files, id, 0)
+            repository.reconcile().success()
+            assertEquals(PackageState.READY, repository.observe(id).first().success().state)
+            assertFalse(checkNotNull(db.packages().get(id.value)).needsVerification)
+            repository.setLayerPresentation(id, listOf(LayerPresentation(manifest.layers.single().id, false, 0.5, 0))).success()
+            assertFalse(checkNotNull(db.packages().get(id.value)).needsVerification)
+            repository.saveAnnotations(id, listOf(Annotation("marker", AnnotationKind.MARKER, listOf(GeographicCoordinate(0.0, 0.0))))).success()
+            assertFalse(checkNotNull(db.packages().get(id.value)).needsVerification)
+        } finally { db.close() }
+    }
+
+    suspend fun cancelledFullVerificationPreservesTrustAndReleasesResources() = fixture { root ->
+        val db = database(Path(root, "catalog.db").toString())
+        val files = PackageFileStorage(PackageStorageLocation(Path(root, "packages").toString()))
+        val repository = LocalPackageRepository(PackageCatalog(db), files, DemReaderFactory())
+        val (request, manifest) = fixtureRequest(ZoomRange(0, 0))
+        val id = request.packageId
+        try {
+            createVerifiedMap(repository, request, manifest)
+            val record = checkNotNull(db.packages().get(id.value))
+            coroutineScope {
+                val checking = async {
+                    repository.verifyFully(id) { progress ->
+                        if (progress.stage == PackageVerificationStage.TILES) currentCoroutineContext().cancel()
+                    }
+                }
+                try { checking.await(); fail("Verification must propagate cancellation") }
+                catch (_: CancellationException) { }
+            }
+            assertEquals(record, db.packages().get(id.value))
+            val progress = mutableListOf<PackageVerificationProgress>()
+            repository.verifyFully(id) { progress.add(it) }.success()
+            assertEquals(1L, progress.last().checkedTiles)
+            assertEquals(1L, progress.last().totalTiles)
+            repository.open(id).success().close()
+            repository.delete(id).success()
+            assertNull(db.packages().get(id.value))
+        } finally { db.close() }
+    }
+
+    private suspend fun createVerifiedMap(repository: LocalPackageRepository, request: BuildRequest, manifest: PackageManifest) {
+        repository.prepare(request, manifest).success()
+        val bytes = ByteString(byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10))
+        repository.write(request.packageId, manifest.layers.single().id,
+            listOf(DownloadedTile(TileKey(0, 0, 0), bytes)), emptyList(), bytes.size.toLong()).success()
+        repository.finalize(request.packageId).success()
+    }
+
+    private suspend fun changeStoredZoom(files: PackageFileStorage, id: PackageId, zoom: Int) {
+        files.access {
+            val connection = BundledSQLiteDriver().open(asset(id.value, false, "map_data.mbtiles").toString())
+            try {
+                connection.prepare("UPDATE tiles SET zoom_level=?").use { it.bindLong(1, zoom.toLong()); it.step() }
+            } finally { connection.close() }
+        }
     }
 
     private suspend fun fixture(block: suspend (Path) -> Unit) {

@@ -16,7 +16,6 @@ import bmaps.feature.library.generated.resources.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
@@ -315,75 +314,9 @@ fun LibraryScreen(
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp))
     }
-    state.maps.firstOrNull { it.id == state.details }?.let { map ->
-        AlertDialog(
-            onDismissRequest = { model.details(null) },
-            title = { Text(map.name) },
-            text = {
-                Column(
-                    Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(stringResource(stateLabel(map.state)))
-                    Text(stringResource(Res.string.library_size, megabytes(map.sizeBytes)))
-                    Text(stringResource(if (map.hasElevationData) Res.string.library_elevation_present else Res.string.library_no_elevation))
-                    map.bounds?.let { bounds ->
-                        Text(
-                            stringResource(
-                                Res.string.library_bounds,
-                                bounds.south.toString(),
-                                bounds.west.toString(),
-                                bounds.north.toString(),
-                                bounds.east.toString()
-                            )
-                        )
-                    }
-                    if (map.zoomLevels.isNotEmpty()) Text(
-                        stringResource(
-                            Res.string.library_levels,
-                            map.zoomLevels.sorted().joinToString()
-                        )
-                    )
-                    Text(
-                        stringResource(
-                            Res.string.library_tile_progress,
-                            map.downloadedTiles,
-                            map.totalTiles
-                        )
-                    )
-                    Text(
-                        stringResource(Res.string.library_avatar),
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    MapAvatar.entries.chunked(2).forEach { avatars ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            avatars.forEach { avatar ->
-                                FilterChip(
-                                    selected = map.avatarKey == avatar.storageKey,
-                                    enabled = map.id !in state.busy,
-                                    onClick = { model.avatar(map.id, avatar) },
-                                    leadingIcon = {
-                                        Icon(
-                                            painterResource(avatarIcon(avatar)),
-                                            null,
-                                            Modifier.size(20.dp)
-                                        )
-                                    },
-                                    label = { Text(stringResource(avatarLabel(avatar))) })
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { model.details(null) }) {
-                    Text(
-                        stringResource(
-                            Res.string.library_done
-                        )
-                    )
-                }
-            })
+    state.details?.let { details ->
+        val map = state.maps.firstOrNull { it.id == details.id } ?: details
+        PackageDetailsDialog(map, map.id in state.busy, { model.avatar(map.id, it) }, { model.details(null) })
     }
     state.deleteConfirmation?.let { id ->
         AlertDialog(
@@ -408,7 +341,7 @@ fun LibraryScreen(
     }
 }
 
-private fun stateLabel(state: PackageState) = when (state) {
+internal fun stateLabel(state: PackageState) = when (state) {
     PackageState.READY -> Res.string.library_ready
     PackageState.BUILDING -> Res.string.library_downloading
     PackageState.FINALIZING -> Res.string.library_finalizing
@@ -418,9 +351,9 @@ private fun stateLabel(state: PackageState) = when (state) {
     PackageState.CORRUPT, PackageState.MISSING -> Res.string.library_damaged
 }
 
-private fun megabytes(bytes: Long): String = "${bytes / 1_000_000}.${bytes / 100_000 % 10}"
+internal fun megabytes(bytes: Long): String = "${bytes / 1_000_000}.${bytes / 100_000 % 10}"
 
-private fun avatarLabel(avatar: MapAvatar) = when (avatar) {
+internal fun avatarLabel(avatar: MapAvatar) = when (avatar) {
     MapAvatar.MAP -> Res.string.avatar_map
     MapAvatar.MOUNTAIN -> Res.string.avatar_mountain
     MapAvatar.FOREST -> Res.string.avatar_forest
@@ -429,7 +362,7 @@ private fun avatarLabel(avatar: MapAvatar) = when (avatar) {
     MapAvatar.CAMP -> Res.string.avatar_camp
 }
 
-private fun avatarIcon(avatar: MapAvatar) = when (avatar) {
+internal fun avatarIcon(avatar: MapAvatar) = when (avatar) {
     MapAvatar.MAP -> Res.drawable.avatar_map
     MapAvatar.MOUNTAIN -> Res.drawable.avatar_mountain
     MapAvatar.FOREST -> Res.drawable.avatar_forest

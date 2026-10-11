@@ -148,24 +148,37 @@ class MbTiles private constructor(private val connection: SQLiteConnection, priv
         }
     }
 
-    suspend fun verify(accepts: (TileAddress) -> Boolean = { true }) = access {
+    suspend fun verify(
+        onTilesChecked: suspend (Long) -> Unit = {},
+        accepts: (TileAddress) -> Boolean = { true },
+    ) = access {
+        currentCoroutineContext().ensureActive()
         require(scalar("SELECT count(*) FROM sqlite_schema WHERE type IN ('trigger', 'view')") == 0L)
         connection.prepare("SELECT 1 FROM tiles GROUP BY zoom_level, tile_column, tile_row HAVING count(*) > 1 LIMIT 1").use {
             require(!it.step())
         }
+        currentCoroutineContext().ensureActive()
         connection.prepare("PRAGMA quick_check").use {
-            check(it.step() && it.getText(0) == "ok" && !it.step()) { "Invalid MBTiles database" }
+            require(it.step() && it.getText(0) == "ok" && !it.step()) { "Invalid MBTiles database" }
         }
+        currentCoroutineContext().ensureActive()
+        var checked = 0L
+        onTilesChecked(checked)
+        currentCoroutineContext().ensureActive()
         connection.prepare("SELECT zoom_level, tile_column, tile_row, length(tile_data) FROM tiles").use {
             while (it.step()) {
                 currentCoroutineContext().ensureActive()
                 val zoom = it.getLong(0)
-                check(zoom in 0..63)
+                require(zoom in 0..63)
                 val stored = TileAddress(zoom.toInt(), it.getLong(1), it.getLong(2))
-                check(accepts(stored.copy(row = tmsRow(stored))))
-                check(it.getLong(3) in 1..MAX_TILE_BYTES.toLong())
+                require(accepts(stored.copy(row = tmsRow(stored))))
+                require(it.getLong(3) in 1..MAX_TILE_BYTES.toLong())
+                checked++
+                if (checked % 256 == 0L) onTilesChecked(checked)
             }
         }
+        onTilesChecked(checked)
+        currentCoroutineContext().ensureActive()
     }
 
     suspend fun close() = withContext(NonCancellable + Dispatchers.IO) {

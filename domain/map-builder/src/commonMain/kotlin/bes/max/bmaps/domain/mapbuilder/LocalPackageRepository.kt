@@ -18,6 +18,7 @@ import dev.zacsweers.metro.SingleIn
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
@@ -70,7 +71,7 @@ class LocalPackageRepository(
                 withContext(NonCancellable) {
                     promote(id.value)
                     records.putPackage(PackageRecord(id.value, manifest.name, PackageState.READY.name, encoded,
-                        size(id.value, false), manifest.updatedAtEpochMillis, manifest.elevation != null))
+                        size(id.value, false), manifest.updatedAtEpochMillis, manifest.elevation != null, needsVerification = false))
                 }
                 id
             } finally {
@@ -117,6 +118,7 @@ class LocalPackageRepository(
             } finally { database.close() }
             kotlinx.coroutines.currentCoroutineContext().ensureActive()
             withContext(NonCancellable) {
+                markNeedsVerification(record)
                 installElevationTiles(job.packageId.value, relativePath)
                 val bytes = assetSize(job.packageId.value, false, relativePath)
                 if (bytes > manifest.sizePolicy.effectiveLayerLimit) throw StorageLimitExceeded(manifest.sizePolicy.effectiveLayerLimit, bytes)
@@ -404,7 +406,8 @@ class LocalPackageRepository(
             promote(id.value)
             val bytes = checkLayerSizes(manifest, false)
             records.checkpoint(finalizing.copy(state = PackageState.READY.name, manifestJson = encoded.decodeToString(),
-                sizeBytes = bytes, updatedAtEpochMillis = manifest.updatedAtEpochMillis, hasElevationData = manifest.elevation != null),
+                sizeBytes = bytes, updatedAtEpochMillis = manifest.updatedAtEpochMillis, hasElevationData = manifest.elevation != null,
+                needsVerification = false),
                 finalJob.copy(state = BuildJobState.COMPLETED.name, packageBytes = bytes))
         }
     }
@@ -420,11 +423,13 @@ class LocalPackageRepository(
         storage.access {
             try {
                 val manifest = readManifest(id, false)
-                verify(manifest, false)
+                val deep = requiresVerification(record, manifest)
+                verify(manifest, false, deep = deep)
                 val actualBytes = size(id.value, false)
-                if (actualBytes != record.sizeBytes) {
+                if (deep || actualBytes != record.sizeBytes) {
                     val download = records.job(id.value)
-                    val updatedRecord = record.copy(sizeBytes = actualBytes, manifestJson = PackageManifestCodec.encode(manifest), updatedAtEpochMillis = manifest.updatedAtEpochMillis)
+                    val updatedRecord = record.copy(sizeBytes = actualBytes, manifestJson = PackageManifestCodec.encode(manifest),
+                        updatedAtEpochMillis = manifest.updatedAtEpochMillis, needsVerification = false)
                     if (download == null) records.putPackage(updatedRecord) else records.checkpoint(updatedRecord, download.copy(packageBytes = actualBytes))
                 }
                 LocalOpenedPackage(manifest, manifest.layers.associate {
@@ -437,7 +442,7 @@ class LocalPackageRepository(
             } catch (error: Exception) {
                 if (error is CancellationException) throw error
                 ElevationDiagnostics.error("package_open package=${id.value} reason=${failureOf(error)}", error)
-                records.putPackage(record.copy(state = if (error is FileNotFoundException) PackageState.MISSING.name else PackageState.CORRUPT.name))
+                records.putPackage(record.copy(state = if (error is FileNotFoundException) PackageState.MISSING.name else PackageState.CORRUPT.name, needsVerification = true))
                 throw error
             }
         }
@@ -468,6 +473,7 @@ class LocalPackageRepository(
                     layer.copy(visible = setting.visible, opacity = setting.opacity, renderOrder = setting.order)
                 })
             val encoded = PackageManifestCodec.encode(updated)
+            markNeedsVerification(record)
             write(id.value, "config.json", Buffer().apply { write(encoded.encodeToByteArray()) }, MANIFEST_RESERVE, Long.MAX_VALUE, staged = false)
             val bytes = size(id.value, false)
             val updatedRecord = record.copy(manifestJson = encoded, sizeBytes = bytes, updatedAtEpochMillis = updated.updatedAtEpochMillis)
@@ -515,6 +521,7 @@ class LocalPackageRepository(
             if (creating) removeTemporaryFiles(id.value, staged = false)
             val path = if (creating) "annotations.db.part" else "annotations.db"
             withContext(NonCancellable) {
+                markNeedsVerification(record)
                 try {
                     AnnotationDatabase.access(asset(id.value, false, path).toString(), id.value, create = creating) {
                         change(rows, deleteId, Long.MAX_VALUE, Clock.System.now().toEpochMilliseconds())
@@ -545,6 +552,7 @@ class LocalPackageRepository(
         if (!force && manifest.annotations?.sizeBytes == bytes && manifest.updatedAtEpochMillis >= modifiedAt) return manifest
         val updated = manifest.copy(annotations = PackageAsset("annotations.db", bytes), updatedAtEpochMillis = maxOf(manifest.updatedAtEpochMillis, modifiedAt))
         val encoded = PackageManifestCodec.encode(updated).encodeToByteArray()
+        records.get(id)?.let { markNeedsVerification(it) }
         write(id, "config.json", Buffer().apply { write(encoded) }, MANIFEST_RESERVE, Long.MAX_VALUE, staged = false)
         return updated
     }
@@ -600,12 +608,12 @@ class LocalPackageRepository(
                                 job.copy(state = if (queued) BuildJobState.QUEUED.name else job.state, completedTiles = counts.downloaded,
                                     failedTiles = counts.failed, packageBytes = bytes))
                         }
-                        else -> records.putPackage(record.copy(state = PackageState.MISSING.name))
+                        else -> records.putPackage(record.copy(state = PackageState.MISSING.name, needsVerification = true))
                     }
                 } catch (error: Exception) {
                     if (error is CancellationException) throw error
                     ElevationDiagnostics.error("package_reconcile package=${id.value} reason=${failureOf(error)}", error)
-                    records.putPackage(record.copy(state = PackageState.CORRUPT.name))
+                    records.putPackage(record.copy(state = PackageState.CORRUPT.name, needsVerification = true))
                 }
             }
             for (id in ids(false)) {
@@ -616,7 +624,7 @@ class LocalPackageRepository(
                     verify(manifest, false)
                     records.putPackage(PackageRecord(id, manifest.name, PackageState.READY.name,
                         PackageManifestCodec.encode(manifest), size(id, false), manifest.updatedAtEpochMillis,
-                        manifest.elevation != null))
+                        manifest.elevation != null, needsVerification = false))
                 } catch (error: Exception) {
                     if (error is CancellationException) throw error
                     records.putPackage(PackageRecord(id, id, PackageState.CORRUPT.name, "", 0, 0))
@@ -631,54 +639,119 @@ class LocalPackageRepository(
         }
     }
 
-    private suspend fun PackageFiles.indexFinal(record: PackageRecord) {
-        val manifest = readManifest(PackageId(record.id), false)
-        verify(manifest, false)
-        val bytes = size(record.id, false)
-        val ready = record.copy(state = PackageState.READY.name, manifestJson = PackageManifestCodec.encode(manifest),
-            sizeBytes = bytes, updatedAtEpochMillis = manifest.updatedAtEpochMillis, hasElevationData = manifest.elevation != null)
-        val job = records.job(record.id)
-        if (job == null) records.putPackage(ready) else {
-            val counts = counts(manifest, false)
-            val generatedTiles = manifest.layers.filter { it.elevationRelief != null }.sumOf { it.tileCount ?: 0 }
-            val downloadedTiles = counts.downloaded - generatedTiles
-            if (downloadedTiles != job.totalTiles || counts.failed != 0L) fail(PackageFailure.CorruptData)
-            records.checkpoint(ready, job.copy(state = BuildJobState.COMPLETED.name,
-                completedTiles = downloadedTiles, failedTiles = 0, packageBytes = bytes, failure = null))
+    override suspend fun verifyFully(
+        id: PackageId, onProgress: suspend (PackageVerificationProgress) -> Unit,
+    ): PackageResult<Unit> {
+        onProgress(PackageVerificationProgress(PackageVerificationStage.WAITING))
+        return operation {
+            val record = records.get(id.value) ?: fail(PackageFailure.NotFound)
+            if (record.state !in setOf(PackageState.READY.name, PackageState.CORRUPT.name, PackageState.MISSING.name)) {
+                fail(PackageFailure.NotReady)
+            }
+            storage.access {
+                try {
+                    indexFinal(record, force = true, onProgress = onProgress)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    records.putPackage(record.copy(
+                        state = if (error is FileNotFoundException) PackageState.MISSING.name else PackageState.CORRUPT.name,
+                        needsVerification = true,
+                    ))
+                    throw error
+                }
+            }
         }
     }
 
-    private suspend fun PackageFiles.verify(manifest: PackageManifest, staged: Boolean) {
+    private suspend fun markNeedsVerification(record: PackageRecord) {
+        if (!record.needsVerification) records.putPackage(record.copy(needsVerification = true))
+    }
+
+    private fun requiresVerification(record: PackageRecord, manifest: PackageManifest): Boolean =
+        record.needsVerification || record.state != PackageState.READY.name ||
+            record.manifestJson != PackageManifestCodec.encode(manifest)
+
+    private suspend fun PackageFiles.indexFinal(
+        record: PackageRecord, force: Boolean = false,
+        onProgress: suspend (PackageVerificationProgress) -> Unit = {},
+    ) {
+        onProgress(PackageVerificationProgress(PackageVerificationStage.FILES))
+        val manifest = readManifest(PackageId(record.id), false)
+        val deep = force || requiresVerification(record, manifest)
+        val verifiedCounts = verify(manifest, false, deep, onProgress)
+        val bytes = size(record.id, false)
+        val ready = record.copy(state = PackageState.READY.name, manifestJson = PackageManifestCodec.encode(manifest),
+            sizeBytes = bytes, updatedAtEpochMillis = manifest.updatedAtEpochMillis,
+            hasElevationData = manifest.elevation != null, needsVerification = false)
+        val job = records.job(record.id)
+        currentCoroutineContext().ensureActive()
+        if (job == null) {
+            if (ready != record) records.putPackage(ready)
+        } else {
+            val generatedTiles = manifest.layers.filter { it.elevationRelief != null }.sumOf { it.tileCount ?: 0 }
+            val downloadedTiles = (verifiedCounts?.downloaded ?: manifest.layers.sumOf { it.tileCount ?: 0 }) - generatedTiles
+            if (downloadedTiles != job.totalTiles || (verifiedCounts?.failed ?: 0L) != 0L) fail(PackageFailure.CorruptData)
+            val completed = job.copy(state = BuildJobState.COMPLETED.name,
+                completedTiles = downloadedTiles, failedTiles = 0, packageBytes = bytes, failure = null)
+            if (ready != record || completed != job) records.checkpoint(ready, completed)
+        }
+    }
+
+    private suspend fun PackageFiles.verify(
+        manifest: PackageManifest, staged: Boolean, deep: Boolean = true,
+        onProgress: suspend (PackageVerificationProgress) -> Unit = {},
+    ): TileCounts? {
+        currentCoroutineContext().ensureActive()
+        onProgress(PackageVerificationProgress(PackageVerificationStage.FILES))
         if (manifest.elevationDataset != bes.max.bmaps.domain.providers.ElevationDataset.NONE && manifest.elevation == null) {
             fail(PackageFailure.CorruptData)
         }
         checkLayerSizes(manifest, staged)
-        val retained = if (staged) emptySet() else retainedReliefAssets(manifest.id) - PackageManifestCodec.assets(manifest).map { it.relativePath }.toSet()
+        val assets = PackageManifestCodec.assets(manifest)
+        val retained = if (staged) emptySet() else retainedReliefAssets(manifest.id) - assets.map { it.relativePath }.toSet()
         if (relativeFiles(manifest.id.value, staged) - retained !=
-            PackageManifestCodec.assets(manifest).map { it.relativePath }.toSet() + "config.json") fail(PackageFailure.CorruptData)
-        for (asset in PackageManifestCodec.assets(manifest)) {
+            assets.map { it.relativePath }.toSet() + "config.json") fail(PackageFailure.CorruptData)
+        for (asset in assets) {
+            currentCoroutineContext().ensureActive()
             if (assetSize(manifest.id.value, staged, asset.relativePath) != asset.sizeBytes) fail(PackageFailure.CorruptData)
-            if (asset.sha256 != null && TransferStreams.digest(this.asset(manifest.id.value, staged, asset.relativePath)) != asset.sha256) {
-                fail(PackageFailure.CorruptData)
+            if (deep && asset.sha256 != null) {
+                onProgress(PackageVerificationProgress(PackageVerificationStage.CHECKSUM, asset.relativePath))
+                if (TransferStreams.digest(this.asset(manifest.id.value, staged, asset.relativePath)) != asset.sha256) {
+                    fail(PackageFailure.CorruptData)
+                }
             }
         }
+        if (manifest.layers.any { it.tileCount == null }) fail(PackageFailure.NotReady)
         manifest.elevation?.let {
             if (!validElevation(manifest.id, it.relativePath, staged)) fail(PackageFailure.CorruptData)
         }
-        if (manifest.annotations != null) AnnotationDatabase.access(
-            asset(manifest.id.value, staged, "annotations.db").toString(), manifest.id.value, verify = true,
-        ) { }
+        if (!deep) return null
+        if (manifest.annotations != null) {
+            onProgress(PackageVerificationProgress(PackageVerificationStage.ANNOTATIONS, "annotations.db"))
+            AnnotationDatabase.access(asset(manifest.id.value, staged, "annotations.db").toString(), manifest.id.value, verify = true) { }
+        }
+        var downloaded = 0L
+        var failed = 0L
+        val totalTiles = manifest.layers.sumOf { it.tileCount ?: 0 }
         for (layer in manifest.layers) {
-            if (layer.tileCount == null) fail(PackageFailure.NotReady)
-            val database = MbTiles.open(asset(manifest.id.value, staged, layer.tiles.relativePath).toString())
+            currentCoroutineContext().ensureActive()
+            val path = layer.tiles.relativePath
+            onProgress(PackageVerificationProgress(PackageVerificationStage.DATABASE, path, downloaded, totalTiles))
+            val database = MbTiles.open(asset(manifest.id.value, staged, path).toString())
             try {
                 val coverage = coverage(layer)
-                database.verify { coverage.contains(TileKey(it.zoom, it.column, it.row)) }
+                database.verify(onTilesChecked = { checked ->
+                    onProgress(PackageVerificationProgress(PackageVerificationStage.TILES, path, downloaded + checked, totalTiles))
+                }) { coverage.contains(TileKey(it.zoom, it.column, it.row)) }
                 val counts = database.counts()
                 if (counts.downloaded != layer.tileCount || counts.failed != 0L ||
                     database.metadata()["bmaps_package_id"] != manifest.id.value) fail(PackageFailure.CorruptData)
+                downloaded += counts.downloaded
+                failed += counts.failed
             } finally { database.close() }
         }
+        currentCoroutineContext().ensureActive()
+        return TileCounts(downloaded, failed)
     }
 
     private suspend fun PackageFiles.counts(manifest: PackageManifest, staged: Boolean): TileCounts {

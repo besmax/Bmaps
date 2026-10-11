@@ -23,6 +23,9 @@ class PackageStorageDeviceTest {
         packageDatabase(Room.databaseBuilder<PackageDatabase>(InstrumentationRegistry.getInstrumentation().targetContext, path))
     }
 
+    @Test fun verifiedRestartSkipsTileScanAndManualVerificationFindsDamage() = runBlocking { scenarios.verifiedRestartSkipsTileScanAndManualVerificationFindsDamage() }
+    @Test fun dirtyReadyPackageIsDeeplyCheckedAndRecovered() = runBlocking { scenarios.dirtyReadyPackageIsDeeplyCheckedAndRecovered() }
+    @Test fun cancelledFullVerificationPreservesTrustAndReleasesResources() = runBlocking { scenarios.cancelledFullVerificationPreservesTrustAndReleasesResources() }
     @Test fun generatedElevationLayerReplacementAndSizeAccounting() = runBlocking { scenarios.generatedElevationLayerReplacementAndSizeAccounting() }
     @Test fun transferRoundTripAndInterruptedImport() = runBlocking { scenarios.transferRoundTripAndInterruptedImport() }
     @Test fun eachLayerHasItsOwnLimitAndElevationIsExcluded() = runBlocking { scenarios.eachLayerHasItsOwnLimitAndElevationIsExcluded() }

@@ -111,6 +111,8 @@ private class LocalOnlyRepository : PackageRepository {
     override fun observe(query: PackageQuery): Flow<PackageResult<PackagePage>> =
         summary.map { PackageResult.Success(PackagePage(listOf(it), null)) }
     override fun observe(id: PackageId): Flow<PackageResult<PackageSummary>> = summary.map { PackageResult.Success(it) }
+    override suspend fun verifyFully(id: PackageId, onProgress: suspend (PackageVerificationProgress) -> Unit): PackageResult<Unit> =
+        PackageResult.Success(Unit)
     override suspend fun open(id: PackageId): PackageResult<OpenedPackage> {
         if (missing) return PackageResult.Failure(PackageFailure.NotFound)
         operations += "open"

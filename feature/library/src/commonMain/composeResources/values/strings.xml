@@ -69,4 +69,19 @@
     <string name="transfer_corrupt">The file is incomplete or invalid. No map was imported.</string>
     <string name="transfer_storage">Not enough storage, or the file exceeds the transfer or layer size limit.</string>
     <string name="transfer_default_name">Imported map</string>
+    <string name="verification_start">Full verification</string>
+    <string name="verification_waiting">Waiting to verify map…</string>
+    <string name="verification_files">Checking map files…</string>
+    <string name="verification_checksum">Checking file checksum…</string>
+    <string name="verification_annotations">Checking map objects…</string>
+    <string name="verification_database">Checking tile database integrity…</string>
+    <string name="verification_tile_stage">Checking tile coverage…</string>
+    <string name="verification_tiles">%1$d of %2$d tiles checked</string>
+    <string name="verification_cancel">Cancel verification</string>
+    <string name="verification_cancelling">Stopping verification…</string>
+    <string name="verification_cancelled">Verification cancelled. Map files were kept.</string>
+    <string name="verification_success">Full verification completed. The map passed all checks.</string>
+    <string name="verification_damaged">Verification failed: map files are missing or damaged.</string>
+    <string name="verification_failed">Verification could not be completed. Try again.</string>
+    <string name="verification_not_ready">Finish or restore this download before verifying the map.</string>
 </resources>

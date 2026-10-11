@@ -148,3 +148,10 @@ DEM coverage (2026-10-09): the download request derives a complete selected XYZ 
 
 
 Annotation height contract (2026-10-10): annotation features may carry optional vertex-aligned `bmaps-elevations` properties containing finite meter values and their vertical reference, or null. Missing properties remain readable as unknown heights; geometry remains two-dimensional. No manifest, transfer or SQLite table version change is required. Full mapping and validation are in `15_ANNOTATIONS_AND_GEOJSON.md`.
+
+
+## Package verification contract — 2026-10-11
+
+`PackageRepository.verifyFully(id, onProgress)` performs an explicit local deep check for a finalized package, including entries currently marked CORRUPT or MISSING. It returns `PackageResult<Unit>`, publishes immutable `PackageVerificationProgress` snapshots and propagates coroutine cancellation. Successful verification repairs final-package catalog/job state; failures retain the package with diagnostic readiness and a dirty verification flag. Cancellation does not mark the package corrupt or clear a dirty verification flag. Read-only cancellation preserves prior trust; an interrupted manifest repair retains its dirty marker. Progress covers waiting/files/checksums/annotations/database integrity/tile coverage, with aggregate tile counters for coverage scanning. It does not promise raster pixel decoding or native GeoTIFF footprint validation.
+
+Room schema version 3 stores device-local `needsVerification`; the explicit 2-to-3 migration defaults existing records to dirty. The package manifest and `.bmaps` transfer versions remain 1. Deep verification is cached for unchanged READY packages; crash recovery and dirty/resource-changing operations follow document 11. Dialog lifecycle, results and cancellation limits are specified in document 13.

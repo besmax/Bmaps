@@ -23,10 +23,20 @@ data class PackagePage(val items: List<PackageSummary>, val nextCursor: String?)
 
 data class LayerPresentation(val id: LayerId, val visible: Boolean, val opacity: Double, val order: Int)
 
+enum class PackageVerificationStage { WAITING, FILES, CHECKSUM, ANNOTATIONS, DATABASE, TILES }
+
+data class PackageVerificationProgress(
+    val stage: PackageVerificationStage,
+    val asset: String? = null,
+    val checkedTiles: Long = 0,
+    val totalTiles: Long = 0,
+)
+
 interface PackageRepository {
     fun observe(query: PackageQuery): Flow<PackageResult<PackagePage>>
     fun observe(id: PackageId): Flow<PackageResult<PackageSummary>>
     suspend fun open(id: PackageId): PackageResult<OpenedPackage>
+    suspend fun verifyFully(id: PackageId, onProgress: suspend (PackageVerificationProgress) -> Unit): PackageResult<Unit>
     suspend fun delete(id: PackageId): PackageResult<Unit>
     suspend fun setLayerPresentation(id: PackageId, layers: List<LayerPresentation>): PackageResult<Unit>
     suspend fun setFavourite(id: PackageId, favourite: Boolean): PackageResult<Unit>

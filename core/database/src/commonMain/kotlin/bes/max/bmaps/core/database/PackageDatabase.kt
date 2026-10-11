@@ -33,6 +33,7 @@ data class PackageRecord(
     val sizeBytes: Long,
     val updatedAtEpochMillis: Long,
     val hasElevationData: Boolean = false,
+    @ColumnInfo(defaultValue = "1") val needsVerification: Boolean = true,
 )
 
 @Entity(
@@ -133,7 +134,7 @@ abstract class PackageDao {
     }
 }
 
-@Database(entities = [PackageRecord::class, DownloadJobRecord::class, PackagePreferencesRecord::class], version = 2, exportSchema = true)
+@Database(entities = [PackageRecord::class, DownloadJobRecord::class, PackagePreferencesRecord::class], version = 3, exportSchema = true)
 @ConstructedBy(PackageDatabaseConstructor::class)
 abstract class PackageDatabase : RoomDatabase() {
     abstract fun packages(): PackageDao
@@ -148,6 +149,11 @@ fun packageDatabase(builder: RoomDatabase.Builder<PackageDatabase>): PackageData
     .addMigrations(object : Migration(1, 2) {
         override fun migrate(connection: SQLiteConnection) {
             connection.execSQL("CREATE TABLE IF NOT EXISTS package_preferences (packageId TEXT NOT NULL, favourite INTEGER NOT NULL, avatar TEXT NOT NULL, PRIMARY KEY(packageId), FOREIGN KEY(packageId) REFERENCES packages(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+        }
+    })
+    .addMigrations(object : Migration(2, 3) {
+        override fun migrate(connection: SQLiteConnection) {
+            connection.execSQL("ALTER TABLE packages ADD COLUMN needsVerification INTEGER NOT NULL DEFAULT 1")
         }
     })
     .setDriver(BundledSQLiteDriver())

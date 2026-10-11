@@ -76,3 +76,8 @@ Annotation callout location (2026-10-10): `CalloutLocationViewModel` owns one im
 
 
 Saved annotation heights (2026-10-10): the editor independently validates geometry/height structure, then invokes the injected domain `AnnotationElevationResolver` before repository commits. Changed vertices invalidate stored heights; Undo restores the previous geometry/height pair. Callout height is taken from saved data at matching vertices, with package-local sampling for unknown/arbitrary click points. See `15_ANNOTATIONS_AND_GEOJSON.md`; new regression scenarios are authored but not executed.
+
+
+## Library package verification presentation — 2026-10-11
+
+`catalog.ui.PackageDetailsDialog` owns a separate ViewModelStore for `catalog.presentation.PackageVerificationViewModel`. The ViewModel exposes one immutable state containing the observed package summary, current verification stage/counters, running/stopping flags and a persistent localized result. Closing the store cancels verification and observation. Duplicate starts are ignored while running or stopping. The library retains the selected summary independently of its filtered page so a verification-induced readiness change does not remove the result dialog. This operation is foreground and dialog-owned; it does not become a durable background job. See `13_LIBRARY_AND_OFFLINE_VIEWER.md`.

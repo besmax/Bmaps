@@ -19,6 +19,9 @@ class PackageStorageIosTest {
         packageDatabase(Room.databaseBuilder<PackageDatabase>(name = path))
     }
 
+    @Test fun verifiedRestartSkipsTileScanAndManualVerificationFindsDamage() = runBlocking { scenarios.verifiedRestartSkipsTileScanAndManualVerificationFindsDamage() }
+    @Test fun dirtyReadyPackageIsDeeplyCheckedAndRecovered() = runBlocking { scenarios.dirtyReadyPackageIsDeeplyCheckedAndRecovered() }
+    @Test fun cancelledFullVerificationPreservesTrustAndReleasesResources() = runBlocking { scenarios.cancelledFullVerificationPreservesTrustAndReleasesResources() }
     @Test fun generatedElevationLayerReplacementAndSizeAccounting() = runBlocking { scenarios.generatedElevationLayerReplacementAndSizeAccounting() }
     @Test fun transferRoundTripAndInterruptedImport() = runBlocking { scenarios.transferRoundTripAndInterruptedImport() }
     @Test fun eachLayerHasItsOwnLimitAndElevationIsExcluded() = runBlocking { scenarios.eachLayerHasItsOwnLimitAndElevationIsExcluded() }

@@ -451,3 +451,10 @@ The historical 300 MB raster-layer policy is temporarily disabled at the shared 
 
 
 Persisted annotation heights (2026-10-10): source now stores optional per-vertex meter heights and DEM vertical references, resolves missing heights before editor saves/moves/imports, invalidates moved-vertex heights, and preserves heights through stored features and GeoJSON/package transfer. Old objects remain readable with unknown heights. Regression scenarios are authored but not run; builds and manual/native validation remain with the owner. See `15_ANNOTATIONS_AND_GEOJSON.md` and `17_ELEVATION_READER.md`.
+
+
+### Library verification performance and manual checking — 2026-10-11
+
+Source implementation replaces repeated deep checks of unchanged READY packages with inventory/size/header checks backed by a durable Room verification flag. Interrupted resource mutations, staging/promotion recovery, unknown packages and changed manifests retain deep verification. Existing entries undergo one deep check after the explicit Room 2-to-3 migration. Final indexing reuses deep-check counters instead of reopening each MBTiles for a second count pass.
+
+Library map details add explicit full verification, stage/tile progress, cancellation and completion results through a dialog-owned ViewModel. Failed checks remain readable even when the map leaves the selected readiness filter. Added Android/iOS storage scenarios and presentation tests are not executed. Resource/license/source and migration SQL checks are the verification scope; builds, generated schema version 3, migration execution in Room, native acceptance and measured startup improvement remain with the user. See documents 11 and 13.
