@@ -43,3 +43,22 @@ expect fun rememberLocationAccess(onChanged: () -> Unit): LocationAccess
 
 internal expect fun locationTimeMillis(): Long
 internal expect fun locationDiagnostic(message: String, error: Throwable? = null)
+
+internal fun LocationFix.isFresh(nowMillis: Long) = nowMillis - timestampMillis in -5_000L..30_000L
+
+internal fun LocationFix.isValid() =
+    latitude.isFinite() && latitude in -90.0..90.0 &&
+        longitude.isFinite() && longitude in -180.0..180.0 &&
+        accuracyMeters.isFinite() && accuracyMeters >= 0
+
+internal fun shouldAcceptLocationFix(
+    current: LocationFix?,
+    candidate: LocationFix,
+    preserveCurrentAccuracy: Boolean,
+    nowMillis: Long,
+): Boolean {
+    if (!candidate.isValid() || !candidate.isFresh(nowMillis)) return false
+    if (current == null) return true
+    if (candidate.timestampMillis < current.timestampMillis) return false
+    return !preserveCurrentAccuracy || !current.isFresh(nowMillis) || candidate.accuracyMeters <= current.accuracyMeters
+}

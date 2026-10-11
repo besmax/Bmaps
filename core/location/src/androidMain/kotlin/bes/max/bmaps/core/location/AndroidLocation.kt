@@ -90,15 +90,11 @@ private class AndroidLocationService(private val context: Context) : LocationSer
                 location.speed.toDouble().takeIf { location.hasSpeed() && it.isFinite() && it >= 0 },
                 location.bearing.toDouble().takeIf { location.hasBearing() && it.isFinite() && it >= 0 && it < 360 },
             )
-            val previous = accepted
-            if (previous != null) {
-                val previousAge = wallTime - previous.timestampMillis
-                val recentGps = acceptedProvider == LocationManager.GPS_PROVIDER && previousAge < 10_000
-                val worseFallback = location.provider != LocationManager.GPS_PROVIDER && fix.accuracyMeters > previous.accuracyMeters
-                if (fix.timestampMillis < previous.timestampMillis || recentGps && worseFallback) {
-                    locationDiagnostic("Fix ignored: a newer or more accurate position is available")
-                    return
-                }
+            val preserveGpsAccuracy = acceptedProvider == LocationManager.GPS_PROVIDER &&
+                location.provider != LocationManager.GPS_PROVIDER
+            if (!shouldAcceptLocationFix(accepted, fix, preserveGpsAccuracy, wallTime)) {
+                locationDiagnostic("Fix ignored: invalid, expired, older, or worse than fresh GPS; previousProvider=$acceptedProvider, previousAgeMs=${accepted?.let { wallTime - it.timestampMillis }}, previousAccuracyM=${accepted?.accuracyMeters}")
+                return
             }
             accepted = fix
             acceptedProvider = location.provider
@@ -107,7 +103,7 @@ private class AndroidLocationService(private val context: Context) : LocationSer
 
         fun publishAvailability() {
             val enabled = candidates.filter { manager.isProviderEnabled(it) }
-            val fix = accepted?.takeIf { locationTimeMillis() - it.timestampMillis in -5_000L..30_000L }
+            val fix = accepted?.takeIf { it.isFresh(locationTimeMillis()) }
             locationDiagnostic("Available providers: $enabled")
             trySend(when {
                 !manager.isLocationEnabled || enabled.isEmpty() -> LocationState(LocationStatus.DISABLED)

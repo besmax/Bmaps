@@ -138,9 +138,6 @@ class LocationViewModel(private val service: LocationService) : ViewModel() {
         }
     }
 
-    private fun fresh(fix: LocationFix) = locationTimeMillis() - fix.timestampMillis in -5_000L..30_000L
-    private fun valid(fix: LocationFix) =
-        fix.latitude.isFinite() && fix.latitude in -90.0..90.0 &&
-            fix.longitude.isFinite() && fix.longitude in -180.0..180.0 &&
-            fix.accuracyMeters.isFinite() && fix.accuracyMeters >= 0
+    private fun fresh(fix: LocationFix) = fix.isFresh(locationTimeMillis())
+    private fun valid(fix: LocationFix) = fix.isValid()
 }
