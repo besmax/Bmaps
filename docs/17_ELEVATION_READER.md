@@ -135,3 +135,6 @@ Annotation callout height (2026-10-10): `CalloutLocationViewModel` samples the s
 
 
 Persisted annotation heights (2026-10-10): the editor samples available package DEM data through `AnnotationElevationResolver` before committing new/edited/imported geometry. Per-vertex values retain meters and the DEM vertical reference; absent data is serialized as null. Known heights are retained across property edits and invalidated for moved vertices. Callouts prefer stored height at matching vertices and otherwise sample the click point. No automatic DEM download or retroactive bulk enrichment occurs. See `15_ANNOTATIONS_AND_GEOJSON.md` for storage/export mapping and source-only verification.
+
+
+Callout display CRS follow-up (2026-10-11): annotation readouts now use the same `ProjTransformerFactory` as the viewer center and observe both display-system and angular-format preferences. Their DEM inputs remain the selected WGS-84 coordinate, so a display-system change does not alter the height lookup or trigger a new sample. Operation failures remain explicit rather than displaying an unchanged WGS-84 fallback. See `15_ANNOTATIONS_AND_GEOJSON.md`; source/static review only, with native acceptance and test execution pending.

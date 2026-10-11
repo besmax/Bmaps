@@ -29,7 +29,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import bes.max.bmaps.domain.mapbuilder.Annotation
 import bes.max.bmaps.domain.mapbuilder.AnnotationKind
-import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import bes.max.bmaps.core.mapengine.ProjectedCoordinate
 import bes.max.bmaps.core.mapengine.CoordinateSystemId
 import bes.max.bmaps.core.datastore.CoordinateFormat
@@ -54,6 +53,9 @@ private data class CalloutContent(
     val moving: Boolean,
     val error: StringResource?,
     val coordinateAxes: Pair<String, String>?,
+    val projected: Boolean,
+    val coordinateError: StringResource?,
+    val coordinatesLoading: Boolean,
     val elevationMeters: Double?,
 )
 
@@ -70,7 +72,9 @@ internal fun MapObjectCallout(
     onEdit: () -> Unit,
     onMove: () -> Unit,
     onDelete: () -> Unit,
-    coordinate: GeographicCoordinate? = null,
+    displayCoordinate: ProjectedCoordinate? = null,
+    coordinateError: StringResource? = null,
+    coordinatesLoading: Boolean = false,
     coordinateFormat: CoordinateFormat = CoordinateFormat.DECIMAL_DEGREES,
     elevationMeters: Double? = null,
 ) {
@@ -84,6 +88,7 @@ internal fun MapObjectCallout(
             (((position.y - window.top) / height) * camera.layout.height).toFloat(),
         ) else null
     } else null
+    val coordinateAxes = displayCoordinate?.let { formatCoordinateAxes(it, coordinateFormat) }
     val current = if (annotation != null && position != null && anchor != null && camera != null) CalloutContent(
         annotation,
         position,
@@ -91,9 +96,12 @@ internal fun MapObjectCallout(
         camera.layout,
         moving,
         error,
-        coordinate?.let {
-            formatCoordinateAxes(ProjectedCoordinate(it.longitude, it.latitude, CoordinateSystemId.Wgs84), coordinateFormat)
+        coordinateAxes,
+        displayCoordinate?.coordinateSystem == CoordinateSystemId.WebMercator,
+        coordinateError ?: Res.string.position_coordinates_unsupported.takeIf {
+            displayCoordinate != null && coordinateAxes == null
         },
+        coordinatesLoading,
         elevationMeters,
     ) else null
     var retained by remember(camera?.session) { mutableStateOf<CalloutContent?>(null) }
@@ -163,11 +171,17 @@ internal fun MapObjectCallout(
                             }
                         }
                         content.coordinateAxes?.let { (latitude, longitude) ->
-                            Text(stringResource(Res.string.position_latitude, latitude),
+                            Text(stringResource(if (content.projected) Res.string.position_x else Res.string.position_latitude, latitude),
                                 style = MaterialTheme.typography.bodySmall)
-                            Text(stringResource(Res.string.position_longitude, longitude),
+                            Text(stringResource(if (content.projected) Res.string.position_y else Res.string.position_longitude, longitude),
                                 style = MaterialTheme.typography.bodySmall)
                         }
+                        content.coordinateError?.let {
+                            Text(stringResource(it), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error)
+                        }
+                        if (content.coordinatesLoading) Text(stringResource(Res.string.position_coordinates_calculating),
+                            style = MaterialTheme.typography.bodySmall)
                         content.elevationMeters?.let { meters ->
                             Text(stringResource(Res.string.position_elevation_value, fixedDecimal(meters, 1)),
                                 style = MaterialTheme.typography.bodySmall)

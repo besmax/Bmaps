@@ -149,15 +149,19 @@ private fun ViewerObjectCallout(
     DisposableEffect(locationModel) {
         onDispose { locationModel.select(null, null, false) }
     }
+    val locationMatches = locationState.packageId == manifest?.id && locationState.coordinate == coordinate
     MapObjectCallout(
         renderer = model.renderer,
         annotation = activeObject,
         position = activeObjectUi?.calloutCoordinate?.let { state.annotationPyramid?.positionOf(it) },
         camera = camera,
-        coordinate = coordinate,
+        displayCoordinate = locationState.displayCoordinate.takeIf { locationMatches },
+        coordinateError = locationState.coordinateError.takeIf { locationMatches },
+        coordinatesLoading = coordinate != null && (!locationMatches ||
+            (locationState.displayCoordinate == null && locationState.coordinateError == null)),
         coordinateFormat = locationState.format,
         elevationMeters = storedElevation ?: locationState.elevationMeters.takeIf {
-            locationState.packageId == manifest?.id && locationState.coordinate == coordinate
+            locationMatches
         },
         animated = animated,
         busy = annotationState.busy,

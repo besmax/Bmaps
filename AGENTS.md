@@ -24,7 +24,7 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Download execution, scheduling, progress and restore | `docs/12_DOWNLOAD_PIPELINE.md` |
 | Library, package opening/deletion, manual full verification and cancellation, offline viewer, adaptive control layout, immersive gestures and viewport retention | `docs/13_LIBRARY_AND_OFFLINE_VIEWER.md` |
 | Raster layer alignment, ordering, visibility, opacity and composition | `docs/14_RASTER_LAYER_COMPOSITION.md` |
-| Map annotations, marker icons, geometry editing, persisted vertex heights, GeoJSON and GPX import | `docs/15_ANNOTATIONS_AND_GEOJSON.md` |
+| Map annotations, marker icons, geometry editing, persisted vertex heights, callout coordinate-system display, GeoJSON and GPX import | `docs/15_ANNOTATIONS_AND_GEOJSON.md` |
 | Map object clustering, cluster interaction and expansion | `docs/15_ANNOTATIONS_AND_GEOJSON.md`, `docs/plans/MAP_OBJECT_CLUSTERING.md` (design proposal; verify current implementation in source) |
 | Elevation/DEM download selection, tile-envelope request bounds/margins, area/size estimates, footprint verification, provider credentials and persistence | `docs/16_ELEVATION_DOWNLOADS.md` |
 | Elevation/DEM reading, TIFF/native integration, bounded grid/block caches, sampling, center lookup cancellation, compact viewer center readout, annotation callout height and pre-save vertex height sampling | `docs/17_ELEVATION_READER.md` |
