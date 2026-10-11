@@ -28,6 +28,7 @@ data class LibraryState(
     val pages: Int = 1, val hasMore: Boolean = false,
     val search: String = "", val filter: LibraryFilter = LibraryFilter.ALL,
     val details: PackageSummary? = null, val deleteConfirmation: PackageId? = null,
+    val actionsExpanded: Boolean = false,
 )
 
 enum class LibraryFilter { ALL, FAVOURITES, READY, INCOMPLETE }
@@ -86,6 +87,8 @@ class LibraryViewModel(
             }
         }
     }
+
+    fun actionsExpanded(expanded: Boolean) { mutableState.update { it.copy(actionsExpanded = expanded) } }
 
     fun search(value: String) {
         if (value == state.value.search) return

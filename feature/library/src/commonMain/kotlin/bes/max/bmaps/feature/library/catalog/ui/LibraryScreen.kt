@@ -80,7 +80,6 @@ fun LibraryScreen(
             state = state,
             transferBusy = transferState.busy,
             margin = margin,
-            onImport = documents::pick,
             onCancelTransfer = transfer::cancel,
             onSearch = model::search,
             onFilter = model::filter,
@@ -97,7 +96,14 @@ fun LibraryScreen(
             onMore = model::more,
             modifier = Modifier.align(Alignment.TopCenter),
         )
-        LibraryBuildButton(onBuildMap, Modifier.align(Alignment.BottomEnd).padding(24.dp))
+        LibraryActionFab(
+            expanded = state.actionsExpanded,
+            importEnabled = !transferState.busy,
+            onExpandedChange = model::actionsExpanded,
+            onBuild = { model.actionsExpanded(false); onBuildMap() },
+            onImport = { model.actionsExpanded(false); documents.pick() },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+        )
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp))
     }
     state.details?.let { details ->
@@ -118,23 +124,10 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryBuildButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    ExtendedFloatingActionButton(
-        onClick = onClick,
-        modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = androidx.compose.ui.graphics.Color.White,
-    ) {
-        Text(stringResource(Res.string.build_a_map))
-    }
-}
-
-@Composable
 private fun LibraryList(
     state: LibraryState,
     transferBusy: Boolean,
     margin: Dp,
-    onImport: () -> Unit,
     onCancelTransfer: () -> Unit,
     onSearch: (String) -> Unit,
     onFilter: (LibraryFilter) -> Unit,
@@ -161,7 +154,6 @@ private fun LibraryList(
                 state.search,
                 state.filter,
                 transferBusy,
-                onImport,
                 onCancelTransfer,
                 onSearch,
                 onFilter
@@ -240,13 +232,12 @@ private fun LibraryControls(
     search: String,
     selectedFilter: LibraryFilter,
     transferBusy: Boolean,
-    onImport: () -> Unit,
     onCancelTransfer: () -> Unit,
     onSearch: (String) -> Unit,
     onFilter: (LibraryFilter) -> Unit,
 ) {
     Column {
-        LibraryImportControls(transferBusy, onImport, onCancelTransfer)
+        LibraryTransferProgress(transferBusy, onCancelTransfer)
         OutlinedTextField(
             value = search,
             onValueChange = onSearch,
@@ -259,11 +250,7 @@ private fun LibraryControls(
 }
 
 @Composable
-private fun LibraryImportControls(busy: Boolean, onImport: () -> Unit, onCancel: () -> Unit) {
-    TextButton(
-        onClick = onImport,
-        enabled = !busy
-    ) { Text(stringResource(Res.string.transfer_import)) }
+private fun LibraryTransferProgress(busy: Boolean, onCancel: () -> Unit) {
     if (busy) {
         LinearProgressIndicator(Modifier.fillMaxWidth())
         Text(stringResource(Res.string.transfer_working))

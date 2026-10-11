@@ -84,4 +84,6 @@
     <string name="verification_damaged">Verification failed: map files are missing or damaged.</string>
     <string name="verification_failed">Verification could not be completed. Try again.</string>
     <string name="verification_not_ready">Finish or restore this download before verifying the map.</string>
+    <string name="library_add_map">Add map</string>
+    <string name="library_close_actions">Close map actions</string>
 </resources>

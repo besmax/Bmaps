@@ -33,6 +33,7 @@ abstract class ShellNavigationChecks {
 
     @Test
     fun settingsApplyImmediatelyAndSurviveRecreationAndBack() {
+        compose.onNodeWithContentDescription("Add map").performClick()
         compose.onNodeWithText("Build a map").performClick()
         compose.onNodeWithText("Choose a place. Take it offline.").assertIsDisplayed()
         compose.activityRule.scenario.recreate()

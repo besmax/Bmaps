@@ -24,6 +24,7 @@ abstract class RasterMapChecks {
     }
 
     @Test fun fixturePixelsRenderAfterNavigationAndRecreation() {
+        compose.onNodeWithContentDescription("Add map").performClick()
         compose.onNodeWithText("Build a map").performClick()
         compose.onNodeWithText("Open map").performClick()
         assertFixtureRendered()
@@ -32,6 +33,7 @@ abstract class RasterMapChecks {
         compose.onNodeWithText("Back").performClick()
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Your maps").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Add map").performClick()
         compose.onNodeWithText("Build a map").performClick()
         compose.onNodeWithText("Open map").performClick()
         assertFixtureRendered()
