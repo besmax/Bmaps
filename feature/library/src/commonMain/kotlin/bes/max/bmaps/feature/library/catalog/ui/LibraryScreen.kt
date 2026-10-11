@@ -10,8 +10,12 @@ package bes.max.bmaps.feature.library.catalog.ui
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -79,6 +83,7 @@ fun LibraryScreen(
             state = state,
             transferBusy = transferState.busy,
             margin = margin,
+            landscape = maxWidth > maxHeight && maxWidth >= 600.dp,
             onCancelTransfer = transfer::cancel,
             onSearch = model::search,
             onFilter = model::filter,
@@ -127,6 +132,7 @@ private fun LibraryList(
     state: LibraryState,
     transferBusy: Boolean,
     margin: Dp,
+    landscape: Boolean,
     onCancelTransfer: () -> Unit,
     onSearch: (String) -> Unit,
     onFilter: (LibraryFilter) -> Unit,
@@ -143,65 +149,105 @@ private fun LibraryList(
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
-        modifier.widthIn(max = 720.dp).fillMaxSize().padding(horizontal = margin),
-        contentPadding = PaddingValues(top = margin, bottom = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            LibraryControls(
-                state.search,
-                state.filter,
-                transferBusy,
-                onCancelTransfer,
-                onSearch,
-                onFilter
-            )
-        }
-        items(
-            state.progress.filter {
-                it.state in setOf(
-                    BuildJobState.RUNNING,
-                    BuildJobState.QUEUED,
-                    BuildJobState.FINALIZING
+    val gridState = rememberLazyGridState()
+    LibraryLayout(
+        landscape, margin, state.search, state.filter, transferBusy,
+        onCancelTransfer, onSearch, onFilter, modifier,
+    ) { gridModifier ->
+        LazyVerticalGrid(
+            columns = if (landscape) GridCells.Adaptive(240.dp) else GridCells.Fixed(1),
+            modifier = gridModifier,
+            state = gridState,
+            contentPadding = PaddingValues(top = margin, bottom = if (landscape) 96.dp else 120.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            if (!landscape) item(key = "controls", span = { GridItemSpan(maxLineSpan) }) {
+                LibraryControls(
+                    state.search,
+                    state.filter,
+                    transferBusy,
+                    onCancelTransfer,
+                    onSearch,
+                    onFilter
                 )
-            },
-            key = { "progress-${it.jobId}" },
-        ) { progress ->
-            val id = progress.packageId
-            LibraryDownloadItem(
-                progress = progress,
-                packageName = state.maps.find { it.id == id }?.name,
-                busy = id in state.busy,
-                onPause = { onPause(id) },
-                onCancel = { onCancel(id) },
+            }
+            items(
+                state.progress.filter {
+                    it.state in setOf(
+                        BuildJobState.RUNNING,
+                        BuildJobState.QUEUED,
+                        BuildJobState.FINALIZING
+                    )
+                },
+                key = { "progress-${it.jobId}" },
+                span = { GridItemSpan(maxLineSpan) },
+            ) { progress ->
+                val id = progress.packageId
+                LibraryDownloadItem(
+                    progress = progress,
+                    packageName = state.maps.find { it.id == id }?.name,
+                    busy = id in state.busy,
+                    onPause = { onPause(id) },
+                    onCancel = { onCancel(id) },
+                )
+            }
+            if (state.loading) item(key = "loading", span = { GridItemSpan(maxLineSpan) }) { LibraryLoadingItem() }
+            state.error?.let { error -> item(key = "error", span = { GridItemSpan(maxLineSpan) }) { LibraryErrorItem(error, onRefresh) } }
+            if (!state.loading && state.error == null && state.maps.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                LibraryEmptyItem(state.search.isNotEmpty() || state.filter != LibraryFilter.ALL)
+            }
+            items(state.maps, key = { it.id }) { map ->
+                val id = map.id
+                val progress = state.progress.find { it.packageId == id }
+                LibraryMapItem(
+                    map = map,
+                    failureLabel = progress?.failureLabel,
+                    needsElevationCredentials = progress?.needsElevationCredentials == true,
+                    busy = id in state.busy,
+                    savingFavourite = id in state.savingFavourites,
+                    transferBusy = transferBusy,
+                    onOpen = { onOpenMap(id) },
+                    onDetails = { onDetails(id) },
+                    onRestore = { onRestore(id) },
+                    onFavourite = { onFavourite(id) },
+                    onExport = { onExport(id) },
+                    onDelete = { onDelete(id) },
+                    onCredentials = onCredentials,
+                )
+            }
+            if (state.hasMore) item(key = "more", span = { GridItemSpan(maxLineSpan) }) { LibraryMoreItem(state.loading, onMore) }
+        }
+    }
+}
+
+@Composable
+private fun LibraryLayout(
+    landscape: Boolean,
+    margin: Dp,
+    search: String,
+    filter: LibraryFilter,
+    transferBusy: Boolean,
+    onCancelTransfer: () -> Unit,
+    onSearch: (String) -> Unit,
+    onFilter: (LibraryFilter) -> Unit,
+    modifier: Modifier,
+    content: @Composable (Modifier) -> Unit,
+) {
+    Row(
+        modifier.widthIn(max = if (landscape) Dp.Infinity else 720.dp)
+            .fillMaxSize().padding(horizontal = margin),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        if (landscape) {
+            LibraryControls(
+                search, filter, transferBusy, onCancelTransfer, onSearch, onFilter,
+                verticalFilters = true,
+                modifier = Modifier.width(200.dp).fillMaxHeight()
+                    .verticalScroll(rememberScrollState()).padding(vertical = margin),
             )
         }
-        if (state.loading) item { LibraryLoadingItem() }
-        state.error?.let { error -> item { LibraryErrorItem(error, onRefresh) } }
-        if (!state.loading && state.error == null && state.maps.isEmpty()) item {
-            LibraryEmptyItem(state.search.isNotEmpty() || state.filter != LibraryFilter.ALL)
-        }
-        items(state.maps, key = { it.id }) { map ->
-            val id = map.id
-            val progress = state.progress.find { it.packageId == id }
-            LibraryMapItem(
-                map = map,
-                failureLabel = progress?.failureLabel,
-                needsElevationCredentials = progress?.needsElevationCredentials == true,
-                busy = id in state.busy,
-                savingFavourite = id in state.savingFavourites,
-                transferBusy = transferBusy,
-                onOpen = { onOpenMap(id) },
-                onDetails = { onDetails(id) },
-                onRestore = { onRestore(id) },
-                onFavourite = { onFavourite(id) },
-                onExport = { onExport(id) },
-                onDelete = { onDelete(id) },
-                onCredentials = onCredentials,
-            )
-        }
-        if (state.hasMore) item { LibraryMoreItem(state.loading, onMore) }
+        content(Modifier.weight(1f).fillMaxHeight())
     }
 }
 
@@ -239,8 +285,10 @@ private fun LibraryControls(
     onCancelTransfer: () -> Unit,
     onSearch: (String) -> Unit,
     onFilter: (LibraryFilter) -> Unit,
+    verticalFilters: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
-    Column {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         LibraryTransferProgress(transferBusy, onCancelTransfer)
         OutlinedTextField(
             value = search,
@@ -249,7 +297,7 @@ private fun LibraryControls(
             label = { Text(stringResource(Res.string.library_search)) },
             modifier = Modifier.fillMaxWidth(),
         )
-        LibraryFilters(selectedFilter, onFilter)
+        LibraryFilters(selectedFilter, onFilter, verticalFilters)
     }
 }
 
@@ -263,20 +311,32 @@ private fun LibraryTransferProgress(busy: Boolean, onCancel: () -> Unit) {
 }
 
 @Composable
-private fun LibraryFilters(selectedFilter: LibraryFilter, onFilter: (LibraryFilter) -> Unit) {
-    Row(
-        Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        LibraryFilter.entries.forEach { filter ->
-            LibraryFilterItem(filter, selectedFilter == filter) { onFilter(filter) }
+private fun LibraryFilters(selectedFilter: LibraryFilter, onFilter: (LibraryFilter) -> Unit, vertical: Boolean) {
+    if (vertical) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LibraryFilterItems(selectedFilter, onFilter, Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            LibraryFilterItems(selectedFilter, onFilter)
         }
     }
 }
 
 @Composable
-private fun LibraryFilterItem(filter: LibraryFilter, selected: Boolean, onClick: () -> Unit) {
+private fun LibraryFilterItems(selectedFilter: LibraryFilter, onFilter: (LibraryFilter) -> Unit, modifier: Modifier = Modifier) {
+    LibraryFilter.entries.forEach { filter ->
+        LibraryFilterItem(filter, selectedFilter == filter, modifier) { onFilter(filter) }
+    }
+}
+
+@Composable
+private fun LibraryFilterItem(filter: LibraryFilter, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     FilterChip(
+        modifier = modifier,
         selected = selected,
         onClick = onClick,
         label = {
