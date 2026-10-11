@@ -24,7 +24,7 @@ import com.google.android.gms.location.LocationRequest as GoogleLocationRequest
 
 internal class GoogleFusedLocationSubscription(
     private val context: Context,
-    private val onLocation: (Location, String) -> Unit,
+    private val onLocation: (Location) -> Unit,
     private val onRegistrationFailure: () -> Unit,
 ) {
     private val closed = AtomicBoolean(false)
@@ -32,7 +32,7 @@ internal class GoogleFusedLocationSubscription(
     private var client: FusedLocationProviderClient? = null
     private val callback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
-            if (!closed.get()) result.locations.forEach { onLocation(it, "update") }
+            if (!closed.get()) result.locations.forEach { onLocation(it) }
         }
     }
 
@@ -74,7 +74,7 @@ internal class GoogleFusedLocationSubscription(
         try {
             fused.lastLocation
                 .addOnSuccessListener(context.mainExecutor) { location ->
-                    if (!closed.get() && location != null) onLocation(location, "cache")
+                    if (!closed.get() && location != null) onLocation(location)
                 }
                 .addOnFailureListener(context.mainExecutor) { error ->
                     if (!closed.get()) locationDiagnostic("Google fused cached position failed", error)
@@ -86,7 +86,7 @@ internal class GoogleFusedLocationSubscription(
             fused.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, currentRequest.token)
                 .addOnSuccessListener(context.mainExecutor) { location ->
                     if (!closed.get()) {
-                        if (location != null) onLocation(location, "current")
+                        if (location != null) onLocation(location)
                         else locationDiagnostic("Google fused current position returned no fix; native providers remain active")
                     }
                 }

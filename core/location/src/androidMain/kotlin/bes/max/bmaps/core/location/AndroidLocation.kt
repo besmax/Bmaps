@@ -76,29 +76,37 @@ private class AndroidLocationService(private val context: Context) : LocationSer
         val currentRequests = mutableListOf<CancellationSignal>()
         val selector = LocationFixSelector()
         var published: SelectedLocationFix? = null
+        var conflictingSources: Set<String> = emptySet()
         var permissionFailure = false
 
         fun publishSelected(): LocationFix? {
             val selected = selector.select(locationTimeMillis())
+            if (selector.conflictingSources != conflictingSources) {
+                conflictingSources = selector.conflictingSources
+                locationDiagnostic("Source conflict changed: quarantined=$conflictingSources; GPS/fused positions conflicting with network are excluded")
+            }
             if (selected != null && selected != published) {
                 published = selected
-                locationDiagnostic("Position selected: provider=${selected.source}, ageMs=${locationTimeMillis() - selected.fix.timestampMillis}, accuracyM=${selected.fix.accuracyMeters}")
-                trySend(LocationState(LocationStatus.ACTIVE, selected.fix))
+                trySend(LocationState(LocationStatus.ACTIVE, selected.fix, selected.sourceConflict))
             }
-            if (selected == null) published = null
+            if (selected == null) {
+                if (published != null && conflictingSources.isNotEmpty()) {
+                    locationDiagnostic("Source conflict: no fresh trusted position; waiting for network or source agreement")
+                    trySend(LocationState(LocationStatus.STALE))
+                }
+                published = null
+            }
             return selected?.fix
         }
 
-        fun receive(location: Location, delivery: String, provider: String) {
+        fun receive(location: Location, provider: String) {
             if (!isActive || !manager.isLocationEnabled) return
             if (provider != "google-fused" && !manager.isProviderEnabled(provider)) return
             val wallTime = locationTimeMillis()
             val age = if (location.elapsedRealtimeNanos > 0) {
                 (SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000
             } else wallTime - location.time
-            locationDiagnostic("Fix received: provider=$provider, delivery=$delivery, ageMs=$age, accuracyM=${location.accuracy}")
             if (!location.hasAccuracy() || age !in -5_000L..30_000L) {
-                locationDiagnostic("Fix ignored: missing accuracy or expired acquisition time")
                 return
             }
             val fix = LocationFix(
@@ -107,7 +115,6 @@ private class AndroidLocationService(private val context: Context) : LocationSer
                 location.bearing.toDouble().takeIf { location.hasBearing() && it.isFinite() && it >= 0 && it < 360 },
             )
             if (!selector.record(provider, fix, wallTime)) {
-                locationDiagnostic("Fix ignored: invalid, expired, or superseded within provider=$provider")
                 return
             }
             publishSelected()
@@ -119,7 +126,7 @@ private class AndroidLocationService(private val context: Context) : LocationSer
             locationDiagnostic("Available providers: $enabled")
             trySend(when {
                 !manager.isLocationEnabled || enabled.isEmpty() -> LocationState(LocationStatus.DISABLED)
-                fix != null -> LocationState(LocationStatus.ACTIVE, fix)
+                fix != null -> LocationState(LocationStatus.ACTIVE, fix, published?.sourceConflict == true)
                 else -> LocationState()
             })
         }
@@ -127,7 +134,7 @@ private class AndroidLocationService(private val context: Context) : LocationSer
         publishAvailability()
         for (provider in candidates) {
             val listener = object : LocationListener {
-                override fun onLocationChanged(location: Location) { receive(location, "update", provider) }
+                override fun onLocationChanged(location: Location) { receive(location, provider) }
                 override fun onProviderDisabled(disabledProvider: String) {
                     selector.remove(provider)
                     published = null
@@ -141,11 +148,11 @@ private class AndroidLocationService(private val context: Context) : LocationSer
                 registered[provider] = listener
                 locationDiagnostic("Continuous updates registered: $provider")
                 if (manager.isProviderEnabled(provider)) {
-                    manager.getLastKnownLocation(provider)?.let { receive(it, "cache", provider) }
+                    manager.getLastKnownLocation(provider)?.let { receive(it, provider) }
                     val cancellation = CancellationSignal()
                     currentRequests += cancellation
                     manager.getCurrentLocation(provider, cancellation, context.mainExecutor) { location ->
-                        if (location != null) receive(location, "current", provider)
+                        if (location != null) receive(location, provider)
                         else locationDiagnostic("Current position request returned no fix: $provider")
                     }
                 }
@@ -164,8 +171,8 @@ private class AndroidLocationService(private val context: Context) : LocationSer
             }
         }
         val google = GoogleFusedLocationSubscription(context,
-            onLocation = { location, delivery ->
-                if (isActive) receive(location, delivery, "google-fused")
+            onLocation = { location ->
+                if (isActive) receive(location, "google-fused")
             },
             onRegistrationFailure = { if (isActive) publishRegistrationFailure() },
         )

@@ -27,7 +27,11 @@ data class LocationRequest(val intervalMillis: Long = 1_000, val minimumDistance
 }
 
 enum class LocationStatus { WAITING, ACTIVE, STALE, PERMISSION_DENIED, PRECISE_PERMISSION_REQUIRED, DISABLED, UNAVAILABLE, TIMED_OUT, INVALID_FIX }
-data class LocationState(val status: LocationStatus = LocationStatus.WAITING, val fix: LocationFix? = null)
+data class LocationState(
+    val status: LocationStatus = LocationStatus.WAITING,
+    val fix: LocationFix? = null,
+    val sourceConflict: Boolean = false,
+)
 
 interface LocationService {
     fun observe(request: LocationRequest = LocationRequest()): Flow<LocationState>
@@ -56,8 +60,9 @@ internal const val LOCATION_ACCURACY_WINDOW_MILLIS = 3_000L
 internal fun canReplaceLocationFix(
     current: LocationFix?,
     candidate: LocationFix,
+    sourceConflict: Boolean = false,
 ): Boolean {
-    if (current == null) return true
+    if (current == null || sourceConflict) return true
     return candidate.timestampMillis >= current.timestampMillis ||
         (current.timestampMillis - candidate.timestampMillis <= LOCATION_ACCURACY_WINDOW_MILLIS &&
             candidate.accuracyMeters < current.accuracyMeters)

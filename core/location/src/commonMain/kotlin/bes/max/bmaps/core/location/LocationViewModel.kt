@@ -94,19 +94,14 @@ class LocationViewModel(private val service: LocationService) : ViewModel() {
                                     publish(update)
                                 }
                                 !valid(fix) -> {
-                                    locationDiagnostic("Fix rejected by presentation: invalid coordinates or accuracy")
                                     if (state.value.fix == null) publish(LocationState(LocationStatus.INVALID_FIX))
                                 }
                                 !fresh(fix) -> {
-                                    locationDiagnostic("Fix rejected by presentation: ageMs=${locationTimeMillis() - fix.timestampMillis}")
                                     if (state.value.fix == null) publish(LocationState(LocationStatus.STALE))
                                 }
-                                !canReplaceLocationFix(state.value.fix?.takeIf { fresh(it) }, fix) -> {
-                                    locationDiagnostic("Fix ignored by presentation: out of order")
-                                }
+                                !canReplaceLocationFix(state.value.fix?.takeIf { fresh(it) }, fix, update.sourceConflict) -> Unit
                                 else -> {
                                     publish(update)
-                                    locationDiagnostic("Fresh position accepted: accuracyM=${fix.accuracyMeters}")
                                     if (centerPending) {
                                         centerPending = false
                                         channel.send(LocationEvent.Center(fix, centerVersion))

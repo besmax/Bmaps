@@ -29,6 +29,7 @@ import bes.max.bmaps.core.mapengine.currentLocationOverlays
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
+import bes.max.bmaps.core.mapengine.positionOf
 import bmaps.feature.viewer.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import dev.zacsweers.metrox.viewmodel.metroViewModel

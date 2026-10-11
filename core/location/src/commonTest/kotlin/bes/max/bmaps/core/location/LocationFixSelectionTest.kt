@@ -33,25 +33,49 @@ class LocationFixSelectionTest {
         }
     }
 
-    @Test fun stoppedAccurateSourceGivesWayToNewerMovingPositionAfterWindow() {
+    @Test fun stoppedAccurateSourceGivesWayAsMovementPenaltyOutweighsAccuracy() {
         val selector = LocationFixSelector()
         selector.record("google-fused", base, 100_000)
         selector.select(100_000)
-        val coarse = base.copy(latitude = 60.1, accuracyMeters = 500.0, timestampMillis = 103_000)
+        val coarse = base.copy(latitude = base.latitude + 0.0001, accuracyMeters = 10.0, timestampMillis = 103_000)
         selector.record("network", coarse, 103_000)
         assertEquals(base, selector.select(103_000)?.fix)
-        val moving = coarse.copy(latitude = 60.2, timestampMillis = 103_001)
-        selector.record("network", moving, 103_001)
-        assertEquals(moving, selector.select(103_001)?.fix)
+        val moving = coarse.copy(latitude = base.latitude + 0.0002, timestampMillis = 106_000)
+        selector.record("network", moving, 106_000)
+        assertEquals(moving, selector.select(106_000)?.fix)
     }
 
-    @Test fun eachSourcesLatestFixReplacesItsOwnOldAccurateFix() {
+    @Test fun sameSourceMovementEventuallyReplacesItsOlderAccurateFix() {
         val selector = LocationFixSelector()
         selector.record("gps", base, 100_000)
         selector.select(100_000)
-        val moving = base.copy(latitude = 60.1, accuracyMeters = 10.0, timestampMillis = 101_000)
-        selector.record("gps", moving, 101_000)
-        assertEquals(moving, selector.select(101_000)?.fix)
+        val moving = base.copy(latitude = 60.1, accuracyMeters = 10.0, timestampMillis = 106_000)
+        selector.record("gps", moving, 106_000)
+        assertEquals(moving, selector.select(106_000)?.fix)
+    }
+
+    @Test fun grosslyWorseFixCannotDisplacePrecisePositionAtFiveOrTenSeconds() {
+        for (source in listOf("network", "google-fused")) {
+            val selector = LocationFixSelector()
+            selector.record("google-fused", base, 100_000)
+            selector.select(100_000)
+            for (elapsed in listOf(5_000L, 10_000L, 20_000L, 30_000L)) {
+                val coarse = base.copy(latitude = 61.0, accuracyMeters = 500.0, timestampMillis = 100_000 + elapsed)
+                selector.record(source, coarse, coarse.timestampMillis)
+                assertEquals(base, selector.select(coarse.timestampMillis)?.fix)
+            }
+            assertEquals(130_000L, selector.select(130_001)?.fix?.timestampMillis)
+        }
+    }
+
+    @Test fun reportedMovementSpeedAcceleratesSwitchingWithoutRewritingTime() {
+        val selector = LocationFixSelector()
+        val moving = base.copy(speedMetersPerSecond = 20.0)
+        selector.record("gps", moving, 100_000)
+        selector.select(100_000)
+        val newer = base.copy(accuracyMeters = 10.0, timestampMillis = 104_000)
+        selector.record("google-fused", newer, 104_000)
+        assertEquals(newer, selector.select(104_000)?.fix)
     }
 
     @Test fun retainedFallbackTakesOverOnExpiryWithoutAnotherCallback() {
@@ -119,5 +143,79 @@ class LocationFixSelectionTest {
         assertFalse(canReplaceLocationFix(base, base.copy(timestampMillis = 96_999, accuracyMeters = 2.0)))
         assertFalse(canReplaceLocationFix(base, base.copy(timestampMillis = 99_000, accuracyMeters = 50.0)))
         assertTrue(canReplaceLocationFix(base, base.copy(timestampMillis = 104_000, accuracyMeters = 50.0)))
+    }
+
+    @Test fun reportedFiftyKilometerDisagreementPrefersNetworkDespiteSatelliteConsensus() {
+        val selector = LocationFixSelector()
+        val satellite = base.copy(latitude = 60.11876669, longitude = 31.38699253,
+            accuracyMeters = 5.7, timestampMillis = 100_000, speedMetersPerSecond = 35.42)
+        for (source in listOf("gps", "fused", "google-fused")) selector.record(source, satellite, 100_000)
+        assertEquals("fused", selector.select(100_000)?.source)
+        val network = base.copy(accuracyMeters = 152.0, timestampMillis = 95_000)
+        selector.record("network", network, 100_000)
+        val recovered = selector.select(100_000)
+        assertEquals(SelectedLocationFix("network", network, sourceConflict = true), recovered)
+        assertEquals(setOf("gps", "fused", "google-fused"), selector.conflictingSources)
+        assertTrue(canReplaceLocationFix(satellite, network, recovered?.sourceConflict == true))
+        assertFalse(canReplaceLocationFix(satellite, network))
+    }
+
+    @Test fun sourceConflictDoesNotRequireNetworkPositionInsideAnyMap() {
+        val selector = LocationFixSelector()
+        val satellite = base.copy(longitude = 31.4)
+        val network = base.copy(longitude = 32.4, accuracyMeters = 100.0)
+        selector.record("gps", satellite, 100_000)
+        selector.record("network", network, 100_000)
+        assertEquals(network, selector.select(100_000)?.fix)
+    }
+
+    @Test fun staleOrPoorlyLocatedNetworkDoesNotQuarantineSatelliteSources() {
+        for (network in listOf(base.copy(timestampMillis = 69_999), base.copy(accuracyMeters = 1_000.0))) {
+            val selector = LocationFixSelector()
+            val satellite = base.copy(longitude = 31.4)
+            selector.record("gps", satellite, 100_000)
+            selector.record("network", network, 100_000)
+            assertEquals(satellite, selector.select(100_000)?.fix)
+            assertTrue(selector.conflictingSources.isEmpty())
+        }
+    }
+
+    @Test fun modestDisagreementAndPossibleTravelDoNotTriggerQuarantine() {
+        val selector = LocationFixSelector()
+        val network = base.copy(accuracyMeters = 150.0, timestampMillis = 80_000)
+        val satellite = base.copy(latitude = base.latitude + 0.02, timestampMillis = 100_000)
+        selector.record("network", network, 100_000)
+        selector.record("gps", satellite, 100_000)
+        assertEquals(satellite, selector.select(100_000)?.fix)
+        assertTrue(selector.conflictingSources.isEmpty())
+    }
+
+    @Test fun networkExpiryDoesNotRestoreStillConflictingSatelliteCoordinates() {
+        val selector = LocationFixSelector()
+        val satellite = base.copy(longitude = 31.4)
+        selector.record("gps", satellite, 100_000)
+        selector.record("network", base.copy(accuracyMeters = 150.0), 100_000)
+        assertEquals("network", selector.select(100_000)?.source)
+        selector.record("gps", satellite.copy(timestampMillis = 130_001), 130_001)
+        assertNull(selector.select(130_001))
+        assertEquals(setOf("gps"), selector.conflictingSources)
+    }
+
+    @Test fun freshSourceAgreementRestoresOrdinaryAccuracySelection() {
+        val selector = LocationFixSelector()
+        selector.record("gps", base.copy(longitude = 31.4), 100_000)
+        selector.record("network", base.copy(accuracyMeters = 150.0), 100_000)
+        selector.select(100_000)
+        val recovered = base.copy(timestampMillis = 101_000)
+        selector.record("gps", recovered, 101_000)
+        assertEquals(SelectedLocationFix("gps", recovered), selector.select(101_000))
+        assertTrue(selector.conflictingSources.isEmpty())
+    }
+
+    @Test fun distanceHandlesDatelineAndIdenticalPositions() {
+        assertEquals(0.0, locationDistanceMeters(base, base))
+        val west = base.copy(latitude = 0.0, longitude = 179.999)
+        val east = base.copy(latitude = 0.0, longitude = -179.999)
+        assertTrue(locationDistanceMeters(west, east) in 220.0..225.0)
     }
 }
