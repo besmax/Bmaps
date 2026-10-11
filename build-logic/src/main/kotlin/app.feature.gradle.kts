@@ -21,6 +21,7 @@ kotlin {
         implementation(project(":core:di"))
         implementation(libs.findLibrary("metro-viewmodel-compose").get())
         implementation(libs.findLibrary("kotlinx-coroutines-core").get())
+        implementation(libs.findLibrary("kotlinx-collections-immutable").get())
     }
     sourceSets.commonTest.dependencies {
         implementation(libs.findLibrary("kotlinx-coroutines-test").get())

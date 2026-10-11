@@ -21,6 +21,7 @@ The `:shared` module is not a standard library module. It is the **Umbrella Modu
 
 ## 3. Presentation Layer (Feature Modules)
 * **Framework:** Compose Multiplatform strictly drives the UI. Shared visual components and theme definitions belong in `core:ui`; screens, ViewModels, and feature-specific components remain in their owning feature. `core:ui` is UI infrastructure with no domain or feature dependencies.
+* **Display Models:** Every screen/capability maps Domain/Data result models into structurally immutable, Compose-stable presentation models before exposing display state. Nested collections use immutable collection types; annotations alone do not make unstable fields safe. Child components receive only the display values they need. See document 4.
 * **State Management:** Stateful presentation follows MVVM+ as specified in document 4. Each ViewModel exposes one immutable state stream and a Channel-backed Flow for one-off events. Stateless placeholder screens may expose callbacks without an otherwise unnecessary ViewModel.
 * **Validation:** Data validation rules must be executed independently inside this presentation layer (e.g., within the ViewModel/Intent handler) before passing sanitized data downwards.
 

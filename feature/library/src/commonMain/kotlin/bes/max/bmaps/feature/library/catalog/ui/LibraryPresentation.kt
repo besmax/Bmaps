@@ -8,7 +8,6 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.library.catalog.ui
 
-import bes.max.bmaps.domain.mapbuilder.PackageFailure
 import bes.max.bmaps.domain.mapbuilder.MapAvatar
 import bes.max.bmaps.domain.mapbuilder.PackageState
 import bmaps.feature.library.generated.resources.*
@@ -41,19 +40,4 @@ internal fun avatarIcon(avatar: MapAvatar) = when (avatar) {
     MapAvatar.WATER -> Res.drawable.avatar_water
     MapAvatar.CITY -> Res.drawable.avatar_city
     MapAvatar.CAMP -> Res.drawable.avatar_camp
-}
-
-internal fun failureLabel(failure: PackageFailure) = when (failure) {
-    PackageFailure.NetworkUnavailable -> Res.string.library_network_failed
-    PackageFailure.AuthenticationRequired -> Res.string.library_credentials_required
-    PackageFailure.ElevationCredentialsRequired -> Res.string.library_elevation_key_required
-    PackageFailure.ElevationAccessDenied -> Res.string.library_elevation_access_denied
-    PackageFailure.ElevationUnavailable -> Res.string.library_elevation_unavailable
-    PackageFailure.ProviderDownloadNotAllowed -> Res.string.library_provider_blocked
-    is PackageFailure.SizeLimitExceeded -> Res.string.library_size_limit
-    is PackageFailure.InsufficientStorage -> Res.string.library_storage_full
-    is PackageFailure.RateLimited -> Res.string.library_rate_limited
-    PackageFailure.TileUnavailable -> Res.string.library_tiles_unavailable
-    PackageFailure.Conflict -> Res.string.library_source_changed
-    else -> Res.string.library_action_failed
 }

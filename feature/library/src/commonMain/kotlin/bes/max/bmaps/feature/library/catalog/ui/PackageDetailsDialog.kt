@@ -19,6 +19,7 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.feature.library.catalog.presentation.LibraryMapUi
 import bes.max.bmaps.feature.library.catalog.presentation.PackageVerificationViewModel
 import bmaps.feature.library.generated.resources.*
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -26,12 +27,12 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
-internal fun PackageDetailsDialog(initialMap: PackageSummary, busy: Boolean, onAvatar: (MapAvatar) -> Unit, onDismiss: () -> Unit) {
+internal fun PackageDetailsDialog(initialMap: LibraryMapUi, busy: Boolean, onAvatar: (MapAvatar) -> Unit, onDismiss: () -> Unit) {
     val owner = remember(initialMap.id) { object : ViewModelStoreOwner { override val viewModelStore = ViewModelStore() } }
     DisposableEffect(owner) { onDispose { owner.viewModelStore.clear() } }
     val model = metroViewModel<PackageVerificationViewModel>(owner)
     val verification by model.state.collectAsStateWithLifecycle()
-    LaunchedEffect(model, initialMap.id) { model.load(initialMap.id) }
+    LaunchedEffect(model, initialMap.id) { model.load(PackageId(initialMap.id)) }
     val map = verification.summary ?: initialMap
     AlertDialog(
         onDismissRequest = { model.cancel(); onDismiss() },
@@ -43,7 +44,7 @@ internal fun PackageDetailsDialog(initialMap: PackageSummary, busy: Boolean, onA
             ) {
                 Text(stringResource(stateLabel(map.state)))
                 if (map.state in setOf(PackageState.READY, PackageState.CORRUPT, PackageState.MISSING)) {
-                    Button(onClick = { model.start(map.id) }, enabled = !busy && !verification.running) {
+                    Button(onClick = { model.start(PackageId(map.id)) }, enabled = !busy && !verification.running) {
                         Text(stringResource(Res.string.verification_start))
                     }
                 }
@@ -81,7 +82,7 @@ internal fun PackageDetailsDialog(initialMap: PackageSummary, busy: Boolean, onA
                 if (map.zoomLevels.isNotEmpty()) Text(
                     stringResource(
                         Res.string.library_levels,
-                        map.zoomLevels.sorted().joinToString()
+                        map.zoomLevels.joinToString()
                     )
                 )
                 Text(
@@ -99,7 +100,7 @@ internal fun PackageDetailsDialog(initialMap: PackageSummary, busy: Boolean, onA
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         avatars.forEach { avatar ->
                             FilterChip(
-                                selected = map.avatarKey == avatar.storageKey,
+                                selected = map.avatar == avatar,
                                 enabled = !busy && !verification.running,
                                 onClick = { onAvatar(avatar) },
                                 leadingIcon = {

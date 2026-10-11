@@ -22,6 +22,7 @@ composeMultiplatform = "1.12.0"
 junit = "4.13.2"
 kotlin = "2.4.10"
 kotlinxIoCore = "0.9.1"
+kotlinxCollectionsImmutable = "0.5.2"
 ktor = "3.5.2"
 mapcomposeMp = "1.1.3"
 material3 = { strictly = "1.9.0" }
@@ -39,6 +40,7 @@ androidx-compose-test = "1.11.2"
 robolectric = "4.16.1"
 
 [libraries]
+kotlinx-collections-immutable = { module = "org.jetbrains.kotlinx:kotlinx-collections-immutable", version.ref = "kotlinxCollectionsImmutable" }
 xmlutil-core = { module = "io.github.pdvrieze.xmlutil:core", version.ref = "xmlutil" }
 proj-source = { module = "org.osgeo:proj", version.ref = "proj" }
 proj-sqlite-source = { module = "org.sqlite:sqlite-amalgamation", version.ref = "proj-sqlite" }

@@ -8,6 +8,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.library.catalog.presentation
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
@@ -26,11 +27,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
 
+@Immutable
 data class PackageVerificationState(
-    val summary: PackageSummary? = null,
+    val summary: LibraryMapUi? = null,
     val running: Boolean = false,
     val cancelling: Boolean = false,
-    val progress: PackageVerificationProgress = PackageVerificationProgress(PackageVerificationStage.WAITING),
+    val progress: LibraryVerificationProgressUi = LibraryVerificationProgressUi(),
     val result: StringResource? = null,
 )
 
@@ -47,7 +49,7 @@ class PackageVerificationViewModel(private val packages: PackageRepository) : Vi
         observation?.cancel()
         observation = viewModelScope.launch {
             packages.observe(id).collect { result ->
-                if (result is PackageResult.Success) mutableState.update { it.copy(summary = result.value) }
+                if (result is PackageResult.Success) mutableState.update { it.copy(summary = result.value.toLibraryUi()) }
             }
         }
     }
@@ -57,7 +59,7 @@ class PackageVerificationViewModel(private val packages: PackageRepository) : Vi
         mutableState.value = PackageVerificationState(summary = state.value.summary, running = true)
         verification = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
-                val result = packages.verifyFully(id) { progress -> mutableState.update { it.copy(progress = progress) } }
+                val result = packages.verifyFully(id) { progress -> mutableState.update { it.copy(progress = progress.toLibraryUi()) } }
                 mutableState.update { it.copy(result = when (result) {
                     is PackageResult.Success -> Res.string.verification_success
                     is PackageResult.Failure -> when (result.reason) {

@@ -26,13 +26,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import bes.max.bmaps.core.sharing.rememberNativeDocuments
 import bes.max.bmaps.domain.mapbuilder.BuildJobState
-import bes.max.bmaps.domain.mapbuilder.BuildProgress
-import bes.max.bmaps.domain.mapbuilder.MapAvatar
-import bes.max.bmaps.domain.mapbuilder.PackageFailure
 import bes.max.bmaps.domain.mapbuilder.PackageId
 import bes.max.bmaps.domain.mapbuilder.PackageState
-import bes.max.bmaps.domain.mapbuilder.PackageSummary
 import bes.max.bmaps.domain.providers.OPENTOPOGRAPHY_CREDENTIAL
+import bes.max.bmaps.feature.library.catalog.presentation.LibraryMapUi
+import bes.max.bmaps.feature.library.catalog.presentation.LibraryMapHeaderUi
+import bes.max.bmaps.feature.library.catalog.presentation.LibraryDownloadUi
 import bes.max.bmaps.feature.library.catalog.presentation.LibraryFilter
 import bes.max.bmaps.feature.library.catalog.presentation.LibraryState
 import bes.max.bmaps.feature.library.catalog.presentation.LibraryViewModel
@@ -86,11 +85,11 @@ fun LibraryScreen(
             onPause = { model.pause(it) },
             onCancel = { model.cancel(it) },
             onRefresh = model::refresh,
-            onOpenMap = onOpenMap,
+            onOpenMap = { onOpenMap(PackageId(it)) },
             onDetails = model::details,
             onRestore = { model.restore(it) },
             onFavourite = { model.favourite(it) },
-            onExport = { transfer.export(it) },
+            onExport = { transfer.export(PackageId(it)) },
             onDelete = model::confirmDelete,
             onCredentials = { onCredentials(OPENTOPOGRAPHY_CREDENTIAL) },
             onMore = model::more,
@@ -131,15 +130,15 @@ private fun LibraryList(
     onCancelTransfer: () -> Unit,
     onSearch: (String) -> Unit,
     onFilter: (LibraryFilter) -> Unit,
-    onPause: (PackageId) -> Unit,
-    onCancel: (PackageId) -> Unit,
+    onPause: (String) -> Unit,
+    onCancel: (String) -> Unit,
     onRefresh: () -> Unit,
-    onOpenMap: (PackageId) -> Unit,
-    onDetails: (PackageId) -> Unit,
-    onRestore: (PackageId) -> Unit,
-    onFavourite: (PackageSummary) -> Unit,
-    onExport: (PackageId) -> Unit,
-    onDelete: (PackageId) -> Unit,
+    onOpenMap: (String) -> Unit,
+    onDetails: (String) -> Unit,
+    onRestore: (String) -> Unit,
+    onFavourite: (String) -> Unit,
+    onExport: (String) -> Unit,
+    onDelete: (String) -> Unit,
     onCredentials: () -> Unit,
     onMore: () -> Unit,
     modifier: Modifier = Modifier,
@@ -167,14 +166,15 @@ private fun LibraryList(
                     BuildJobState.FINALIZING
                 )
             },
-            key = { "progress-${it.jobId.value}" },
+            key = { "progress-${it.jobId}" },
         ) { progress ->
+            val id = progress.packageId
             LibraryDownloadItem(
                 progress = progress,
-                packageName = state.maps.find { it.id == progress.packageId }?.name,
-                busy = progress.packageId in state.busy,
-                onPause = { onPause(progress.packageId) },
-                onCancel = { onCancel(progress.packageId) },
+                packageName = state.maps.find { it.id == id }?.name,
+                busy = id in state.busy,
+                onPause = { onPause(id) },
+                onCancel = { onCancel(id) },
             )
         }
         if (state.loading) item { LibraryLoadingItem() }
@@ -182,18 +182,22 @@ private fun LibraryList(
         if (!state.loading && state.error == null && state.maps.isEmpty()) item {
             LibraryEmptyItem(state.search.isNotEmpty() || state.filter != LibraryFilter.ALL)
         }
-        items(state.maps, key = { it.id.value }) { map ->
+        items(state.maps, key = { it.id }) { map ->
+            val id = map.id
+            val progress = state.progress.find { it.packageId == id }
             LibraryMapItem(
                 map = map,
-                failure = state.progress.find { it.packageId == map.id }?.failure,
-                busy = map.id in state.busy,
+                failureLabel = progress?.failureLabel,
+                needsElevationCredentials = progress?.needsElevationCredentials == true,
+                busy = id in state.busy,
+                savingFavourite = id in state.savingFavourites,
                 transferBusy = transferBusy,
-                onOpen = { onOpenMap(map.id) },
-                onDetails = { onDetails(map.id) },
-                onRestore = { onRestore(map.id) },
-                onFavourite = { onFavourite(map) },
-                onExport = { onExport(map.id) },
-                onDelete = { onDelete(map.id) },
+                onOpen = { onOpenMap(id) },
+                onDetails = { onDetails(id) },
+                onRestore = { onRestore(id) },
+                onFavourite = { onFavourite(id) },
+                onExport = { onExport(id) },
+                onDelete = { onDelete(id) },
                 onCredentials = onCredentials,
             )
         }
@@ -292,7 +296,7 @@ private fun LibraryFilterItem(filter: LibraryFilter, selected: Boolean, onClick:
 
 @Composable
 private fun LibraryDownloadItem(
-    progress: BuildProgress,
+    progress: LibraryDownloadUi,
     packageName: String?,
     busy: Boolean,
     onPause: () -> Unit,
@@ -340,9 +344,11 @@ private fun LibraryDownloadItem(
 
 @Composable
 private fun LibraryMapItem(
-    map: PackageSummary,
-    failure: PackageFailure?,
+    map: LibraryMapUi,
+    failureLabel: StringResource?,
+    needsElevationCredentials: Boolean,
     busy: Boolean,
+    savingFavourite: Boolean,
     transferBusy: Boolean,
     onOpen: () -> Unit,
     onDetails: () -> Unit,
@@ -358,28 +364,34 @@ private fun LibraryMapItem(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            LibraryMapHeader(map)
-            Text(
-                stringResource(stateLabel(map.state)),
-                style = MaterialTheme.typography.labelMedium
-            )
-            Text(stringResource(Res.string.library_size, megabytes(map.sizeBytes)))
-            Text(stringResource(if (map.hasElevationData) Res.string.library_elevation_present else Res.string.library_no_elevation))
-            LibraryMapRecovery(map, failure, busy, onRestore, onCredentials)
-            LibraryMapActions(map, busy, transferBusy, onFavourite, onDetails, onExport, onDelete)
+            LibraryMapHeader(map.header)
+            LibraryMapStatus(map.state)
+            LibraryMapMetadata(map.sizeBytes, map.hasElevationData)
+            LibraryMapRecovery(map.state, map.missingTiles, failureLabel, needsElevationCredentials, busy, onRestore, onCredentials)
+            LibraryMapActions(map.favourite, map.state == PackageState.READY, busy, savingFavourite, transferBusy, onFavourite, onDetails, onExport, onDelete)
         }
     }
 }
 
 @Composable
-private fun LibraryMapHeader(map: PackageSummary) {
+private fun LibraryMapStatus(state: PackageState) {
+    Text(stringResource(stateLabel(state)), style = MaterialTheme.typography.labelMedium)
+}
+
+@Composable
+private fun LibraryMapMetadata(sizeBytes: Long, hasElevationData: Boolean) {
+    Text(stringResource(Res.string.library_size, megabytes(sizeBytes)))
+    Text(stringResource(if (hasElevationData) Res.string.library_elevation_present else Res.string.library_no_elevation))
+}
+
+@Composable
+private fun LibraryMapHeader(header: LibraryMapHeaderUi) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Surface(
             shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.primaryContainer
         ) {
-            val avatar =
-                MapAvatar.entries.firstOrNull { it.storageKey == map.avatarKey } ?: MapAvatar.MAP
+            val avatar = header.avatar
             Icon(
                 painterResource(avatarIcon(avatar)),
                 stringResource(avatarLabel(avatar)),
@@ -387,7 +399,7 @@ private fun LibraryMapHeader(map: PackageSummary) {
             )
         }
         Text(
-            map.name,
+            header.name,
             Modifier.weight(1f).padding(horizontal = 12.dp),
             style = MaterialTheme.typography.titleLarge,
         )
@@ -396,39 +408,39 @@ private fun LibraryMapHeader(map: PackageSummary) {
 
 @Composable
 private fun LibraryMapRecovery(
-    map: PackageSummary,
-    failure: PackageFailure?,
+    state: PackageState,
+    missingTiles: Long,
+    failureLabel: StringResource?,
+    needsElevationCredentials: Boolean,
     busy: Boolean,
     onRestore: () -> Unit,
     onCredentials: () -> Unit,
 ) {
-    if (map.state in setOf(PackageState.FAILED, PackageState.PAUSED)) {
+    if (state in setOf(PackageState.FAILED, PackageState.PAUSED)) {
         Text(
-            if (map.missingTiles == 0L) stringResource(Res.string.library_assets_incomplete)
-            else stringResource(Res.string.library_missing_warning, map.missingTiles),
+            if (missingTiles == 0L) stringResource(Res.string.library_assets_incomplete)
+            else stringResource(Res.string.library_missing_warning, missingTiles),
             color = MaterialTheme.colorScheme.error,
         )
-        failure?.let { Text(stringResource(failureLabel(it))) }
-        if (failure in setOf(
-                PackageFailure.ElevationCredentialsRequired,
-                PackageFailure.ElevationAccessDenied
-            )
-        ) {
+        failureLabel?.let { Text(stringResource(it)) }
+        if (needsElevationCredentials) {
             TextButton(onClick = onCredentials) { Text(stringResource(Res.string.library_elevation_replace_key)) }
         }
         TextButton(
             onClick = onRestore,
             enabled = !busy
         ) { Text(stringResource(Res.string.library_restore)) }
-    } else if (map.state in setOf(PackageState.CORRUPT, PackageState.MISSING)) {
+    } else if (state in setOf(PackageState.CORRUPT, PackageState.MISSING)) {
         Text(stringResource(Res.string.library_damaged), color = MaterialTheme.colorScheme.error)
     }
 }
 
 @Composable
 private fun LibraryMapActions(
-    map: PackageSummary,
+    favourite: Boolean,
+    ready: Boolean,
     busy: Boolean,
+    savingFavourite: Boolean,
     transferBusy: Boolean,
     onFavourite: () -> Unit,
     onDetails: () -> Unit,
@@ -436,10 +448,10 @@ private fun LibraryMapActions(
     onDelete: () -> Unit,
 ) {
     Row(Modifier.horizontalScroll(rememberScrollState())) {
-        IconButton(onClick = onFavourite, enabled = !busy) {
+        IconButton(onClick = onFavourite, enabled = !busy && !savingFavourite) {
             Icon(
-                painter = painterResource(if (map.favourite) Res.drawable.ic_star else Res.drawable.ic_star_border),
-                contentDescription = stringResource(if (map.favourite) Res.string.library_unfavourite else Res.string.library_favourite)
+                painter = painterResource(if (favourite) Res.drawable.ic_star else Res.drawable.ic_star_border),
+                contentDescription = stringResource(if (favourite) Res.string.library_unfavourite else Res.string.library_favourite)
             )
         }
 
@@ -450,7 +462,7 @@ private fun LibraryMapActions(
             )
         }
 
-        if (map.state == PackageState.READY) {
+        if (ready) {
             IconButton(onClick = onExport, enabled = !transferBusy && !busy) {
                 Icon(
                     painter = painterResource(Res.drawable.ic_share),
