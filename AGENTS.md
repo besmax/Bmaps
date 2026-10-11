@@ -13,7 +13,7 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | --- | --- |
 | Product scope and requirements | `docs/1_VISION_AND_PRODUCT.md` |
 | Architecture, dependencies, module creation or ownership, feature package organization | `docs/2_ARCHITECTURE.md`, `docs/3_MODULES.md` |
-| UI state, ViewModels and events | `docs/4_STATE_AND_UI.md` |
+| UI state, ViewModels, events and composable decomposition (screens, lists and list items) | `docs/4_STATE_AND_UI.md` |
 | Phase work, current status and acceptance criteria | `docs/5_IMPLEMENTATION_PLAN.md` |
 | Domain contracts and package format | `docs/6_CONTRACTS_AND_PACKAGE_FORMAT.md` |
 | Feature shell, navigation and application composition | `docs/7_FEATURE_SHELL.md` |
@@ -47,6 +47,7 @@ Documents under `docs/plans/` describe proposals and implementation approaches; 
 * **License Notices:** Preserve original Bmaps license/provenance headers and `NOTICE`. Add the standard header to new original source files using `scripts/license_headers.py --write` after reviewing ownership; check with `scripts/license_headers.py`. Required legal notices are an intentional exception to the minimal-comments rule. Never replace third-party notices or attribute third-party code to the project owner. See `CONTRIBUTING.md` and `docs/18_LICENSING_AND_PROVENANCE.md`.
 
 ## 2. Architectural Boundaries
+* **Composable Decomposition:** Split large composables into separate logical components. Every list must have its own composable, and each list item must have a separate item composable. Screen entry points resolve ViewModels, observe state and wire events; extracted UI components receive display data and callbacks. Keep small screen-local components in the same file. Extract a separate file only when a component is substantial in size or is used from multiple files. Keep feature-specific components in their owning feature. See `docs/4_STATE_AND_UI.md`.
 * **Presentation Layer Validation:** Data validation rules must be invoked independently inside the presentation layer (UI/ViewModel). Do not embed data validation logic inside structural business use cases. Use cases must maintain single responsibility.
 * **Data Layer Pagination:** Pagination and filtering must be custom-built directly within the data layer (`core:database`). This ensures maximum architectural flexibility for complex filters. Do not use standard generic pagination libraries (e.g., Paging 3).
 * **Umbrella Module:** The `:shared` module acts exclusively as an umbrella module to assemble the Metro DI graph and expose platform entry points. It must not contain business logic.

@@ -1,5 +1,7 @@
 # Bmaps design system
 
+Top app bars name the current screen rather than repeating the application name. Library uses **Your maps** and the constructor uses **Build a map**, with no duplicate content headings below them. Settings retains its own screen title. Builds and device/emulator acceptance remain with the user.
+
 The user-supplied Stitch Bmaps specification defines the visual system. `core:ui/theme/BmapsTheme.kt` owns the complete dark color palette, a derived light palette, Inter typography, and Material shapes. `AppShell` applies it around every destination and dialog while preserving the existing device/light/dark preference.
 
 The supplied named color table takes precedence where the prose uses different shades. Primary containers use Trail Amber (#FF6B35); primary action buttons explicitly use that container with white labels as requested. Confirmation uses secondary colors and size estimates use tertiary colors. Light mode derives neutral surfaces and darker foreground accents from the supplied palette. All fixed color roles remain the supplied values.

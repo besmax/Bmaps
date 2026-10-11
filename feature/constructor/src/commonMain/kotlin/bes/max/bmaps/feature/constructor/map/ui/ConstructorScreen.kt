@@ -38,7 +38,6 @@ fun ConstructorScreen(onOpenLibrary: () -> Unit, onCredentials: (String) -> Unit
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val margin = if (maxWidth < 600.dp) 16.dp else 24.dp
         Column(Modifier.align(Alignment.TopCenter).widthIn(max = 720.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(margin), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(stringResource(Res.string.build_a_map), style = MaterialTheme.typography.headlineLarge)
             Text(stringResource(Res.string.constructor_subtitle), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(Res.string.choose_source_instructions))
             Box {

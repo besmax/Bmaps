@@ -17,7 +17,14 @@ Feature source packages group capabilities before separating `ui` and `presentat
     * Heavy dialogs must be backed by their own ViewModels, strictly bound to the specific lifecycle of that dialog.
 * **No Reducer Classes:** Do not over-engineer UDF (Unidirectional Data Flow). There are no separate `Reducer` classes in this architecture. State reduction and mutation logic must be implemented directly within the ViewModel using standard Kotlin functions or coroutine flows.
 
+### Composable decomposition
+
+Split large composables into separate logical components during development and refactoring. Every list must be implemented in its own composable, and each list item must be rendered by a separate item composable; this also applies to non-lazy lists such as filter rows. Separate substantial controls, cards, recovery/actions sections and dialogs rather than embedding their complete UI in a screen or list builder. Keep small related screen-local components in the same file so the screen remains easy to read. A separate composable does not imply a separate file: extract a file only when the component is substantial in size or is used from multiple files. Keep extracted feature-local files in the owning feature's `ui` package.
+
+Screen entry points resolve ViewModels, observe state, handle lifecycle/event collection and connect callbacks. Extracted display components accept data and callbacks instead of resolving ViewModels or accessing repositories. Decomposition must retain the existing state owners, lazy item keys, scrolling, interaction rules and lifecycle behavior; extracting visual components alone does not require additional ViewModels.
+
 ## 2. State & Event Management
+
 * **Single Immutable State:** Each ViewModel exposes exactly one immutable state object (e.g., `data class ScreenState`), exposed to Compose via a `StateFlow`.
 * **One-Off Events:** Side effects (e.g., showing a snackbar, triggering a navigation route, displaying a toast) must be handled using Kotlin `Channel` and exposed to the UI as a `Flow` (via `receiveAsFlow()`). Do not use state variables to model one-off events.
 

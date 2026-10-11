@@ -7,12 +7,12 @@
     <string name="cluster_map_objects_hint">Group nearby markers, small lines, and polygons into numbered circles.</string>
     <string name="appearance">Appearance</string>
     <string name="bmaps">Bmaps</string>
-    <string name="build">Build</string>
+    <string name="build">Build a map</string>
     <string name="cancel">Cancel</string>
     <string name="changes_could_not_be_saved_please_try_again">Changes could not be saved. Please try again.</string>
     <string name="dark">Dark</string>
     <string name="default_coordinate_system">Default coordinate system</string>
-    <string name="library">Library</string>
+    <string name="library">Your maps</string>
     <string name="light">Light</string>
     <string name="preferences">Preferences</string>
     <string name="preferences_could_not_be_loaded">Preferences could not be loaded.</string>

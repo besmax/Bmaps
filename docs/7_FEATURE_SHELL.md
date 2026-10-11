@@ -26,6 +26,8 @@ The DataStore artifact is an API dependency of `core:datastore` because its type
 
 ## Navigation and settings layout
 
+The shell top bar displays the current destination label: **Your maps** for Library and **Build a map** for the constructor. These screens do not repeat their titles in the content below the bar. Settings owns its existing **Settings** top bar; full-screen maps retain their floating controls. Source/static verification only; builds and device/emulator acceptance remain with the user.
+
 The root starts at Library. Its FAB opens the constructor, and ready package rows open a viewer entry carrying the package ID. There is no bottom navigation or saved tab stack. The top-bar gear opens **Settings** at route `settings`. It is a normal composable destination with its own top app bar and Back button; the outer shell hides its chrome and insets for this destination. Back returns to the previous entry. Feature callbacks become Channel-backed `ShellEvent` values; the shell consumes them while RESUMED and the umbrella performs navigation.
 
 `SettingsScreen` observes one immutable preference state. Portrait/narrow windows show a centered, scrollable stack of Appearance, map settings, and About cards. Landscape windows at least 600 dp wide use two independent scrolling columns: Appearance and About on the left, map settings on the right. Insets and a fixed top bar remain outside the scrolling content. Recreating or rotating the activity retains the navigation entry and ViewModel.
