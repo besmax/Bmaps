@@ -53,6 +53,8 @@ The first usable slice is intentionally smaller than the full documented MVP. It
 
 Vector tile rendering, professional grid UI, BLE transport, and local Wi-Fi transport remain future extensions. Their contracts should remain possible without implementing those features now. Routes mean user-drawn geometry; automatic routing is not specified. Foreground current-location updates are implemented as described in `20_CURRENT_LOCATION.md`. Navigator camera following, route guidance, recording, and background location tracking remain future extensions.
 
+Track mode is a separate feature workstream in [22_TRACK_MODE_AND_TELEMETRY.md](22_TRACK_MODE_AND_TELEMETRY.md), including complex-route guidance, route-free recording, detailed telemetry, Apple Watch integration, and feature-local phases T0–T7. T0 contract/lifecycle/validation source, authored regression scenarios, and isolated Apple workout probes are present as of 2026-10-12. Runtime recording/UI remain unimplemented; builds/tests and physical phone/watch evidence are unrun. The owner approved SwiftUI only for watchOS and full telemetry stop on manual pause. Apple Watch implementation and physical feasibility are deferred to final phase T7, after phone history/export and acceptance; phone phases have no wearable dependency. That document owns detailed feature status and the temporary plan; it does not renumber the application phases above or establish device completion.
+
 ## 3. Decisions to settle before dependent implementation
 
 Record decisions in the relevant existing architecture/product document. These are targeted design tasks, not reasons to block unrelated work.

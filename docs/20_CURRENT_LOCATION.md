@@ -37,6 +37,8 @@ Features own camera behavior:
 
 ## Future navigator mode
 
+The target behavior, current feature state, and implementation phases for navigator sessions, route-free recording, background lifecycle, telemetry, and Apple Watch integration are maintained in [22_TRACK_MODE_AND_TELEMETRY.md](22_TRACK_MODE_AND_TELEMETRY.md). T0 domain contracts and isolated Apple probes are present; runtime recording/navigation remain unimplemented. The lifecycle described here is still the existing foreground-map behavior. The chosen T2 policy starts native recording only after a visible user action, keeps one activity-owned location subscription, and requires explicit resume after process interruption rather than background auto-restart.
+
 The implemented stream already updates the marker as the user moves. Navigator mode will add explicit session ownership, camera-follow state, gesture behavior while following, and any route/guidance UI. Speed and course are optional and must never be assumed available or precise enough for guidance. Background navigation will require a separate lifecycle policy, platform authorization/capability work, and Android foreground-service ownership; no background permission, iOS location background mode, route recording, or navigation UI is added here.
 
 ## User verification

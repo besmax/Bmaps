@@ -6,6 +6,8 @@ Status: Phase 1 contract baseline. Phase 2 preferences/shell and Phase 3A online
 
 `core:map-engine` owns renderer-independent geometry, tile descriptors, tile sources, and coordinate transformation contracts. `domain:providers` owns provider/style definitions. `domain:map-builder` owns package manifests and build/library lifecycle contracts. The module registry records the one-way dependency from map-builder to providers. Domain repository implementations will adapt core APIs; core does not implement interfaces that require importing domain. `:shared` will assemble Metro bindings.
 
+Track-mode T0 introduces `domain:activity` contracts for independent reusable routes, activities, telemetry, lifecycle, and wearable packets, specified in [22_TRACK_MODE_AND_TELEMETRY.md](22_TRACK_MODE_AND_TELEMETRY.md). These application-owned assets do not change the map-package manifest or transfer schema. Package annotation lines are copied into activity route snapshots at selection; they remain package-owned. Activity persistence and transfer are not implemented by these contracts.
+
 No screen logic, use-case implementation, or DI graph is introduced in Phase 1. The framework convention fix is the minimal Phase 0 prerequisite: `app.kmp.library` declares targets; only `:shared` applies `app.shared`, which generates the static framework. The remainder of Phase 0 is still outstanding.
 
 ## Coordinates and levels

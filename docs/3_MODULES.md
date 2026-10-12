@@ -46,6 +46,10 @@ The umbrella imports screen entry points from their owning UI packages: `constru
 
 ## 3. Domain Layer (Business Logic & Contracts)
 Modules containing pure use cases, models, and interface contracts.
+* **`domain:activity`**
+    * **Responsibility:** Application-owned segmented reusable routes and immutable route snapshots, activity lifecycle policy, timestamped/provenance-bearing telemetry, repository/session contracts, independent validation, data limits, and versioned wearable command/measurement DTOs. Domain values are not annotated as Compose-stable presentation models.
+    * **Dependencies:** `core:map-engine` for renderer-independent WGS 84 coordinates, catalog-pinned serialization and coroutines. No feature, platform HealthKit, Room, or renderer implementation imports. Applies `app.android.library` and `app.serialization`; no iOS framework generation.
+    * **T0 status:** Contracts, lifecycle transitions, validation, and regression scenarios are present; compilation/tests are unrun. Storage adapters, native recording/session ownership, route matching, DI bindings, UI, and wearable adapters belong to later phases. See `22_TRACK_MODE_AND_TELEMETRY.md`.
 * **`domain:providers`**
     * **Responsibility:** Provider/style identities, extensible provider definitions, endpoint and credential-reference contracts, configuration, attribution, and online/offline capabilities. Includes the provider registry, URL builders, and online tile-source adapter. Provider policy remains here; raw HTTP execution belongs to `core:network`. Also owns OpenTopography dataset identities, request constraints/estimates, credential resolution, and the streaming elevation provider adapter.
     * **Dependencies:** `core:map-engine` for renderer-independent geometry and tile contracts; `core:network` for bounded HTTP, `core:datastore` for encrypted credentials, and `core:di` for Metro contributions.

@@ -60,7 +60,7 @@ dependencyResolutionManagement {
 
 include(":androidApp")
 include(":shared")
-include(":domain:providers", ":domain:map-builder")
+include(":domain:providers", ":domain:map-builder", ":domain:activity")
 include(":feature:shell", ":feature:constructor", ":feature:library", ":feature:viewer")
 
 include(

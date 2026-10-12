@@ -14,8 +14,8 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Product scope and requirements | `docs/1_VISION_AND_PRODUCT.md` |
 | Architecture, dependencies, module creation or ownership, feature package organization | `docs/2_ARCHITECTURE.md`, `docs/3_MODULES.md` |
 | UI state, ViewModels, events, stable presentation models and composable decomposition (screens, lists and list items) | `docs/4_STATE_AND_UI.md` |
-| Phase work, current status and acceptance criteria | `docs/5_IMPLEMENTATION_PLAN.md` |
-| Domain contracts and package format | `docs/6_CONTRACTS_AND_PACKAGE_FORMAT.md` |
+| Phase work, current status and acceptance criteria | `docs/5_IMPLEMENTATION_PLAN.md`; track-mode feature phases and status: `docs/22_TRACK_MODE_AND_TELEMETRY.md` |
+| Domain contracts and package format | `docs/6_CONTRACTS_AND_PACKAGE_FORMAT.md`; activity/route/telemetry and wearable contracts: `docs/22_TRACK_MODE_AND_TELEMETRY.md` |
 | Feature shell, navigation and application composition | `docs/7_FEATURE_SHELL.md` |
 | Providers, networking and credentials | `docs/8_PROVIDER_NETWORKING_AND_CREDENTIALS.md` |
 | Map rendering, camera control and coordinate transformations | `docs/9_MAP_ENGINE.md` |
@@ -32,6 +32,7 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Licensing, provenance, source headers, packaged notices and release signing | `docs/18_LICENSING_AND_PROVENANCE.md`, `CONTRIBUTING.md` |
 | Package import/export, `.bmaps` transfer format, standalone MBTiles and native document access/sharing | `docs/19_PACKAGE_TRANSFER.md` |
 | Current location/GPS, permissions, native and Google Fused Location Provider sources, severe source disagreements, lifecycle, accuracy overlays, initial focus and navigator preparation | `docs/20_CURRENT_LOCATION.md` |
+| Track mode, complex-route navigation, route-free recording, background activity lifecycle, telemetry, Apple Watch, activity history and reusable recorded routes | `docs/22_TRACK_MODE_AND_TELEMETRY.md` |
 
 For tasks spanning multiple areas, read the relevant sections from each affected area. Discover additional documents with targeted filename or text searches when needed. Reuse context already read in the conversation unless it has changed or needs verification. Update affected documentation when behavior, contracts, or implementation status changes.
 
@@ -64,7 +65,7 @@ Documents under `docs/plans/` describe proposals and implementation approaches; 
     * `core` modules are isolated infrastructure. Cross-imports within `core` should be strictly minimized.
 
 ## 4. Tech Stack Constraints
-* **UI:** Compose Multiplatform for all UI rendering.
+* **UI:** Compose Multiplatform for all UI rendering, with one exception approved by the project owner on 2026-10-12: SwiftUI is permitted only for the Apple Watch companion's watchOS UI. This exception does not extend to phone UI.
 * **Map Engine:** MapComposeMP for tile rendering.
 * **Network:** Ktor Client with platform-specific engines, specifically OkHttp for Android and Darwin for iOS.
 * **Storage:** Room KMP for primary application metadata; custom SQLite driver for `.mbtiles` read/write operations.
