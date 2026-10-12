@@ -8,6 +8,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.domain.activity
 
+@kotlinx.serialization.Serializable
 enum class ActivityAction { PAUSE, RESUME, FINISH, INTERRUPT, COMPLETE }
 
 object ActivityLifecycle {

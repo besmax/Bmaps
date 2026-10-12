@@ -83,6 +83,9 @@ data class ActivityQualityPolicy(
 object ActivityLimits {
     const val MAX_IMPORT_BYTES = 32_000_000
     const val MAX_IMPORT_ROUTES = 100
+    const val MAX_ROUTE_STORAGE_BYTES = 64_000_000
+    const val MAX_ACTIVITY_HEADER_BYTES = 65_536
+    const val MAX_WRITE_EVENTS = 256
     const val MAX_ROUTE_VERTICES = 200_000
     const val MAX_ROUTE_SEGMENTS = 2_000
     const val MAX_CONTROL_POINTS = 2_000

@@ -31,8 +31,8 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Generated elevation color layers, palette/range settings, background generation, performance pipeline/range cache, regeneration and disk-size accounting | `docs/21_ELEVATION_COLOR_LAYERS.md` |
 | Licensing, provenance, source headers, packaged notices and release signing | `docs/18_LICENSING_AND_PROVENANCE.md`, `CONTRIBUTING.md` |
 | Package import/export, `.bmaps` transfer format, standalone MBTiles and native document access/sharing | `docs/19_PACKAGE_TRANSFER.md` |
-| Current location/GPS, permissions, native and Google Fused Location Provider sources, severe source disagreements, lifecycle, accuracy overlays, initial focus and navigator preparation | `docs/20_CURRENT_LOCATION.md` |
-| Track mode, complex-route navigation, route-free recording, background activity lifecycle, telemetry, Apple Watch, activity history and reusable recorded routes | `docs/22_TRACK_MODE_AND_TELEMETRY.md` |
+| Current location/GPS, shared map/recorder location distribution, native acquisition uptime/provenance/altitude, permissions, native and Google Fused Location Provider sources, severe source disagreements, lifecycle, accuracy overlays, initial focus and navigator preparation | `docs/20_CURRENT_LOCATION.md` |
+| Track mode, complex-route navigation, route-free recording, background activity lifecycle, telemetry, activity/route spatial storage and catalog recovery, detailed GPX route import, Apple Watch, activity history and reusable recorded routes | `docs/22_TRACK_MODE_AND_TELEMETRY.md` |
 
 For tasks spanning multiple areas, read the relevant sections from each affected area. Discover additional documents with targeted filename or text searches when needed. Reuse context already read in the conversation unless it has changed or needs verification. Update affected documentation when behavior, contracts, or implementation status changes.
 

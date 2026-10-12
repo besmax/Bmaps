@@ -8,12 +8,13 @@
 		<string>bes.max.bmaps.elevation-generation</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Bmaps uses your location to show your position on maps and center the map builder near you.</string>
+	<string>Bmaps uses your location to show your position on maps and record your track, including while the screen is locked.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>processing</string>
+		<string>location</string>
 	</array>
 </dict>
 </plist>

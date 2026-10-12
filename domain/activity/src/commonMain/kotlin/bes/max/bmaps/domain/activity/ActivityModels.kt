@@ -29,7 +29,11 @@ interface ActivityClock {
 }
 
 @Serializable
-data class RouteVertex(val coordinate: GeographicCoordinate, val elevation: ElevationMeasurement? = null)
+data class RouteVertex(
+    val coordinate: GeographicCoordinate,
+    val elevation: ElevationMeasurement? = null,
+    val sourceTimeEpochMillis: Long? = null,
+)
 
 @Serializable
 data class RouteSegment(val id: String, val vertices: List<RouteVertex>)
@@ -48,6 +52,7 @@ data class ActivityRoute(
     val segments: List<RouteSegment>,
     val controlPoints: List<RouteControlPoint> = emptyList(),
     val schemaVersion: Int = 1,
+    val description: String = "",
 )
 
 @Serializable
@@ -75,6 +80,8 @@ data class ActivityRecord(
     val derivedRouteId: String? = null,
     val schemaVersion: Int = 1,
     val controlRevision: Long = 0,
+    val statistics: ActivityStatistics = ActivityStatistics(),
+    val lastCommand: ActivityCommand? = null,
 )
 
 @Serializable
@@ -114,3 +121,15 @@ data class RouteProgress(
     val deviationMeters: Double? = null,
     val nextControlPointId: String? = null,
 )
+
+@Serializable
+data class ActivityStatistics(
+    val distanceMeters: Double = 0.0,
+    val elapsedMillis: Long = 0,
+    val recordingMillis: Long = 0,
+    val movingMillis: Long = 0,
+    val interruptedMillis: Long = 0,
+    val elapsedIsEstimated: Boolean = false,
+) {
+    fun durations() = ActivityDurations(elapsedMillis, recordingMillis, movingMillis, interruptedMillis, elapsedIsEstimated)
+}

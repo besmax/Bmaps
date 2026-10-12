@@ -1,5 +1,7 @@
 # Package storage and recovery
 
+Application-owned activity/route storage is independent of this package lifecycle. Track phase T1 adds separate spatial SQLite stores and Room schema-4 catalog projections without changing map inventory, package size accounting, or package deletion. Its implementation/recovery contracts and pending acceptance are documented in [22_TRACK_MODE_AND_TELEMETRY.md](22_TRACK_MODE_AND_TELEMETRY.md).
+
 Phase 4 implementation, 2026-09-12. Source review only: builds, schema generation, and all test execution are left to the user. This document records the Phase 4 storage foundation. Phase 5 now submits downloads and adds scheduling, Restore controls, progress, and notifications; current integration status is in `12_DOWNLOAD_PIPELINE.md`.
 
 Android compilation follow-up: replaced the unavailable `OsConstants.O_DIRECTORY` reference with `O_RDONLY` and a descriptor-based `fstat`/`S_ISDIR` check before synchronizing directories. Descriptor closure remains in `finally`. Rebuild and runtime verification remain with the user. These operations use the public [Android Os APIs](https://developer.android.com/reference/android/system/Os) and [OsConstants helpers](https://developer.android.com/reference/android/system/OsConstants).

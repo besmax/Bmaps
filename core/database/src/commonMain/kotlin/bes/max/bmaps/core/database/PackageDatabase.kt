@@ -134,10 +134,12 @@ abstract class PackageDao {
     }
 }
 
-@Database(entities = [PackageRecord::class, DownloadJobRecord::class, PackagePreferencesRecord::class], version = 3, exportSchema = true)
+@Database(entities = [PackageRecord::class, DownloadJobRecord::class, PackagePreferencesRecord::class,
+    ActivityCatalogRecord::class, ActivityRouteCatalogRecord::class], version = 4, exportSchema = true)
 @ConstructedBy(PackageDatabaseConstructor::class)
 abstract class PackageDatabase : RoomDatabase() {
     abstract fun packages(): PackageDao
+    abstract fun activities(): ActivityCatalogDao
 }
 
 @Suppress("NO_ACTUAL_FOR_EXPECT", "KotlinNoActualForExpect")
@@ -154,6 +156,13 @@ fun packageDatabase(builder: RoomDatabase.Builder<PackageDatabase>): PackageData
     .addMigrations(object : Migration(2, 3) {
         override fun migrate(connection: SQLiteConnection) {
             connection.execSQL("ALTER TABLE packages ADD COLUMN needsVerification INTEGER NOT NULL DEFAULT 1")
+        }
+    })
+    .addMigrations(object : Migration(3, 4) {
+        override fun migrate(connection: SQLiteConnection) {
+            connection.execSQL("CREATE TABLE activity_catalog (id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, profile TEXT NOT NULL, status TEXT NOT NULL, revision INTEGER NOT NULL, startedAtEpochMillis INTEGER NOT NULL, finishedAtEpochMillis INTEGER, routeId TEXT, generation TEXT NOT NULL)")
+            connection.execSQL("CREATE INDEX index_activity_catalog_startedAtEpochMillis_id ON activity_catalog(startedAtEpochMillis, id)")
+            connection.execSQL("CREATE TABLE activity_route_catalog (id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, revision INTEGER NOT NULL, vertexCount INTEGER NOT NULL, segmentCount INTEGER NOT NULL, generation TEXT NOT NULL)")
         }
     })
     .setDriver(BundledSQLiteDriver())

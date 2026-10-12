@@ -30,8 +30,8 @@ internal class LocationFixSelector {
     fun record(source: String, fix: LocationFix, nowMillis: Long): Boolean {
         if (!fix.isValid() || !fix.isFresh(nowMillis)) return false
         val previous = fixes[source]
-        if (previous != null && (fix.timestampMillis < previous.timestampMillis ||
-                (fix.timestampMillis == previous.timestampMillis && fix.accuracyMeters >= previous.accuracyMeters))) {
+        if (previous != null && (fix.orderMillis < previous.orderMillis ||
+                (fix.orderMillis == previous.orderMillis && fix.accuracyMeters >= previous.accuracyMeters))) {
             return false
         }
         fixes[source] = fix
@@ -47,7 +47,7 @@ internal class LocationFixSelector {
         fixes["network"]?.takeIf { it.accuracyMeters <= NETWORK_CONFLICT_MAX_ACCURACY_METERS }?.let { network ->
             for (source in listOf("gps", "fused", "google-fused")) {
                 val satellite = fixes[source] ?: continue
-                val timeDifferenceSeconds = abs(satellite.timestampMillis - network.timestampMillis) / 1_000.0
+                val timeDifferenceSeconds = abs(satellite.orderMillis - network.orderMillis) / 1_000.0
                 val allowedDistance = maxOf(SOURCE_CONFLICT_MIN_DISTANCE_METERS,
                     SOURCE_CONFLICT_ACCURACY_MULTIPLIER * (satellite.accuracyMeters + network.accuracyMeters) +
                         SOURCE_CONFLICT_TRAVEL_METERS_PER_SECOND * timeDifferenceSeconds)
@@ -59,16 +59,16 @@ internal class LocationFixSelector {
         val current = selected?.takeIf { it.fix.isFresh(nowMillis) && it.source in fixes && it.source !in quarantined }
         val candidates = fixes.filterKeys { it !in quarantined }
             .map { SelectedLocationFix(it.key, it.value, conflict) } + listOfNotNull(current?.copy(sourceConflict = conflict))
-        val newest = candidates.maxOfOrNull { it.fix.timestampMillis } ?: return null
+        val newest = candidates.maxOfOrNull { it.fix.orderMillis } ?: return null
         val movementMetersPerSecond = maxOf(2.0, candidates.maxOfOrNull { it.fix.speedMetersPerSecond ?: 0.0 } ?: 0.0)
         fun score(candidate: SelectedLocationFix): Double {
-            val lagMillis = (newest - candidate.fix.timestampMillis - LOCATION_ACCURACY_WINDOW_MILLIS).coerceAtLeast(0)
+            val lagMillis = (newest - candidate.fix.orderMillis - LOCATION_ACCURACY_WINDOW_MILLIS).coerceAtLeast(0)
             return candidate.fix.accuracyMeters + lagMillis / 1_000.0 * movementMetersPerSecond
         }
         val next = candidates.asSequence()
             .filter { canReplaceLocationFix(selected?.fix?.takeIf { fix -> fix.isFresh(nowMillis) }, it.fix, conflict) }
             .minWithOrNull(compareBy<SelectedLocationFix> { score(it) }
-                .thenByDescending { it.fix.timestampMillis }
+                .thenByDescending { it.fix.orderMillis }
                 .thenBy { it.source })
         if (next != null) selected = next
         return next

@@ -23,6 +23,11 @@ import dev.zacsweers.metro.SingleIn
 object AndroidPackageStorageBindings {
     @Provides
     @SingleIn(AppScope::class)
+    fun activities(context: Context): ActivityStorageLocation =
+        ActivityStorageLocation(context.applicationContext.filesDir.absolutePath)
+
+    @Provides
+    @SingleIn(AppScope::class)
     fun location(context: Context): PackageStorageLocation =
         PackageStorageLocation(java.io.File(context.applicationContext.filesDir, "packages").absolutePath)
 }

@@ -6,7 +6,7 @@ purpose: "Define track navigation, route-free recording, telemetry, Apple Watch 
 
 # Track mode and telemetry
 
-Created: 2026-10-12. Updated: 2026-10-12. Status: T0 contracts, pure lifecycle policy, validation, and API assessment are implemented in source. The owner approved watchOS-only SwiftUI and full telemetry stop on manual pause. Production watch work and physical feasibility checks are deferred to final phase T7. Builds/tests are unrun; runtime recording/navigation are not implemented.
+Created: 2026-10-12. Updated: 2026-10-12. Status: T1 persistence, catalog recovery, detailed GPX import, and separate route previews are implemented in source. The owner reported the preceding T0 app builds and launches; platform and automated-test results were not specified. T1 builds/tests and schema/native acceptance are unrun. Runtime recording/navigation are T2–T4 work; production watch work remains final phase T7.
 
 This document owns the feature specification and its temporary implementation tracking. Sections 1–8 describe the target behavior, not existing functionality. Section 9 records current evidence. Section 10 contains the temporary implementation plan and decision register. Update behavior sections to describe the actual implementation as each slice lands. Once the complete feature is implemented and accepted, remove section 10, including the phase table, checklists, and resolved decision register. Retain the implementation description, contracts, limitations, and verification evidence; do not leave the completed plan in this document.
 
@@ -45,7 +45,7 @@ Deferred scope includes automatic road/trail routing, automatic detour generatio
 
 An activity with a route retains an immutable route snapshot and selected direction. Editing or deleting the original route must not rewrite an active or historical activity.
 
-Activities and reusable recorded routes must be independent of map-package deletion. Existing package annotations remain package-owned; route selection adapts their line geometry into the route model rather than silently relocating annotations. T0 selects independent application-owned SQLite spatial stores and a repairable Room catalog projection, specified in section 8.2. The storage implementation belongs to T1.
+Activities and reusable recorded routes must be independent of map-package deletion. Existing package annotations remain package-owned; route selection adapts their line geometry into the route model rather than silently relocating annotations. T0 selects independent application-owned SQLite spatial stores and a repairable Room catalog projection, specified in section 8.2. Storage is implemented in T1 source; native acceptance remains pending.
 
 At most one phone-owned activity is active at a time. The phone owns activity state, navigation, and the primary recording. Apple Watch owns its sensor session and temporary telemetry buffer, but does not become an independent activity authority in the first version.
 
@@ -190,7 +190,7 @@ Existing architecture and module ownership remain authoritative until updated wi
 | `ActivityModels.kt` | Segmented route vertices/control points, route revision snapshot, direction/start edge, profile, clock anchors, activity state/revisions, events, durations, and uncertain route progress |
 | `ActivityTelemetry.kt` | Typed position/speed/heart-rate/elevation/course measurements, source/phase/acquisition/receipt metadata, quality policy, and resource bounds |
 | `ActivityLifecycle.kt` | Pure transition table with explicit interruption/resume, finalization boundary, and idempotent repeated actions |
-| `ActivityContracts.kt` | Session owner, atomic repository commit, route derivation, custom keyset history/sample/event queries, and typed failures; interfaces only |
+| `ActivityContracts.kt` | Session owner, atomic repository commit, route derivation, custom keyset history/sample/event queries, and typed failures; T2 implements the phone session |
 | `ActivityValidation.kt` | Independently callable input/schema/geometry/sample/query/quality validation; not embedded in structural use cases |
 | `WearableProtocol.kt` | Version-1 snapshots, commands/acknowledgments, bounded timestamped heart-rate batches, sample acknowledgments, and independent inbound validation |
 
@@ -200,7 +200,7 @@ The route snapshot carries ordered segments and `RoutePosition(segmentIndex, edg
 
 ### 8.2 Selected storage and consistency design
 
-T1 will implement two private spatial databases, outside package folders:
+T1 implements two private spatial databases, outside package folders:
 
 - `activities/activity.sqlite`: activity records, route snapshots, accepted position/non-positional samples, events, interval/segment boundaries, durable checkpoint, active-owner slot, and command deduplication/acknowledgments.
 - `routes/routes.sqlite`: reusable route records, ordered segments/vertices, control points, route revisions, and derivation identity.
@@ -213,15 +213,15 @@ Use bundled SQLite through core-owned primitive records and kotlinx-io path infr
 
 Lifecycle control has a separate `controlRevision`, incremented only for control changes, not periodic telemetry commits. Wearable pause/resume compares this revision, preventing normal sample writes from constantly invalidating commands. `sessionGeneration` changes on recovery/resume from interruption and protects commands from a previous recorder instance.
 
-Flush at 256 samples, 256 KiB of encoded transaction input, or the one-second scheduled commit interval, whichever is reached first. Start, pause, resume, finish, and error/interruption transitions flush immediately. The one-second interval is a scheduling target, not a guarantee while the OS suspends execution; only committed batches are durable. Capacity/IO failure ends healthy recording state, preserves committed data, and requires explicit recovery. Never acknowledge wearable samples before their transaction commits.
+Transaction caps are 256 samples/events and 256 KiB of encoded input. T2 flushes before its smaller buffer exceeds 128 samples or 128 KiB of encoded samples, bounds quality-event buffering, and schedules commits once per second. Start, pause, resume, finish, and error/interruption transitions flush immediately. The one-second interval is a scheduling target, not a guarantee while the OS suspends execution; only committed batches are durable. Capacity/IO failure ends healthy recording state, preserves committed data, and requires explicit recovery. Never acknowledge wearable samples before their transaction commits.
 
 Finish first records `FINALIZING` and its stop boundary, releases native recording ownership, then derives a route if required. Derivation uses the predetermined route ID and activity ID as a unique key in the route store. A retry returns the existing derived route rather than creating another. Completion records that link and `COMPLETED`; finalization can resume on startup without resuming sensor recording. There is no claimed cross-database atomic transaction. An interrupted catalog/link update is reconciled from derivation identity. Deleting an activity does not delete an independently saved reusable route; removing associated pending wearable samples must prevent late delivery from recreating the deleted activity.
 
-Detailed GPX limits are 32 MB UTF-8 input, at most 100 resulting routes, 200,000 vertices, 2,000 segments and 2,000 control points across the import document, with the same geometry caps on each stored route. The future streamed importer also retains XML depth/entity protections and counts limits before allocating the complete geometry. Existing annotation limits remain unchanged. Oversized routes fail explicitly; no implicit truncation or simplification. GPX export preserves track segments; health telemetry is an explicit separate versioned JSON payload rather than undocumented vendor GPX extensions. Export/storage codecs are not implemented in T0.
+Detailed GPX limits are 32 MB UTF-8 input, at most 100 resulting routes, 200,000 vertices, 2,000 segments and 2,000 control points across the import document, with the same geometry caps on each stored route. The future streamed importer also retains XML depth/entity protections and counts limits before allocating the complete geometry. Existing annotation limits remain unchanged. Oversized routes fail explicitly; no implicit truncation or simplification. GPX export preserves track segments; health telemetry is an explicit separate versioned JSON payload rather than undocumented vendor GPX extensions. The T1 storage/import codecs are implemented; export codecs remain T5 work.
 
 ### 8.3 Start, clocks, lifecycle, and recovery
 
-Start requires a visible user action, an available native location service, and appropriate precise location permission. Optional heart-rate denial does not block start. A missing initial fix is allowed: the activity begins in RECORDING with unavailable position/progress and no invented path. T2 must independently validate start input in presentation before calling the session owner.
+Start requires a visible user action, an available native location service, and appropriate precise location permission. Optional heart-rate denial does not block start. A missing initial fix is allowed: the activity begins in RECORDING with unavailable position/progress and no invented path. The session invokes structural validation; T4 preparation presentation must independently validate input before calling the owner.
 
 | State | Pause | Resume | Finish | Process interruption | Complete finalization |
 | --- | --- | --- | --- | --- | --- |
@@ -239,7 +239,7 @@ Elapsed time includes pause/interruption and is accumulated from monotonic owned
 
 Default quality candidates in `ActivityQualityPolicy` are position age <= 5 seconds, future allowance <= 2 seconds, accuracy <= 50 m, segment break after a 10-second position gap, and live-heart-rate age <= 15 seconds. They are application defaults awaiting device calibration, not sensor guarantees. Source conflict makes a position ineligible for path accumulation/matching until trust recovers. Position contributions are strictly chronological within a segment; a presentation correction to an older selected fix does not add backward distance. Cross-device clock uncertainty affects freshness, not acquisition timestamp rewriting.
 
-T2/T3 will add profile-specific movement hysteresis and deviation policies with fixture/device evidence; no physical speed, ascent, or warning threshold is claimed calibrated in T0. Preserve speed source, never differentiate noisy positions without a defined quality policy, and never merge unidentified elevation references. Negative elevation is valid; zero heart rate is invalid/missing.
+T2 adds initial profile-specific movement hysteresis; T3 adds deviation policy. Fixture execution and device calibration remain pending; no physical speed, ascent, or warning threshold is claimed calibrated in T0. Preserve speed source, never differentiate noisy positions without a defined quality policy, and never merge unidentified elevation references. Negative elevation is valid; zero heart rate is invalid/missing.
 
 ### 8.4 Wearable protocol and retention
 
@@ -259,8 +259,8 @@ API/documentation assessment date: 2026-10-12. Source/header inspection is separ
 
 | Platform / scenario | Selected direction and evidence | Remaining verification |
 | --- | --- | --- |
-| Android | Keep project minSdk 30; start from a resumed user action using a location foreground service, fine location, `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_LOCATION`; no initial background-location permission or boot auto-resume | T2 native implementation; API-level/device behavior, notification actions, process interruption |
-| iPhone | Keep current deployment minimum iOS 18.2; foreground-started Core Location with location background mode and `allowsBackgroundLocationUpdates`; When In Use authorization and visible background-location status; disable automatic activity pauses while recording | T2 capability changes and physical locked-screen/background evidence; no force-quit guarantee |
+| Android | Keep project minSdk 30; start from a resumed user action using a location foreground service, fine location, `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_LOCATION`; no initial background-location permission or boot auto-resume | T2 source present; user-run API-level/device, notification and interruption acceptance |
+| iPhone | Keep current deployment minimum iOS 18.2; foreground-started Core Location with location background mode and `allowsBackgroundLocationUpdates`; When In Use authorization and visible background-location status; disable automatic activity pauses while recording | T2 source/capability changes present; physical locked-screen/background evidence pending; no force-quit guarantee |
 | Apple Watch hiking | Proposed minimum watchOS 10; real outdoor hiking workout with HealthKit live builder and mirrored workout data. No hardware model whitelist is asserted beyond platform/API availability | T7 physical paired device, read denial/no samples, competing workout, screen-off, full telemetry pause, battery and disconnection |
 | Apple Watch motorized profiles | Compact state/commands can use Watch Connectivity when the watch app is reachable; passive authorized heart-rate history is opportunistic, not a continuous sensor subscription | No supported dedicated continuous motorized heart-rate/session policy established; background alert/display reliability without a workout also remains unresolved |
 | watchOS UI | Owner-approved SwiftUI companion target; Android/iOS retain Compose | Target/toolchain and physical verification in T7 |
@@ -294,29 +294,99 @@ Primary sources reviewed:
 
 Collapsed primary metric is hiking pace and motorcycle/road speed; elapsed recording state is always visible. Expanded fields include speed/pace, available heart rate, actual distance, and remaining route distance when meaningful. Metric customization is deferred until the fixed presets/layout pass acceptance. Coordinates, DEM readout, callouts, and activity panels share a visibility/layout policy rather than independent overlapping expansions.
 
-The eventual activity owner is application-scoped through Metro with platform service ownership. `core:location` supplies raw native observation and retains source selection/quality behavior, but needs provenance/altitude metadata extensions in T2; its current `LocationFix` does not expose selected provider identity or height. Viewer location UI must observe the owner's stream during an activity and keep existing foreground subscriptions when no activity exists. Native wearable infrastructure is a separate future core adapter, not a dependency on viewer or domain; source DTO mapping happens in the activity domain adapter.
+The T2 activity owner is application-scoped through Metro with platform service ownership. `core:location` supplies raw native observation and retains source selection/quality behavior, with T2 uptime/provenance/altitude metadata extensions. The map widget and owner use `SharedLocationService`; foreground maps release their consumer on lifecycle stop, while recording retains its background consumer. Native wearable infrastructure is a separate future core adapter, not a dependency on viewer or domain; source DTO mapping happens in the activity domain adapter.
+
+### 8.7 T1 implementation — 2026-10-12
+
+`LocalActivityStore` is application-scoped and serializes both activity and route repositories. The umbrella contributes interface bindings and graph entry points only. `ActivityFileStorage` receives the native application storage root: Android filesDir and iOS Application Support. The activity/route directories are siblings of `packages`, not members of any package inventory. Fixed paths and journal companions are checked for symlinks before opening.
+
+`ActivityDatabase` and `ActivityRouteDatabase` expose primitive rows in core; JSON semantic mapping, validation, pause rules and route derivation stay in domain. Both spatial databases begin at schema version 1; a new empty version-0 database is initialized transactionally. Unsupported nonzero versions fail without destructive fallback. A nonempty unversioned database also fails instead of being overwritten. SQLite writable reopen recovers hot journals; first access and explicit reconciliation use quick/foreign-key checks. Cancellation before transaction commit rolls back; once SQLite commits, a catalog or directory-sync failure can still return a failure, and the next reconciliation repairs its projection.
+
+Activity headers exclude the route selection payload. Frozen selections occupy `route_snapshots` once per activity; periodic commits update small headers, samples, events and checkpoint without rewriting that geometry. The store caches only the current owner's decoded snapshot and returns owned collection copies. Route JSON is bounded to 64 MB; activity headers and individual row payloads to 64 KiB. Read queries bound text before decoding. History/catalog pages return scalar summaries and never load all route geometries.
+
+The checkpoint records the last event sequence, position epoch/monotonic/continuity anchor, segment ID and pending segment-break flag. New positions require strictly advancing measurement time within a known clock continuity; wall-clock rollback does not override a valid monotonic order. Pause/interruption/position-loss events and a >10-second position gap forbid reuse of the same path segment. Re-entering an already closed segment ID is rejected. Positions are read in durable insertion sequence for route derivation, independently of chart epoch ordering.
+
+Pause eligibility uses durable lifecycle events plus any events in the pending atomic commit. Local measurements compare monotonic anchors when available; remote/unknown-continuity measurements use acquisition epoch, subject to later source-quality/clock policy. The repository accepts telemetry acquired in recording intervals only. A measurement falsely labeled RECORDING but acquired during a pause is rejected. Pre-pause non-positional data delivered after resume remains eligible. Position recording after finalization is rejected; late eligible non-positional data can update a completed history entry without reopening it. Wire ignored-sample acknowledgments and interval-overlap handling remain T7 work.
+
+Compare-and-set protects both activity and route revisions. Activity control revisions change only with lifecycle state; generation changes only for explicit recovery from interruption. Initial create uses a stable content fingerprint; retrying the same create returns the existing record. Command-bearing commits retain fingerprint/result metadata, so identical retries return the original result without repeating events or samples. Same sample identity/content is deduplicated within/across batches; conflicting identity payloads fail and roll back. Batches accept at most 256 samples, 256 events and 256 KiB combined encoded header/event/sample input. T2 adds the recorder's one-second flush scheduler; every repository commit is synchronous/durable.
+
+Room schema 4 adds `activity_catalog` and `activity_route_catalog`, without package foreign keys. The explicit 3-to-4 migration preserves package/job/preferences rows. Startup/explicit reconciliation scans authoritative headers and route summaries in 500-row pages, stamps projection generations, and prunes stale catalog entries only after a successful scan. Stale/missing Room rows do not delete spatial data. Generated schema 4 is now present after the owner's build attempt; static inspection confirms its version and both activity tables. Full review, successful builds and migration execution remain pending; no identity hash is hand-authored.
+
+Activity deletion is refused while recording, paused or finalizing. Deleting completed/interrupted activities transactionally removes their samples/events/snapshot/checkpoint/command data and owner slot, and retains an ID tombstone so stale writes or repeated creation cannot resurrect them. Independently saved routes remain. Route deletion retains derivation identity/tombstones to prevent finalization retries recreating an explicitly deleted route. `secure_delete=ON` is configured; this is a SQLite policy, not a physical flash-erasure guarantee.
+
+Route-free derivation is available for finalizing/completed activities. It reads bounded position pages, preserves segment boundaries, removes consecutive duplicate coordinates and omits non-navigable one-point segments. An activity without any valid segment returns no route. Geometry resource limits fail explicitly; no implicit truncation occurs. Activity ID uniquely binds its derived route across retries; independently updating/deleting an original planned route never changes the activity snapshot. T2 orchestrates automatic derivation and completion; T5 adds history/reuse UI.
+
+`ActivityRouteGpx.decode(RawSource)` bridges a bounded strict UTF-8 stream into XMLUtil's catalog-pinned generic reader; it does not retain an XML tree or close the caller's source. `decode(String)` is a bounded convenience wrapper. Limits apply to the complete import: 32 MB, 100 routes, 200,000 source positions, 2,000 segments and 2,000 named control points; XML nesting is at most 64, elements at most 2,000,000, and attributes at most 128 per element. DTD/entity declarations, malformed UTF-8, unrelated root namespaces/versions, duplicate supported text properties, invalid coordinates, and degenerate segments reject the complete result. Import persistence uses one route-store transaction, so an ID/revision collision cannot partially save a batch.
+
+Supported GPX mapping is `rte/rtept` to one route/segment and each `trk` to one route retaining all `trkseg` gaps. Route name/description/comment fallback, optional vertex elevation and explicitly zoned timestamps, and named route/track points are retained. Imported heights use `GPX_UNSPECIFIED` vertical reference; they are never silently labeled as a DEM datum. Consecutive duplicate positions keep the first vertex metadata. Top-level waypoints and vendor extensions are outside this route importer and ignored; the existing annotation importer remains the way to import standalone waypoints. Its 4 MB/1,000-vertex contract is unchanged.
+
+`ActivityRouteAdapter.line` accepts already mapped line vertices without importing map-builder annotation models. `ActivityRoutePreview.create` makes a separate bounded overview geometry with source indices, preserving segment endpoints and control-point edge endpoints. Its deterministic sampling has no geometric error bound; it is an overview helper, not route-matching or measurement geometry. Navigation/storage continue using the complete route. UI wiring and zoom-dependent render policy belong to T4.
+
+### 8.8 T2 implementation — 2026-10-12
+
+`PhoneActivitySession` is the application-scoped phone owner, bound through Metro as `ActivitySession`. Android application creation and the existing iOS initialization entry point initialize recovery without starting recording. Start/control/recovery serialize with sensor ingestion and flushes in the owner's scope, so leaving a map or cancelling a caller does not cancel an accepted control transaction. Preparation/control UI and its independently validating ViewModel belong to T4; no map buttons are added here.
+
+`SharedLocationService` distributes one native subscription to the map widget and recorder. Requests combine minimum interval/distance hints and enable background mode only for a recording consumer. Identical effective requests retain the subscription. Distribution preserves sequential updates rather than conflating them to a latest-state value; iOS forwards each supplied native location in a batch. Stopping map collection clears map presentation but retains the recorder; stopping the last consumer releases native listeners. Effective-policy changes and explicit map Retry/permission refresh restart the native stream and publish waiting/quality states.
+
+Phone fixes carry native uptime, provider identity, optional altitude/vertical accuracy and speed accuracy. Android uses acquisition `elapsedRealtimeNanos`; iOS maps Core Location timestamp age to uptime. Map selection/freshness/order use uptime when available, retaining epoch fallback for older/test fixes. Activity continuity is a process-specific identity. Accepted points must be valid, at most five seconds old, no worse than 50 m accuracy, free of source conflict, strictly chronological and inside the current recording/quality boundary. Future phone acquisitions are rejected rather than counted before a pause boundary. A missing local uptime anchor can be mapped from epoch age; no phone anchor is invented for remote health samples.
+
+Each qualified fix retains position and available valid speed, course and altitude with independent sample IDs, acquisition/receipt anchors and provider provenance. Altitude uses `PHONE_UNSPECIFIED`, rather than silently combining it with DEM heights. Missing speed stays missing. The initial recorder takes these channels together from qualified fixes; poor/conflicting fixes do not produce apparently trustworthy phone telemetry. Heart rate is explicitly unavailable until T7; there is no production HealthKit/BLE/watch producer.
+
+The one-second scheduled flush commits samples, quality events, statistics and checkpoint together; thresholds flush earlier. Pending samples are bounded to 128/128 KiB; quality transitions flush before 120 pending events. Native callback and shared distribution queues are also bounded to 256 updates each. A native queue overflow or terminal subscription exception produces an explicit delivery-gap signal; the owner commits a gap/interruption and requires recovery instead of silently losing telemetry. Repository transaction caps remain independent. Start/control/interruption boundaries flush immediately. The interval is a scheduling target, not an OS suspension guarantee; only committed batches are durable. Write failure stops native ownership, clears uncommitted input and exposes `ActivityLiveState.failure` with the last durable record/statistics. A still-persisted RECORDING header does not indicate a healthy runtime after failure. Explicit recovery reconciles it to interruption when storage becomes available.
+
+Pause persists its boundary and removes the recorder's sensor consumer. Late callbacks and cached acquisitions before resume are rejected. Pause adds elapsed time only: no path, speed, course, altitude or future health samples. Android retains its paused service notification; a separately visible map may retain its foreground consumer. iOS releases background location during pause and requires foreground resume. Resume/quality recovery create new segments. Quality/source-conflict/loss and long-gap events are explicit. GPS loss alone retains RECORDING with unavailable position; permission or native-owner loss interrupts recording.
+
+Android owns a non-exported `location` foreground service, native foreground-service permissions, a low-importance ongoing notification with recording/paused status, an app-opening intent and Finish action. Start checks fine permission, enabled location and a resumed activity, and waits for service foreground promotion. A paused existing service can continue without creating another. `START_NOT_STICKY` and no boot receiver prevent auto-restart. Notification permission is declared but not required to record; T4 must offer a contextual Android 13+ request because denial limits notification visibility. The Application exposes graph-backed service/session properties only; business policy stays in `domain:activity`.
+
+The iOS app declares location background mode and an updated usage explanation. Recording configures Core Location background updates/indicator and disables automatic pausing. The native host checks foreground state, services, When In Use/Always authorization and full accuracy without prompting or requesting Always. Reduced accuracy/authorization loss during recording interrupts the owner; ordinary map requests retain foreground cleanup and reported reduced accuracy. Physical locked-screen delivery remains unverified. API references: [Android foreground-service restrictions](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start), [Android location service type](https://developer.android.com/develop/background-work/services/fgs/service-types#location), [Apple authorization](https://developer.apple.com/documentation/corelocation/requesting-authorization-to-use-location-services), and [Apple background configuration](https://developer.apple.com/documentation/corelocation/cllocationmanager/allowsbackgroundlocationupdates).
+
+`ActivityRecord.statistics` persists elapsed/recording/moving/interrupted time and distance. Owned time uses monotonic deltas; pause adds no recording/motion, and cross-continuity downtime is estimated without filling motion. Movement uses consecutive points in one segment at most ten seconds apart and horizontal geodesic distance. Initial speed hysteresis starts hiking at 0.5 m/s and motorized profiles at 1 m/s; stop thresholds are half those values. Without native speed, displacement must exceed both 3 m and half the sum of accuracy radii. Displacements below 1 m do not count. These heuristics await device calibration; movement-filtered distance can differ from reusable-route geometry length. Moving time is capped by recording time; distance/time never bridge segments.
+
+Recovery marks persisted RECORDING/PAUSED interrupted from their last committed `updatedAt`, a conservative ownership boundary. Downtime is outside recording/moving time. Explicit resume rotates generation and starts a segment. FINALIZING retries derivation/completion without sensors. Route-free finish uses deterministic `recorded-<digest of activity ID>` identity; insufficient geometry yields no reusable route. Finish acknowledgment is the durable FINALIZING transition; completion is exposed separately in session state. Stored command results retain `lastCommand` to reject an identical ID carrying a different payload.
+
+Owned snapshots use persistent immutable collections. Periodic commits reuse unchanged trusted geometry while validating headers; new geometry receives full validation. This avoids copying/scanning 200k vertices every tick. Domain contracts are not annotated presentation models. Statistics/command payload additions have readable defaults in activity version 1 and require no spatial/Room schema increment.
 
 ## 9. Current state and evidence
 
-Baseline: 2026-10-12. T0 now adds contract/lifecycle/validation source and headless Apple probe source. Recording, persistence, navigation, phone/watch UI, and production integration remain unimplemented. No builds, application tests, or physical device checks have been run for T0.
+Baseline: 2026-10-12. T0 added contracts/lifecycle/validation and headless Apple probes. The owner subsequently reported that the app builds and launches, without specifying a platform or test results. T1 adds storage/import source; T2 adds the phone owner, shared location distribution, native background ownership, recording/quality/statistics and recovery. Navigation, preparation/history UI and production watch integration remain later phases. No T1/T2 build, application test execution or physical acceptance was performed by the agent.
 
 | Area | Existing evidence / constraint | Feature work remaining |
 | --- | --- | --- |
-| Location | `core:location` exposes continuous fixes with time, accuracy, optional speed/course | Activity ownership, background lifecycle, recording quality policy |
-| Viewer lifecycle | `LocationTracking` collects while the map lifecycle is resumed | Decouple active recording from map visibility while retaining ordinary foreground-map behavior |
-| GPX | Annotation import maps each track segment to a line; input is bounded and route/segment vertices are limited to 1,000 | Bounded detailed-track import, grouped route identity, explicit gaps, separate reusable-route representation |
+| Location | T2 shares map/recorder subscriptions with native uptime/provenance/phone telemetry | Native background/permission/clock/overflow acceptance |
+| Viewer lifecycle | Map collection stays RESUMED-only; T2 recorder retains its own consumer | T4 activity controls and user-run screen-lock/map-exit acceptance |
+| GPX | Separate T1 streamed route importer preserves track grouping, gaps, supported metadata and named points; existing annotation importer is unchanged | T4 map/import preparation integration and user-run detailed-file acceptance |
 | Map UI | Viewer has object controls, callouts, immersive state, and translucent control styling | Preparation, activity panel, camera-follow state, navigation overlays |
-| Activity contracts | Registered `domain:activity`, serializable models, pure transitions, independent validation, query/session/repository interfaces, wearable DTOs | Repository/session implementations and DI integration |
-| Storage | Room app metadata and package-local annotations exist; T0 selects independent spatial SQLite stores and repairable catalog | Implement samples, recovery, migration, deletion/export in T1/T5 |
+| Activity contracts | Registered `domain:activity`; T1 repository adapters and umbrella bindings are present; history uses summaries | T2 phone owner present; T3 navigation and T4 UI consumers remain |
+| Storage | T1 spatial schema-1 databases, atomic commits/checkpoints, tombstones, route derivation, projection repair, Room schema 4 and 3-to-4 migration are present | User-run builds/schema review, native migration/IO acceptance; T2 timed recorder flush present; T5 export |
 | Wearables | Official API and local SDK-header review; original headless hiking/mirroring probes authored | UI policy, user-run compilation and physical evidence, production buffering/commands, motorized capability decision |
 
 Targeted source inspection: `core/location/src/commonMain/kotlin/bes/max/bmaps/core/location/LocationTracking.kt`, `domain/map-builder/src/commonMain/kotlin/bes/max/bmaps/domain/mapbuilder/AnnotationGpx.kt`, and `feature/viewer/src/commonMain/kotlin/bes/max/bmaps/feature/viewer/map/ui/ViewerScreen.kt`. Source inspection establishes integration constraints, not runtime acceptance.
 
 For each implementation increment record its date, actual source changes, authored checks, executed checks/results, user-reported device acceptance, and remaining limits separately here. Existing project policy reserves mobile builds and test execution for the user; authored checks must not be marked as passed without execution evidence.
 
-T0 regression source: `ActivityContractsTest` contains nine checks for terminal-state protection, explicit interruption resume/idempotent pause, reverse route snapshot/segment preservation, detailed-route independence from annotation limits, full telemetry rejection during manual pause, finish boundaries, command expiry/versioning, duplicate wearable sample IDs/timestamps, and unknown remote monotonic time/duration invariants. These checks are authored and unrun. User handoff: `./gradlew :domain:activity:testAndroidHostTest :domain:activity:iosSimulatorArm64Test` on a configured host, followed by physical probe scenarios above; no passing result is implied.
+T0 regression source: `ActivityContractsTest` contains nine checks for terminal-state protection, explicit interruption resume/idempotent pause, reverse route snapshot/segment preservation, detailed-route independence from annotation limits, full telemetry rejection during manual pause, finish boundaries, command expiry/versioning, duplicate wearable sample IDs/timestamps, and unknown remote monotonic time/duration invariants. These checks are authored and unrun. User handoff: `./gradlew :core:location:testAndroidHostTest :domain:activity:testAndroidHostTest :domain:activity:iosSimulatorArm64Test` on a configured host, followed by physical probe scenarios above; no passing result is implied.
 
 Executed T0 static checks: `scripts/license_headers.py --write` applied standard headers after original-source ownership review; the subsequent checker passed for 312 source files and three packaged notices. `git diff --check` passed. Additional path/module/source-boundary checks confirmed all 30 AGENTS documentation references, registered module/source references, all eight feature phases, English-only new feature text, and new-file whitespace. These checks do not establish Kotlin/Swift compilation or physical sensor behavior.
+
+T1 source evidence: five `ActivityRouteGpxTest` checks cover a detailed 4,001-point track, grouped gaps and metadata, split UTF-8/BOM/prefix handling with caller-owned source lifetime, duplicate/invalid geometry, declaration/input limits, and preview endpoints/control edges. Seven `ActivityStorageScenarios` are exposed as Android device and iOS simulator tests: single owner/restart, real transaction rollback and repeated-command deduplication, paused acquisition rejection and segmented derivation, frozen snapshots/import rollback, catalog recovery/package-directory independence, batch/history cursors, and monotonic ordering across wall-clock rollback. These are authored and unrun. The owner-reported preceding app build/launch is not evidence for T1.
+
+Executed T1 static checks: the license checker passed for 328 original source headers and three packaged notices; `git diff --check` passed. Source/document checks confirmed all 30 AGENTS paths, unchanged phase ordering, implementation status, core/domain import boundaries, module/DI references, Room migration registration, and authored test counts. These checks did not compile Kotlin, execute SQLite scenarios, generate the Room schema, or establish device acceptance.
+
+T1 compilation follow-up (2026-10-12): the owner reported a Kotlin reified intersection-type inference error in `ActivityDatabase.page`. SQL parameter arrays in `ActivityDatabase` and `ActivityRouteDatabase` now explicitly use `Any?`, matching the query contract for mixed string/integer/null bindings. A successful rebuild or test run has not yet been reported.
+
+T2 source evidence: eight `PhoneActivitySessionTest` scenarios cover all phone-channel pause/resume, duplicate/poor/conflicting fixes, shared map/recorder lifetime, checkpoint recovery/generation guards, storage stop/finalization retry, precise-permission failure, non-conflated native batches and explicit delivery overflow. Four statistics tests cover monotonic rollback/pause, discontinuity, segment/gap distance and duplicate/stationary movement. Location selection adds an uptime/wall-clock rollback regression. Native storage adds statistics/command-payload reopen coverage on Android/iOS (eight scenarios per platform). All are authored and unrun; fake hosts do not establish physical background delivery.
+
+Executed T2 static checks: license validation passed for 336 original source headers and three packaged documents; `git diff --check` passed. Source/DI inspection and targeted checks covered 23 unique AGENTS document paths, Android service/permission declarations and matching native notification strings, iOS location background mode, core import boundaries, phase ordering, authored test counts and generated Room schema-4 presence. Local Kotlin/Native 2.4.10 metadata inspection confirmed the Core Location background properties and enum-qualified accuracy/UIApplication state access. These checks did not compile Kotlin, execute tests or establish background/device acceptance. Until T4 exposes map controls, exercise sessions through tests or a development caller of graph-bound `ActivitySession`; do not expect a new map button here.
+
+User verification handoff:
+
+```sh
+./gradlew :core:location:testAndroidHostTest :domain:activity:testAndroidHostTest
+./gradlew :domain:activity:iosSimulatorArm64Test
+./gradlew :domain:activity:connectedAndroidDeviceTest
+```
+
+Confirm available Android device task naming with the installed Gradle plugin if needed. Review/commit the generated `core/database/schemas/bes.max.bmaps.core.database.PackageDatabase/4.json` after building. Native acceptance must also cover upgrading an existing schema-3 installation without losing packages, actual package deletion with retained activities, low storage/failed writes, cancellation/journal recovery, large GPX limits, and unsupported spatial schemas. T2 native acceptance also covers screen lock/navigation-away, single subscription with a map, paused sensor release, notification denial/Finish, foreground start/resume restrictions, permission/owner loss, wall-clock changes, finalization restart and write failure. No T1/T2 build or test result is claimed here.
 
 ## 10. Temporary implementation plan
 
@@ -324,9 +394,9 @@ Remove this entire section after implementation and acceptance, moving enduring 
 
 | Phase | Deliverable | Dependency | Current state |
 | --- | --- | --- | --- |
-| T0 | Contracts, architecture decisions, and API feasibility assessment | None | Implemented in source; owner decisions resolved; builds/tests unrun |
-| T1 | Durable activity/route/sample storage and detailed-route import | T0 | Not started |
-| T2 | Phone-owned background recording and recovery; full telemetry stop on pause | T1 | Not started |
+| T0 | Contracts, architecture decisions, and API feasibility assessment | None | Source present; owner decisions resolved; app build/launch user-reported; tests unreported |
+| T1 | Durable activity/route/sample storage and detailed-route import | T0 | Implemented in source; builds/tests/schema/native acceptance pending |
+| T2 | Phone-owned background recording and recovery; full telemetry stop on pause | T1 | Implemented in source; builds/tests/background/native acceptance pending |
 | T3 | Complex-track navigation and progress | T1–T2 | Not started |
 | T4 | Map entry points and compact activity UI | T2–T3 | Not started |
 | T5 | History, synchronized charts, reusable routes, export | T1–T4; no wearable dependency | Not started |
@@ -342,26 +412,28 @@ Remove this entire section after implementation and acceptance, moving enduring 
 - [x] Author isolated live-heart-rate/mirroring source probes without introducing UI or production capabilities. Keep these existing probes inactive until T7.
 - [x] Record the owner's watchOS-only SwiftUI approval and fixed full-stop pause decision; move production watch integration and physical feasibility checks to T7.
 
-Acceptance: contracts and ownership are implemented in source, and the policy choices are resolved. Builds/tests remain unrun under the existing owner-run verification policy. Physical watch evidence and unresolved motorized capabilities belong to T7 and do not gate phone phases T1–T6. No source/API assessment is described as device acceptance.
+Acceptance: contracts and ownership are implemented in source, and the policy choices are resolved. The owner reported app build/launch without a specified platform; automated-test evidence remains unreported. Physical watch evidence and unresolved motorized capabilities belong to T7 and do not gate phone phases T1–T6. No source/API assessment is described as device acceptance.
 
 ### T1 — Durable data and detailed routes
 
-- [ ] Implement versioned activity, route snapshot, segmented positions, telemetry, event, and checkpoint storage with bounded IO and custom history queries.
-- [ ] Define write-loss bounds, flush/finalization behavior, migration, capacity failures, deletion, and orphan recovery.
-- [ ] Add detailed GPX route import preserving route/track grouping and segment gaps. Enforce explicit byte/point/segment limits.
-- [ ] Retain source geometry and separate render simplification; adapt existing selected annotation lines to routes without changing package ownership.
+- [x] Implement versioned activity, route snapshot, segmented positions, telemetry, event, and checkpoint storage with bounded IO and custom history queries.
+- [x] Define write-loss bounds, flush/finalization behavior, migration, capacity failures, deletion, and orphan recovery.
+- [x] Add detailed GPX route import preserving route/track grouping and segment gaps. Enforce explicit byte/point/segment limits.
+- [x] Retain source geometry and separate render simplification; adapt existing selected annotation lines to routes without changing package ownership.
 
-Acceptance: realistic detailed 5–30 km fixtures round-trip without silent truncation; gaps survive import/storage; interrupted writes recover; deleting a map package preserves application-owned activities/routes.
+Acceptance targets: realistic detailed 5–30 km fixtures round-trip without silent truncation; gaps survive import/storage; interrupted writes recover; deleting a map package preserves application-owned activities/routes. Source deliverables and regression scenarios are present; none of these runtime targets is marked verified until user-run tests/device evidence are recorded. Timed sensor buffering is T2, and map import UI is T4.
 
 ### T2 — Recording and lifecycle
 
-- [ ] Implement one activity owner, shared location distribution, accepted positional recording, telemetry/event recording, and explicit quality states.
-- [ ] Add Android foreground-service ownership and iOS background-location integration with appropriate permissions and native status.
-- [ ] Implement start/pause/resume/finish, locked-screen recording, durable interruption recovery, and storage-failure handling.
-- [ ] Stop all telemetry/path recording during manual pause; retain lifecycle events and elapsed time; start a new path segment on resume.
-- [ ] Compute elapsed, recording, moving time, and distance without counting duplicate fixes or bridging gaps.
+- [x] Implement one activity owner, shared location distribution, accepted positional recording, telemetry/event recording, and explicit quality states.
+- [x] Add Android foreground-service ownership and iOS background-location integration with appropriate permissions and native status.
+- [x] Implement start/pause/resume/finish, locked-screen recording, durable interruption recovery, and storage-failure handling.
+- [x] Stop all telemetry/path recording during manual pause; retain lifecycle events and elapsed time; start a new path segment on resume.
+- [x] Compute elapsed, recording, moving time, and distance without counting duplicate fixes or bridging gaps.
 
-Acceptance: routed and route-free activities record through screen lock and leaving the map; ordinary non-recording maps retain lifecycle cleanup; pause records no telemetry; interruption restores committed data with explicit gaps; denied sensors and write failures have truthful states.
+Acceptance targets: routed and route-free activities record through screen lock and leaving the map; ordinary non-recording maps retain lifecycle cleanup; pause records no telemetry; interruption restores committed data with explicit gaps; denied sensors and write failures have truthful states.
+
+Source and regression scenarios are present. Builds/tests and physical background, service/permission, battery and storage acceptance remain pending. Checked items describe implementation, not passed runtime acceptance; map preparation/controls arrive in T4.
 
 ### T3 — Complex-track navigation
 
@@ -417,15 +489,15 @@ Acceptance: Apple Watch is the final functionality implemented after phone accep
 
 | Decision | Current proposal / open issue | Required before |
 | --- | --- | --- |
-| Manual pause | Owner confirmed full telemetry/path stop; no selectable pause policy; resume creates a segment; late delivery uses acquisition-time boundaries | Implement T2/T7 |
-| Moving time | Separate monotonic owned intervals; no automatic pause; movement hysteresis awaits measured profile tuning | T2 statistics |
-| Application-owned spatial data | Selected independent activity/route SQLite stores plus repairable Room projection; no package cascade | Implement T1 |
+| Manual pause | Owner confirmed full telemetry/path stop; no selectable pause policy; resume creates a segment; late delivery uses acquisition-time boundaries | T2 native acceptance; T7 health producer |
+| Moving time | Separate monotonic owned intervals; no automatic pause; movement hysteresis awaits measured profile tuning | T2 source present; device tuning pending |
+| Application-owned spatial data | T1 source implements independent activity/route SQLite stores and repairable Room projection; no package cascade | Native migration/storage acceptance |
 | Module boundaries | `domain:activity` registered; viewer-owned activity/history; future core native adapter | Adapter creation |
 | Apple Watch UI | Owner approved SwiftUI only for watchOS; production integration follows all phone phases | Implement final T7 |
 | Apple Watch per-profile heart rate | Hiking probe source/API path established; continuous motorized HR and background alerts unresolved, no fabricated workout | Physical feasibility/T7 commitment |
 | Map/history entry points | Offline viewer plus activity-only vector map; Activities callback from library; constructor unchanged | Implement T4/T5 |
 | Metric defaults | Hiking pace; motorized speed; compact elapsed/state; fixed expanded presets initially | Implement T4 |
 | Data-quality policies | Explicit provisional age/accuracy/gap/live-HR gates in section 8.3; profile movement/deviation/elevation tuning requires evidence | T2/T3 |
-| Import/export limits | 32 MB/100 routes/200k total vertices/2k total segments and control points; GPX segmented geometry and explicit JSON telemetry | Streamed importer T1; codecs T5 |
-| Recovery guarantees | Bounded commits, explicit resume/new generation/segment after interruption, idempotent finalization; no force-quit continuation guarantee | Implement T1/T2 |
+| Import/export limits | T1 streamed importer enforces 32 MB/100 routes/200k total vertices/2k total segments and named points; GPX segmented export and explicit JSON telemetry remain planned | File acceptance; export codecs T5 |
+| Recovery guarantees | T1 atomic commits/checkpoints/projection repair/idempotent derivation are present; T2 recorder interruption/native ownership are present in source | User-run T1/T2 native evidence |
 | Wearable buffer policy | 24h/16 MB, bounded packets/chunks, acquired-time ingestion, durable sample acknowledgment, five-second commands without offline replay | Implement T7 |

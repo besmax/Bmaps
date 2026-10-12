@@ -71,6 +71,8 @@ Polygon persistence fix, 2026-09-20: append the closing GeoJSON position as a si
 
 ## GPX import
 
+Track phase T1 adds a separate detailed-route importer and application-owned route repository, described in [22_TRACK_MODE_AND_TELEMETRY.md](22_TRACK_MODE_AND_TELEMETRY.md). It groups track segments into one reusable route and has its own bounded geometry limits. It is not yet wired into map preparation/import UI. The annotation import below and its 1,000-vertex limit are unchanged.
+
 The same Map objects import flow accepts UTF-8 GPX files and pasted XML, detected from content rather than the filename. Import remains an explicit confirmation step and saves a single transactional batch with fresh IDs. GeoJSON export is unchanged.
 
 GPX 1.0 and 1.1 map top-level `wpt` to markers, `rte/rtept` to lines, and each `trk/trkseg/trkpt` segment to a separate line. Segments are never joined across gaps. Coordinates are WGS 84 latitude/longitude attributes, following the [TopoGrafix GPX schema](https://www.topografix.com/gpx/1/1/). Default and prefixed GPX namespaces are supported; namespace-free documents are accepted for interoperability, but unrelated namespaces and unsupported versions are rejected.

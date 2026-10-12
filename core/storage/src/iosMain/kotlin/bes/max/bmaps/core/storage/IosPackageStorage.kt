@@ -24,6 +24,12 @@ import platform.posix.*
 object IosPackageStorageBindings {
     @Provides
     @SingleIn(AppScope::class)
+    fun activities(): ActivityStorageLocation = ActivityStorageLocation(checkNotNull(
+        NSFileManager.defaultManager.URLForDirectory(NSApplicationSupportDirectory, NSUserDomainMask, null, true, null)?.path,
+    ))
+
+    @Provides
+    @SingleIn(AppScope::class)
     fun location(): PackageStorageLocation {
         val support = checkNotNull(NSFileManager.defaultManager.URLForDirectory(
             NSApplicationSupportDirectory, NSUserDomainMask, null, true, null,
