@@ -56,6 +56,7 @@ data class ActivityCommit(
     val samples: List<TelemetrySample> = emptyList(),
     val events: List<ActivityEvent> = emptyList(),
     val appliedCommandId: String? = null,
+    val navigationSnapshot: ActivityRoute? = null,
 )
 
 data class ActivityHistoryCursor(val startedAtEpochMillis: Long, val id: String)
@@ -99,6 +100,8 @@ interface ActivityRepository {
     suspend fun commit(value: ActivityCommit): ActivityResult<ActivityRecord>
     suspend fun history(query: ActivityHistoryQuery): ActivityResult<ActivityHistoryPage>
     suspend fun telemetry(activityId: String, query: TelemetryQuery): ActivityResult<TelemetryPage>
+    suspend fun positions(activityId: String, query: ActivityPositionQuery): ActivityResult<ActivityPositionPage>
+    suspend fun navigationRoute(activityId: String): ActivityResult<ActivityRoute?>
     suspend fun events(activityId: String, query: ActivityEventQuery): ActivityResult<ActivityEventPage>
     suspend fun delete(id: String): ActivityResult<Unit>
     suspend fun reconcile(): ActivityResult<Unit>
@@ -119,6 +122,8 @@ interface ActivitySession {
     fun initialize()
     val active: Flow<ActivityRecord?>
     val live: Flow<ActivityLiveState?>
+    val navigationAlerts: Flow<ActivityNavigationAlert>
+    suspend fun navigate(command: ActivityNavigationCommand): ActivityResult<ActivityNavigationState>
     suspend fun start(request: ActivityStartRequest): ActivityResult<ActivityRecord>
     suspend fun apply(command: ActivityCommand): ActivityResult<ActivityRecord>
     suspend fun recover(): ActivityResult<ActivityRecord?>

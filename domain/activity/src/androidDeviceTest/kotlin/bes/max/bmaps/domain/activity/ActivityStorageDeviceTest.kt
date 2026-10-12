@@ -23,6 +23,7 @@ class ActivityStorageDeviceTest {
         packageDatabase(Room.databaseBuilder<PackageDatabase>(InstrumentationRegistry.getInstrumentation().targetContext, path))
     }
     @Test fun ownerStatisticsAndCommandPayloadSurviveReopen() = runBlocking { scenarios.ownerStatisticsAndCommandPayloadSurviveReopen() }
+    @Test fun navigationSnapshotAndOrderedPositionsSurviveReopen() = runBlocking { scenarios.navigationSnapshotAndOrderedPositionsSurviveReopen() }
     @Test fun singleOwnerAndRestart() = runBlocking { scenarios.singleOwnerAndRestart() }
     @Test fun atomicRollbackAndIdempotentCommands() = runBlocking { scenarios.atomicRollbackAndIdempotentCommands() }
     @Test fun pauseIntervalsGapsAndDerivedRoutes() = runBlocking { scenarios.pauseIntervalsGapsAndDerivedRoutes() }

@@ -17,6 +17,7 @@ import kotlin.test.Test
 class ActivityStorageIosTest {
     private val scenarios = ActivityStorageScenarios { packageDatabase(Room.databaseBuilder<PackageDatabase>(name = it)) }
     @Test fun ownerStatisticsAndCommandPayloadSurviveReopen() = runBlocking { scenarios.ownerStatisticsAndCommandPayloadSurviveReopen() }
+    @Test fun navigationSnapshotAndOrderedPositionsSurviveReopen() = runBlocking { scenarios.navigationSnapshotAndOrderedPositionsSurviveReopen() }
     @Test fun singleOwnerAndRestart() = runBlocking { scenarios.singleOwnerAndRestart() }
     @Test fun atomicRollbackAndIdempotentCommands() = runBlocking { scenarios.atomicRollbackAndIdempotentCommands() }
     @Test fun pauseIntervalsGapsAndDerivedRoutes() = runBlocking { scenarios.pauseIntervalsGapsAndDerivedRoutes() }

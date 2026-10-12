@@ -9,6 +9,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.domain.activity
 
 import bes.max.bmaps.core.location.*
+import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
@@ -174,6 +175,69 @@ class PhoneActivitySessionTest {
     }
 
     @Test
+    fun navigationCorrectionChangesGuidanceWithoutChangingTelemetryOrPlan() = runTest {
+        fixture { f ->
+            val route = ActivityRoute("plan", 0, "Plan", listOf(RouteSegment("leg", listOf(
+                RouteVertex(GeographicCoordinate(55.0, 37.0)), RouteVertex(GeographicCoordinate(55.003, 37.0))))))
+            f.start(RouteSelection(route, RouteDirection.FORWARD, RoutePosition(0, 0, 0.0)))
+            f.fix(55.0, course = 0.0)
+            f.session.apply(f.command(ActivityAction.RESUME)).success()
+            advanceTimeBy(1_000); runCurrent()
+            f.fix(55.0001, course = 0.0)
+            f.session.apply(f.command(ActivityAction.RESUME)).success()
+            assertEquals(RouteMatchQuality.MATCHED, f.session.live.value?.progress?.quality)
+            val samples = f.repository.samples.toList()
+            val record = f.session.active.value!!
+            val correction = ActivityNavigationCommand("correct", record.id, record.sessionGeneration, 0,
+                ActivityNavigationAction.CORRECT_POSITION, RoutePosition(0, 0, 0.5))
+            val state = f.session.navigate(correction).success()
+            assertEquals(1L, state.revision)
+            assertEquals(samples, f.repository.samples)
+            assertEquals(route, f.session.active.value?.route?.snapshot)
+            assertEquals(record.controlRevision, f.session.active.value?.controlRevision)
+            assertEquals(state, f.session.navigate(correction).success())
+            assertEquals(1, f.repository.eventLog.count { it.kind == ActivityEventKind.NAVIGATION_CORRECTED })
+            assertIs<ActivityResult.Failure>(f.session.navigate(correction.copy(id = "stale-correction")))
+            assertIs<ActivityResult.Failure>(f.session.navigate(correction.copy(position = RoutePosition(0, 0, 0.8))))
+        }
+    }
+
+    @Test
+    fun recordedReturnIsAFrozenReverseSnapshotWithGapsAndRecordingContinues() = runTest {
+        fixture { f ->
+            f.start()
+            f.fix(55.0)
+            advanceTimeBy(1_000); runCurrent()
+            f.fix(55.0001)
+            f.session.apply(f.command(ActivityAction.PAUSE)).success()
+            advanceTimeBy(5_000); runCurrent()
+            f.session.apply(f.command(ActivityAction.RESUME)).success(); runCurrent()
+            f.fix(55.01)
+            val record = f.session.active.value!!
+            val returning = ActivityNavigationCommand("return", record.id, record.sessionGeneration, 0, ActivityNavigationAction.RETURN_ALONG_RECORDING)
+            assertIs<ActivityResult.Failure>(f.session.navigate(returning))
+            assertEquals(ActivityStatus.RECORDING, f.session.active.value?.status)
+            advanceTimeBy(1_000); runCurrent()
+            f.fix(55.0101)
+            f.session.apply(f.command(ActivityAction.RESUME)).success()
+            val before = f.repository.samples.toList()
+            val returned = f.session.navigate(returning).success()
+            assertEquals(ActivityNavigationMode.RECORDED_RETURN, returned.mode)
+            assertEquals(RouteDirection.REVERSE, returned.direction)
+            val frozen = f.repository.navigationRoute(record.id).success()!!
+            assertEquals(listOf(2, 2), frozen.segments.map { it.vertices.size })
+            assertEquals(before, f.repository.samples)
+            assertNull(f.session.active.value?.route)
+            advanceTimeBy(1_000); runCurrent()
+            f.fix(55.0102, course = 0.0)
+            f.session.apply(f.command(ActivityAction.RESUME)).success()
+            assertEquals(frozen, f.repository.navigationRoute(record.id).success())
+            assertTrue(f.repository.samples.size > before.size)
+            assertEquals(returned, f.session.navigate(returning).success())
+        }
+    }
+
+    @Test
     fun startPermissionFailureDoesNotCreateAnActivity() = runTest {
         fixture { f ->
             f.host.failure = ActivityFailure.PreciseLocationRequired
@@ -209,11 +273,11 @@ class PhoneActivitySessionTest {
             override fun now() = ActivityTime(100_000 + scheduler.currentTime, 100_000 + scheduler.currentTime, "phone-process")
         }
         val session = PhoneActivitySession(repository, routes, locations, host, clock)
-        suspend fun start() { session.start(ActivityStartRequest("activity", "Trip", ActivityProfile.HIKING)).success(); scheduler.runCurrent() }
-        suspend fun fix(latitude: Double, accuracy: Double = 3.0, conflict: Boolean = false) {
+        suspend fun start(route: RouteSelection? = null) { session.start(ActivityStartRequest("activity", "Trip", ActivityProfile.HIKING, route)).success(); scheduler.runCurrent() }
+        suspend fun fix(latitude: Double, accuracy: Double = 3.0, conflict: Boolean = false, course: Double? = 90.0) {
             val time = clock.now()
             native.states.emit(LocationState(LocationStatus.ACTIVE, LocationFix(latitude, 37.0, accuracy, time.epochMillis,
-                speedMetersPerSecond = 2.0, courseDegrees = 90.0, monotonicMillis = time.monotonicMillis,
+                speedMetersPerSecond = 2.0, courseDegrees = course, monotonicMillis = time.monotonicMillis,
                 provider = "gps", altitudeMeters = -5.0, altitudeAccuracyMeters = 2.0), conflict))
             scheduler.runCurrent()
         }
@@ -253,6 +317,7 @@ class PhoneActivitySessionTest {
         val value = MutableStateFlow<ActivityRecord?>(null)
         val samples = mutableListOf<TelemetrySample>()
         val eventLog = mutableListOf<ActivityEvent>()
+        val navigationSnapshots = mutableMapOf<String, ActivityRoute>()
         val commands = mutableMapOf<String, ActivityRecord>()
         var last: ActivityRecord? = null
         var failWrites = false
@@ -268,6 +333,7 @@ class PhoneActivitySessionTest {
             if (last?.revision != value.expectedRevision) return ActivityResult.Failure(ActivityFailure.RevisionConflict)
             assertNull(ActivityValidation.record(value.record))
             assertTrue(value.samples.all { ActivityValidation.sample(it) == null })
+            value.navigationSnapshot?.let { navigationSnapshots[it.id] = it }
             last = value.record
             this.value.value = value.record.takeIf { it.status != ActivityStatus.COMPLETED }
             samples += value.samples; eventLog += value.events
@@ -277,6 +343,16 @@ class PhoneActivitySessionTest {
         override suspend fun appliedCommand(activityId: String, commandId: String) = ActivityResult.Success(commands[commandId])
         override fun observeActive(): Flow<ActivityRecord?> = value
         override suspend fun reconcile() = ActivityResult.Success(Unit)
+        override suspend fun navigationRoute(activityId: String): ActivityResult<ActivityRoute?> {
+            val record = last ?: value.value
+            val nav = record?.navigation
+            return ActivityResult.Success(if (nav?.mode == ActivityNavigationMode.RECORDED_RETURN) navigationSnapshots[nav.routeId] else record?.route?.snapshot)
+        }
+        override suspend fun positions(activityId: String, query: ActivityPositionQuery): ActivityResult<ActivityPositionPage> {
+            val rows = samples.withIndex().filter { it.index + 1 > query.afterSequence && it.value.measurement is PositionMeasurement }.take(query.limit + 1)
+            val page = rows.take(query.limit)
+            return ActivityResult.Success(ActivityPositionPage(page.map { it.value }, if (rows.size > query.limit) page.last().index + 1L else null))
+        }
         override suspend fun events(activityId: String, query: ActivityEventQuery) = ActivityResult.Success(ActivityEventPage(eventLog.filter { it.sequence > (query.afterSequence ?: 0) }, null))
         override suspend fun history(query: ActivityHistoryQuery) = ActivityResult.Success(ActivityHistoryPage(emptyList(), null))
         override suspend fun telemetry(activityId: String, query: TelemetryQuery) = ActivityResult.Success(TelemetryPage(samples.toList(), null))

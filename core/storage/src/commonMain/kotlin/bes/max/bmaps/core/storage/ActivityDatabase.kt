@@ -13,6 +13,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
 data class StoredActivity(val id: String, val revision: Long, val generation: String, val startedAt: Long, val payload: String, val routeId: String? = null)
+data class StoredNavigationSnapshot(val id: String, val payload: String)
 data class StoredActivityEvent(
     val id: String, val sequence: Long, val acquiredAt: Long, val payload: String, val kind: String,
     val monotonicTime: Long? = null, val clockId: String = "",
@@ -48,6 +49,10 @@ class ActivityDatabase internal constructor(private val sql: SpatialSql) {
     fun snapshot(id: String): String? = sql.query("SELECT substr(payload,1,64000001) FROM route_snapshots WHERE activity_id=?", arrayOf<Any?>(id)) {
         boundedText(it, 0, 64_000_000)
     }.singleOrNull()
+
+    fun navigationSnapshot(activityId: String, routeId: String): String? = sql.query(
+        "SELECT substr(payload,1,64000001) FROM navigation_snapshots WHERE activity_id=? AND id=?", arrayOf<Any?>(activityId, routeId),
+    ) { boundedText(it, 0, 64_000_000) }.singleOrNull()
 
     fun checkpoint(id: String): StoredActivityCheckpoint = sql.query(
         "SELECT event_sequence, position_time, segment_id, segment_break, position_monotonic, position_clock FROM checkpoints WHERE activity_id=?", arrayOf<Any?>(id),
@@ -85,7 +90,7 @@ class ActivityDatabase internal constructor(private val sql: SpatialSql) {
 
     suspend fun commit(
         record: StoredActivity, expectedRevision: Long, events: List<StoredActivityEvent>, samples: List<StoredTelemetry>,
-        nextCheckpoint: StoredActivityCheckpoint, ownsActivity: Boolean, commandId: String?, fingerprint: String,
+        nextCheckpoint: StoredActivityCheckpoint, ownsActivity: Boolean, commandId: String?, fingerprint: String, storedSnapshot: StoredNavigationSnapshot? = null,
     ): StoredActivity = sql.transaction {
         val current = get(record.id) ?: throw SpatialNotFound()
         if (commandId != null) {
@@ -114,6 +119,12 @@ class ActivityDatabase internal constructor(private val sql: SpatialSql) {
                 if (previous.payload != sample.payload) throw SpatialCorruptData()
             } else sql.execute("INSERT INTO telemetry(activity_id, id, source_id, acquired_at, kind, segment_id, payload) VALUES(?, ?, ?, ?, ?, ?, ?)",
                 record.id, sample.id, sample.sourceId, sample.acquiredAt, sample.kind, sample.segmentId, sample.payload)
+        }
+        if (storedSnapshot != null) {
+            require(storedSnapshot.payload.encodeToByteArray().size <= 64_000_000)
+            val previous = navigationSnapshot(record.id, storedSnapshot.id)
+            if (previous != null && previous != storedSnapshot.payload) throw SpatialCorruptData()
+            sql.execute("INSERT OR IGNORE INTO navigation_snapshots(activity_id, id, payload) VALUES(?, ?, ?)", record.id, storedSnapshot.id, storedSnapshot.payload)
         }
         sql.execute("UPDATE activities SET revision=?, generation=?, payload=? WHERE id=?", record.revision, record.generation, record.payload, record.id)
         sql.execute("UPDATE checkpoints SET event_sequence=?, position_time=?, segment_id=?, segment_break=?, position_monotonic=?, position_clock=? WHERE activity_id=?",
@@ -145,7 +156,7 @@ class ActivityDatabase internal constructor(private val sql: SpatialSql) {
     }
 
     fun positions(activityId: String, afterSequence: Long, limit: Int): List<StoredTelemetry> {
-        require(limit in 1..500)
+        require(limit in 1..501)
         return sql.query("SELECT id, source_id, acquired_at, kind, segment_id, substr(payload,1,65537), sequence FROM telemetry WHERE activity_id=? AND kind='position' AND sequence>? ORDER BY sequence LIMIT ?",
             arrayOf<Any?>(activityId, afterSequence, limit), ::telemetry)
     }
@@ -184,6 +195,7 @@ class ActivityDatabase internal constructor(private val sql: SpatialSql) {
     companion object {
         internal val SCHEMA = listOf(
             "CREATE TABLE activities(id TEXT PRIMARY KEY NOT NULL, revision INTEGER NOT NULL, generation TEXT NOT NULL, started_at INTEGER NOT NULL, payload TEXT NOT NULL, creation_fingerprint TEXT NOT NULL, route_id TEXT)",
+            "CREATE TABLE navigation_snapshots(activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE, id TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(activity_id, id))",
             "CREATE TABLE activity_owner(slot INTEGER PRIMARY KEY CHECK(slot=1), activity_id TEXT NOT NULL UNIQUE REFERENCES activities(id) ON DELETE CASCADE)",
             "CREATE TABLE route_snapshots(activity_id TEXT PRIMARY KEY NOT NULL REFERENCES activities(id) ON DELETE CASCADE, payload TEXT NOT NULL)",
             "CREATE TABLE checkpoints(activity_id TEXT PRIMARY KEY NOT NULL REFERENCES activities(id) ON DELETE CASCADE, event_sequence INTEGER NOT NULL, position_time INTEGER, segment_id TEXT, segment_break INTEGER NOT NULL, position_monotonic INTEGER, position_clock TEXT)",

@@ -28,6 +28,7 @@ kotlin {
         implementation(project(":core:storage"))
         implementation(project(":core:database"))
         implementation(libs.kotlinx.coroutines.test)
+        implementation(libs.androidx.sqlite.bundled)
     }
     sourceSets.androidMain.dependencies {
         implementation(libs.androidx.core.ktx)

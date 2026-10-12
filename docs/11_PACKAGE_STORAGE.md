@@ -1,6 +1,6 @@
 # Package storage and recovery
 
-Application-owned activity/route storage is independent of this package lifecycle. Track phase T1 adds separate spatial SQLite stores and Room schema-4 catalog projections without changing map inventory, package size accounting, or package deletion. Its implementation/recovery contracts and pending acceptance are documented in [22_TRACK_MODE_AND_TELEMETRY.md](22_TRACK_MODE_AND_TELEMETRY.md).
+Application-owned activity/route storage is independent of this package lifecycle. Track phase T1 adds separate spatial SQLite stores and Room schema-4 catalog projections without changing map inventory, package size accounting, or package deletion. T3 includes immutable private return-navigation snapshots in the initial activity SQLite schema 1 without a migration or version increase; routes SQLite remains 1 and Room remains 4. Snapshot/header/control writes are atomic and snapshots cascade with activity deletion. Its implementation/recovery contracts and pending acceptance are documented in [22_TRACK_MODE_AND_TELEMETRY.md](22_TRACK_MODE_AND_TELEMETRY.md).
 
 Phase 4 implementation, 2026-09-12. Source review only: builds, schema generation, and all test execution are left to the user. This document records the Phase 4 storage foundation. Phase 5 now submits downloads and adds scheduling, Restore controls, progress, and notifications; current integration status is in `12_DOWNLOAD_PIPELINE.md`.
 

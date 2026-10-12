@@ -8,6 +8,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.domain.activity
 
+import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import bes.max.bmaps.core.database.ActivityCatalog
 import bes.max.bmaps.core.database.PackageDatabase
 import bes.max.bmaps.core.mapengine.GeographicCoordinate
@@ -38,6 +39,51 @@ class ActivityStorageScenarios(private val database: (String) -> PackageDatabase
         assertEquals(statistics, f.activities.get(initial.id).success().statistics)
         assertEquals(command, f.activities.appliedCommand(initial.id, command.id).success()?.lastCommand)
         assertEquals(paused, f.activities.observeActive().first())
+    }
+
+    suspend fun navigationSnapshotAndOrderedPositionsSurviveReopen() = fixture { f ->
+        var record = f.activities.create(record("navigation"), started()).success()
+        record = f.activities.commit(ActivityCommit(record.revision, record.copy(revision = 1, updatedAt = time(1200)),
+            listOf(position("p1", 1100, "path", 50.0), position("p2", 1200, "path", 50.01)))).success()
+        val snapshot = line("return", "Return")
+        val point = RoutePosition(0, 0, 1.0)
+        val nav = ActivityNavigationState(ActivityNavigationMode.RECORDED_RETURN, snapshot.id, 0, RouteDirection.REVERSE, point, point, revision = 1)
+        val command = ActivityNavigationCommand("return-command", record.id, record.sessionGeneration, 0, ActivityNavigationAction.RETURN_ALONG_RECORDING)
+        val next = record.copy(revision = 2, updatedAt = time(1300), navigation = nav, lastNavigationCommand = command)
+        val commit = ActivityCommit(record.revision, next, events = listOf(ActivityEvent("return-event", 2, ActivityEventKind.RETURN_STARTED, time(1300), navigationRouteId = snapshot.id)),
+            appliedCommandId = command.id, navigationSnapshot = snapshot)
+        f.activities.commit(commit).success()
+        assertEquals(next, f.activities.commit(commit).success())
+        f.reopen()
+        assertEquals(snapshot, f.activities.navigationRoute(record.id).success())
+        assertEquals(command, f.activities.appliedCommand(record.id, command.id).success()?.lastNavigationCommand)
+        val first = f.activities.positions(record.id, ActivityPositionQuery(limit = 1)).success()
+        val second = f.activities.positions(record.id, ActivityPositionQuery(first.nextSequence!!, 1)).success()
+        assertEquals(listOf("p1", "p2"), (first.items + second.items).map { it.id })
+        assertNull(second.nextSequence)
+        assertTrue(f.routes.routes(ActivityRouteQuery()).success().items.isEmpty())
+        val path = Path(f.root, "activities", "activity.sqlite").toString()
+        BundledSQLiteDriver().open(path).use { db ->
+            db.prepare("PRAGMA user_version").use { assertTrue(it.step()); assertEquals(1L, it.getLong(0)) }
+            db.prepare("CREATE TRIGGER fail_navigation BEFORE UPDATE ON activities BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END").use { it.step() }
+        }
+        val failedSnapshot = snapshot.copy(id = "failed-return")
+        val failedCommand = command.copy(id = "failed-command", expectedNavigationRevision = 1)
+        assertIs<ActivityResult.Failure>(f.activities.commit(ActivityCommit(2, next.copy(revision = 3, updatedAt = time(1400),
+            navigation = nav.copy(routeId = failedSnapshot.id, revision = 2), lastNavigationCommand = failedCommand),
+            events = listOf(ActivityEvent("failed-event", 3, ActivityEventKind.RETURN_STARTED, time(1400), navigationRouteId = failedSnapshot.id)),
+            appliedCommandId = failedCommand.id, navigationSnapshot = failedSnapshot)))
+        BundledSQLiteDriver().open(path).use { db ->
+            db.prepare("SELECT count(*) FROM navigation_snapshots WHERE id='failed-return'").use { assertTrue(it.step()); assertEquals(0L, it.getLong(0)) }
+            db.prepare("DROP TRIGGER fail_navigation").use { it.step() }
+        }
+        assertEquals(next, f.activities.get(record.id).success())
+        val interrupted = next.copy(revision = 3, controlRevision = 1, status = ActivityStatus.INTERRUPTED, updatedAt = time(1400))
+        f.activities.commit(ActivityCommit(2, interrupted, events = listOf(ActivityEvent("interrupted", 3, ActivityEventKind.INTERRUPTED, time(1400))))).success()
+        f.activities.delete(record.id).success()
+        BundledSQLiteDriver().open(path).use { db ->
+            db.prepare("SELECT count(*) FROM navigation_snapshots").use { assertTrue(it.step()); assertEquals(0L, it.getLong(0)) }
+        }
     }
 
     suspend fun singleOwnerAndRestart() = fixture { f ->

@@ -40,6 +40,8 @@ class LocalActivityStore(private val storage: ActivityFileStorage, private val c
     private var initialized = false
     private var projectionGeneration = ""
     private var cachedSnapshotId: String? = null
+    private var cachedNavigationKey: Pair<String, String>? = null
+    private var cachedNavigationRoute: ActivityRoute? = null
     private var cachedSnapshot: RouteSelection? = null
 
     internal suspend fun <T> operation(forceReconcile: Boolean = false, block: suspend ActivitySpatialStores.() -> T): ActivityResult<T> = try {
@@ -47,7 +49,7 @@ class LocalActivityStore(private val storage: ActivityFileStorage, private val c
             mutex.withLock {
                 try {
                     storage.access(verify = !initialized || forceReconcile) {
-                        if (!initialized || forceReconcile) { reconcileProjection(); initialized = true }
+                        if (!initialized || forceReconcile) { cachedNavigationKey = null; cachedNavigationRoute = null; reconcileProjection(); initialized = true }
                         val result = block()
                         active.value = activities.active()?.let { read(it) }
                         ActivityResult.Success(result)
@@ -84,12 +86,29 @@ class LocalActivityStore(private val storage: ActivityFileStorage, private val c
             if (activities.active()?.id == value.id) { cachedSnapshotId = value.id; cachedSnapshot = decoded?.let { it.copy(snapshot = it.snapshot.owned()) } }
             decoded?.let { it.copy(snapshot = it.snapshot.owned()) }
         }
-        return metadata.copy(route = snapshot)
+        return metadata.copy(route = snapshot).also { record ->
+            record.navigation?.takeIf { it.mode == ActivityNavigationMode.PLANNED_ROUTE }?.let { nav ->
+                if (record.route == null || ActivityValidation.navigation(nav, record.route.snapshot) != null || nav.direction != record.route.direction || nav.origin != record.route.start) throw SpatialCorruptData()
+            }
+        }
     }
 
     internal fun decodeRecord(value: StoredActivity): ActivityRecord = decode<ActivityRecord>(value.payload).also {
-        if (ActivityValidation.record(it) != null || it.id != value.id || it.revision != value.revision ||
+        if (ActivityValidation.recordMetadata(it) != null || it.id != value.id || it.revision != value.revision ||
             it.sessionGeneration != value.generation || it.startedAt.epochMillis != value.startedAt || it.route != null) throw SpatialCorruptData()
+    }
+
+    internal fun ActivitySpatialStores.navigationRoute(record: ActivityRecord): ActivityRoute? {
+        val nav = record.navigation ?: return record.route?.snapshot
+        if (nav.mode == ActivityNavigationMode.PLANNED_ROUTE) return record.route?.snapshot ?: throw SpatialCorruptData()
+        val key = record.id to nav.routeId
+        val route = if (key == cachedNavigationKey) checkNotNull(cachedNavigationRoute) else {
+            val payload = activities.navigationSnapshot(record.id, nav.routeId) ?: throw SpatialCorruptData()
+            decode<ActivityRoute>(payload).also { if (ActivityValidation.route(it) != null) throw SpatialCorruptData() }.owned()
+        }
+        if (ActivityValidation.navigation(nav, route) != null) throw SpatialCorruptData()
+        cachedNavigationKey = key; cachedNavigationRoute = route
+        return route
     }
 
     internal inline fun <reified T> decode(payload: String): T = try { json.decodeFromString<T>(payload) }

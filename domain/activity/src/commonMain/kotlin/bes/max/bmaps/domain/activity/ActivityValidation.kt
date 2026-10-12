@@ -38,6 +38,33 @@ object ActivityValidation {
         ?: if (position(value.snapshot, value.start)) null else "startPosition"
 
     fun record(value: ActivityRecord): String? = recordMetadata(value) ?: value.route?.let(::selection)
+        ?: value.navigation?.takeIf { it.mode == ActivityNavigationMode.PLANNED_ROUTE }?.let {
+            value.route?.let { selection ->
+                if (it.direction != selection.direction || it.origin != selection.start) "navigationSelection" else navigation(it, selection.snapshot)
+            } ?: "navigationRoute"
+        }
+
+    fun validRoutePosition(route: ActivityRoute, value: RoutePosition): Boolean = position(route, value)
+
+    fun navigationCommand(value: ActivityNavigationCommand): String? {
+        if (!id(value.id) || !id(value.activityId) || !id(value.sessionGeneration) || value.expectedNavigationRevision < 0) return "navigationCommand"
+        return when (value.action) {
+            ActivityNavigationAction.CORRECT_POSITION -> if (value.position == null || value.alertsEnabled != null) "navigationPosition" else null
+            ActivityNavigationAction.SET_ALERTS_ENABLED -> if (value.position != null || value.alertsEnabled == null) "navigationAlerts" else null
+            ActivityNavigationAction.RETURN_ALONG_RECORDING, ActivityNavigationAction.FOLLOW_PLANNED -> if (value.position != null || value.alertsEnabled != null) "navigationArguments" else null
+        }
+    }
+
+    fun navigation(value: ActivityNavigationState, route: ActivityRoute): String? = navigationMetadata(value)
+        ?: if (value.routeId != route.id || value.routeRevision != route.revision || !position(route, value.origin) || !position(route, value.checkpoint) ||
+            value.gapAnnouncedSegmentId?.let { route.segments[value.checkpoint.segmentIndex].id != it } == true) "navigationRoute" else null
+
+    private fun navigationMetadata(value: ActivityNavigationState): String? = if (
+        !id(value.routeId) || value.routeRevision < 0 || value.revision < 0 ||
+        listOf(value.origin, value.checkpoint).any { it.segmentIndex < 0 || it.edgeIndex < 0 || !it.fraction.isFinite() || it.fraction !in 0.0..1.0 } ||
+        value.lastDeviationAlertAt?.let { !time(it) || it.monotonicMillis == null } == true ||
+        value.gapAnnouncedSegmentId?.let { !id(it) } == true
+    ) "navigationState" else null
 
     internal fun recordMetadata(value: ActivityRecord): String? {
         if (value.schemaVersion != 1) return "schemaVersion"
@@ -53,6 +80,8 @@ object ActivityValidation {
             if (!id(command.id) || command.activityId != value.id || !id(command.sessionGeneration) ||
                 command.expectedControlRevision < 0 || command.expectedControlRevision > value.controlRevision) return "lastCommand"
         }
+        value.navigation?.let { if (it.revision > value.revision) return "navigationRevision"; navigationMetadata(it)?.let { error -> return error } }
+        value.lastNavigationCommand?.let { if (navigationCommand(it) != null || it.activityId != value.id || value.navigation == null || it.expectedNavigationRevision > value.navigation.revision) return "lastNavigationCommand" }
         if (!nonnegative(value.statistics.distanceMeters) || durations(value.statistics.durations()) != null) return "statistics"
         return null
     }

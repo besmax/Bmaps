@@ -15,6 +15,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
@@ -31,6 +32,10 @@ class PhoneActivitySession(
 ) : ActivitySession {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutex = Mutex()
+    private var navigator: RouteNavigator? = null
+    private val pendingNavigationAlerts = mutableListOf<ActivityNavigationAlert>()
+    private val mutableNavigationAlerts = MutableSharedFlow<ActivityNavigationAlert>(extraBufferCapacity = 32, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    override val navigationAlerts = mutableNavigationAlerts.asSharedFlow()
     private val mutableActive = MutableStateFlow<ActivityRecord?>(null)
     private val mutableLive = MutableStateFlow<ActivityLiveState?>(null)
     override val active = mutableActive.asStateFlow()
@@ -77,12 +82,20 @@ class PhoneActivitySession(
             if (recovery is ActivityResult.Failure) return@owned recovery
         }
         if (current != null) return@owned ActivityResult.Failure(ActivityFailure.AnotherActivityActive)
+        val guidance = input.route?.let { selection ->
+            when (val result = makeNavigator(selection.snapshot, ActivityNavigationState(ActivityNavigationMode.PLANNED_ROUTE,
+                selection.snapshot.id, selection.snapshot.revision, selection.direction, selection.start, selection.start), input.profile)) {
+                is ActivityResult.Failure -> return@owned result
+                is ActivityResult.Success -> result.value
+            }
+        }
         host.start(input.profile)?.let { host.stop(); return@owned ActivityResult.Failure(it) }
         val now = clock.now()
-        val record = ActivityRecord(input.id, 0, activityIdentity(), input.name, input.profile, ActivityStatus.RECORDING, now, now, input.route).owned()
+        val record = ActivityRecord(input.id, 0, activityIdentity(), input.name, input.profile, ActivityStatus.RECORDING, now, now, input.route, navigation = guidance?.state).owned()
         val result = repository.create(record, ActivityEvent(activityIdentity(), 1, ActivityEventKind.STARTED, now))
         if (result is ActivityResult.Success) {
             current = result.value
+            navigator = guidance
             eventSequence = 1
             failure = null
             pendingStatistics = result.value.statistics
@@ -108,18 +121,32 @@ class PhoneActivitySession(
         current = found
         recovered = true
         failure = null
-        samples.clear(); events.clear(); sampleBytes = 0
+        samples.clear(); events.clear(); pendingNavigationAlerts.clear(); sampleBytes = 0
+        navigator = null
         segmentId = null; lastPositionTime = null; position = null; speed = null
         availability = ActivityDataAvailability.UNAVAILABLE
         if (found == null) { publish(clock.now()); return ActivityResult.Success(null) }
         movement = ActivityMovement(found.profile)
         pendingStatistics = found.statistics
+        val navigationRoute = repository.navigationRoute(found.id)
+        if (navigationRoute is ActivityResult.Failure) { fail(navigationRoute.reason); return navigationRoute }
+        (navigationRoute as ActivityResult.Success<ActivityRoute?>).value?.let { route ->
+            val selected = found.route
+            val state = found.navigation ?: selected?.let { ActivityNavigationState(ActivityNavigationMode.PLANNED_ROUTE, route.id, route.revision, it.direction, it.start, it.start) }
+                ?: return@let
+            when (val made = makeNavigator(route, state, found.profile)) {
+                is ActivityResult.Failure -> { fail(made.reason); return made }
+                is ActivityResult.Success -> navigator = made.value
+            }
+        }
         var cursor: Long? = null
         eventSequence = 0
         do {
             when (val page = repository.events(found.id, ActivityEventQuery(cursor, 500))) {
                 is ActivityResult.Failure -> { fail(page.reason); return page }
                 is ActivityResult.Success -> {
+                    page.value.items.filter { it.kind == ActivityEventKind.CONTROL_POINT && it.navigationRouteId == navigator?.state?.routeId }
+                        .forEach { event -> event.relatedId?.let { navigator?.restoreControlPoint(it) } }
                     eventSequence = page.value.items.lastOrNull()?.sequence ?: eventSequence
                     cursor = page.value.nextSequence
                 }
@@ -137,6 +164,112 @@ class PhoneActivitySession(
         beginTicker()
         if (current != null) publish(clock.now())
         return ActivityResult.Success(current?.owned())
+    }
+
+    private suspend fun makeNavigator(route: ActivityRoute, state: ActivityNavigationState, profile: ActivityProfile): ActivityResult<RouteNavigator> {
+        ActivityValidation.navigation(state, route)?.let { return ActivityResult.Failure(ActivityFailure.InvalidInput(it)) }
+        return try {
+            ActivityResult.Success(withContext(Dispatchers.Default) { RouteNavigator(RouteNavigationIndex(route), state, RouteNavigationPolicy.forProfile(profile)) })
+        } catch (_: IllegalArgumentException) { ActivityResult.Failure(ActivityFailure.InvalidInput("navigationGeometry")) }
+    }
+
+    private suspend fun restoreControls(activityId: String, guidance: RouteNavigator): ActivityResult<Unit> {
+        var after: Long? = null
+        do {
+            when (val page = repository.events(activityId, ActivityEventQuery(after, 500))) {
+                is ActivityResult.Failure -> return page
+                is ActivityResult.Success -> {
+                    page.value.items.filter { it.kind == ActivityEventKind.CONTROL_POINT && it.navigationRouteId == guidance.state.routeId }
+                        .forEach { it.relatedId?.let(guidance::restoreControlPoint) }
+                    val next = page.value.nextSequence
+                    if (next != null && next <= (after ?: 0)) return ActivityResult.Failure(ActivityFailure.CorruptData)
+                    after = next
+                }
+            }
+        } while (after != null)
+        return ActivityResult.Success(Unit)
+    }
+
+    override suspend fun navigate(command: ActivityNavigationCommand): ActivityResult<ActivityNavigationState> = owned {
+        ActivityValidation.navigationCommand(command)?.let { return@owned ActivityResult.Failure(ActivityFailure.InvalidInput(it)) }
+        when (val duplicate = repository.appliedCommand(command.activityId, command.id)) {
+            is ActivityResult.Failure -> return@owned duplicate
+            is ActivityResult.Success -> duplicate.value?.let { saved ->
+                return@owned if (saved.lastNavigationCommand == command && saved.navigation != null) ActivityResult.Success(saved.navigation)
+                    else ActivityResult.Failure(ActivityFailure.InvalidInput("commandIdentity"))
+            }
+        }
+        val record = current ?: return@owned ActivityResult.Failure(ActivityFailure.NotFound)
+        if (record.id != command.activityId || record.sessionGeneration != command.sessionGeneration) return@owned ActivityResult.Failure(ActivityFailure.StaleSession)
+        if (failure != null) return@owned ActivityResult.Failure(failure!!)
+        if (record.status == ActivityStatus.FINALIZING) return@owned ActivityResult.Failure(ActivityFailure.ActivityBusy)
+        val old = navigator?.state
+        if (command.expectedNavigationRevision != (old?.revision ?: 0) || command.expectedNavigationRevision == Long.MAX_VALUE) return@owned ActivityResult.Failure(ActivityFailure.RevisionConflict)
+        if (command.action == ActivityNavigationAction.CORRECT_POSITION) {
+            val route = repository.navigationRoute(record.id)
+            if (route is ActivityResult.Failure) return@owned route
+            val geometry = (route as ActivityResult.Success<ActivityRoute?>).value ?: return@owned ActivityResult.Failure(ActivityFailure.NotFound)
+            if (!ActivityValidation.validRoutePosition(geometry, checkNotNull(command.position))) return@owned ActivityResult.Failure(ActivityFailure.InvalidInput("navigationPosition"))
+        }
+        pendingNavigationAlerts.clear()
+        if (flush(clock.now()) is ActivityResult.Failure) return@owned ActivityResult.Failure(checkNotNull(failure))
+        var frozen: ActivityRoute? = null
+        var replacement: RouteNavigator? = null
+        val nextRevision = command.expectedNavigationRevision + 1
+        val kind: ActivityEventKind
+        val next = when (command.action) {
+            ActivityNavigationAction.RETURN_ALONG_RECORDING -> {
+                val built = RecordedReturnRoute.build(current!!, "return-${activityDigest(record.id + "|" + command.id)}", repository)
+                if (built is ActivityResult.Failure) return@owned built
+                val route = (built as ActivityResult.Success<ActivityRoute>).value
+                frozen = route
+                val start = RoutePosition(route.segments.lastIndex, route.segments.last().vertices.lastIndex - 1, 1.0)
+                kind = ActivityEventKind.RETURN_STARTED
+                val state = ActivityNavigationState(ActivityNavigationMode.RECORDED_RETURN, route.id, route.revision, RouteDirection.REVERSE, start, start, nextRevision, old?.alertsEnabled ?: true)
+                when (val builtNavigator = makeNavigator(route, state, record.profile)) {
+                    is ActivityResult.Failure -> return@owned builtNavigator
+                    is ActivityResult.Success -> replacement = builtNavigator.value
+                }
+                state
+            }
+            ActivityNavigationAction.FOLLOW_PLANNED -> {
+                val selection = record.route ?: return@owned ActivityResult.Failure(ActivityFailure.NotFound)
+                kind = ActivityEventKind.PLANNED_GUIDANCE_RESTORED
+                val state = ActivityNavigationState(ActivityNavigationMode.PLANNED_ROUTE, selection.snapshot.id, selection.snapshot.revision,
+                    selection.direction, selection.start, selection.start, nextRevision, old?.alertsEnabled ?: true)
+                when (val builtNavigator = makeNavigator(selection.snapshot, state, record.profile)) {
+                    is ActivityResult.Failure -> return@owned builtNavigator
+                    is ActivityResult.Success -> replacement = builtNavigator.value
+                }
+                state
+            }
+            ActivityNavigationAction.CORRECT_POSITION -> {
+                if (old == null) return@owned ActivityResult.Failure(ActivityFailure.NotFound)
+                kind = ActivityEventKind.NAVIGATION_CORRECTED
+                old.copy(checkpoint = checkNotNull(command.position), revision = nextRevision, deviated = false, gapAnnouncedSegmentId = null, endAnnounced = false, lastDeviationAlertAt = null)
+            }
+            ActivityNavigationAction.SET_ALERTS_ENABLED -> {
+                if (old == null) return@owned ActivityResult.Failure(ActivityFailure.NotFound)
+                kind = ActivityEventKind.NAVIGATION_ALERTS_CHANGED
+                old.copy(revision = nextRevision, alertsEnabled = checkNotNull(command.alertsEnabled))
+            }
+        }
+        if (replacement != null && command.action == ActivityNavigationAction.FOLLOW_PLANNED) {
+            val restored = restoreControls(record.id, checkNotNull(replacement))
+            if (restored is ActivityResult.Failure) return@owned restored
+        }
+        val now = clock.now()
+        val latest = current!!
+        val updated = latest.copy(revision = latest.revision + 1, updatedAt = now, statistics = latest.statisticsAt(now), navigation = next, lastNavigationCommand = command)
+        val event = ActivityEvent(activityIdentity(), eventSequence + 1, kind, now, navigationRouteId = next.routeId)
+        val saved = repository.commit(ActivityCommit(latest.revision, updated, events = listOf(event), appliedCommandId = command.id, navigationSnapshot = frozen))
+        if (saved is ActivityResult.Failure) { fail(saved.reason); return@owned saved }
+        current = (saved as ActivityResult.Success<ActivityRecord>).value
+        pendingStatistics = current!!.statistics
+        eventSequence++
+        if (replacement != null) navigator = replacement else navigator?.reanchor(next)
+        publish(now)
+        ActivityResult.Success(next)
     }
 
     override suspend fun apply(command: ActivityCommand): ActivityResult<ActivityRecord> = owned {
@@ -162,6 +295,7 @@ class PhoneActivitySession(
             host.start(record.profile)?.let { return@owned ActivityResult.Failure(it) }
         }
         val now = clock.now()
+        if (command.action == ActivityAction.PAUSE || command.action == ActivityAction.FINISH) pendingNavigationAlerts.clear()
         val flushed = flush(now)
         if (flushed is ActivityResult.Failure) return@owned flushed
         val changed = transition(command.action, now, command)
@@ -192,7 +326,7 @@ class PhoneActivitySession(
             ActivityAction.COMPLETE -> ActivityEventKind.COMPLETED
         }
         val updated = record.copy(revision = record.revision + 1, controlRevision = record.controlRevision + if (changed) 1 else 0,
-            status = next, updatedAt = time, statistics = record.statisticsAt(time),
+            status = next, updatedAt = time, statistics = record.statisticsAt(time), navigation = navigator?.state,
             sessionGeneration = if (record.status == ActivityStatus.INTERRUPTED && next == ActivityStatus.RECORDING) activityIdentity() else record.sessionGeneration,
             finishedAt = if (next == ActivityStatus.FINALIZING && record.finishedAt == null) time else record.finishedAt,
             lastCommand = command ?: record.lastCommand)
@@ -232,6 +366,7 @@ class PhoneActivitySession(
     }
 
     private fun beginLocations(since: ActivityTime) {
+        navigator?.suspendPosition()
         recordingSince = since
         positionBarrier = null
         availability = ActivityDataAvailability.WAITING
@@ -239,8 +374,8 @@ class PhoneActivitySession(
             locations.observe(LocationRequest(background = true)).collect { state -> mutex.withLock { receive(state) } }
         }
     }
-    private fun stopLocations() { locationJob?.cancel(); locationJob = null; recordingSince = null }
-    private fun resetPath() { segmentId = null; lastPositionTime = null; position = null; speed = null; movement?.reset() }
+    private fun stopLocations() { pendingNavigationAlerts.clear(); locationJob?.cancel(); locationJob = null; recordingSince = null }
+    private fun resetPath() { navigator?.suspendPosition(); segmentId = null; lastPositionTime = null; position = null; speed = null; movement?.reset() }
 
     private fun beginTicker() {
         if (current == null || ticker?.isActive == true) return
@@ -318,7 +453,7 @@ class PhoneActivitySession(
         fix.courseDegrees?.let { add(CourseMeasurement(it)) }
         fix.altitudeMeters?.let { add(ElevationMeasurement(it, "PHONE_UNSPECIFIED", fix.altitudeAccuracyMeters)) }
         val bytes = batch.sumOf { json.encodeToString(it).encodeToByteArray().size }
-        if (samples.size + batch.size > 128 || sampleBytes + bytes > 131_072 || events.size >= 128) {
+        if (samples.size + batch.size > 128 || sampleBytes + bytes > 131_072 || events.size >= 110) {
             if (flush(now) is ActivityResult.Failure) return
         }
         if (batch.any { ActivityValidation.sample(it) != null }) { quality(ActivityDataAvailability.UNRELIABLE, now); publish(now); return }
@@ -329,13 +464,21 @@ class PhoneActivitySession(
         lastPositionTime = acquired
         position = point
         speed = batch.lastOrNull { it.measurement is SpeedMeasurement }
+        navigator?.let { guidance ->
+            val updates = withContext(Dispatchers.Default) { guidance.update(point, now, fix.speedMetersPerSecond, fix.courseDegrees) }
+            for (update in updates.events) {
+                val event = ActivityEvent(activityIdentity(), eventSequence + events.size + 1, update.kind, now, update.relatedId, guidance.state.routeId)
+                events += event
+                if (guidance.state.alertsEnabled) pendingNavigationAlerts += ActivityNavigationAlert(event.id, record.id, guidance.state.routeId, update.kind, now, update.relatedId)
+            }
+        }
         publish(now)
     }
 
     private suspend fun quality(value: ActivityDataAvailability, time: ActivityTime) {
         if (availability == value || failure != null) return
         if (events.size >= 120 && flush(time) is ActivityResult.Failure) return
-        if (value != ActivityDataAvailability.LIVE) positionBarrier = time
+        if (value != ActivityDataAvailability.LIVE) { positionBarrier = time; navigator?.suspendPosition(); pendingNavigationAlerts.clear() }
         val wasLive = availability == ActivityDataAvailability.LIVE
         availability = value
         if (value == ActivityDataAvailability.SOURCE_CONFLICT)
@@ -356,11 +499,13 @@ class PhoneActivitySession(
         if (record.status != ActivityStatus.RECORDING && samples.isEmpty() && events.isEmpty()) return ActivityResult.Success(record)
         val statistics = record.statisticsAt(now).copy(distanceMeters = pendingStatistics.distanceMeters, movingMillis = pendingStatistics.movingMillis)
         val result = repository.commit(ActivityCommit(record.revision,
-            record.copy(revision = record.revision + 1, updatedAt = now, statistics = statistics), samples.toList(), events.toList()))
+            record.copy(revision = record.revision + 1, updatedAt = now, statistics = statistics, navigation = navigator?.state), samples.toList(), events.toList()))
         if (result is ActivityResult.Success) {
             current = result.value
             pendingStatistics = result.value.statistics
             eventSequence += events.size
+            pendingNavigationAlerts.forEach { mutableNavigationAlerts.tryEmit(it) }
+            pendingNavigationAlerts.clear()
             samples.clear(); events.clear(); sampleBytes = 0
             publish(now)
         } else if (result is ActivityResult.Failure) fail(result.reason)
@@ -382,7 +527,7 @@ class PhoneActivitySession(
         stopLocations(); host.stop()
         resetPath()
         availability = ActivityDataAvailability.UNAVAILABLE
-        samples.clear(); events.clear(); sampleBytes = 0
+        samples.clear(); events.clear(); pendingNavigationAlerts.clear(); sampleBytes = 0
         publish(clock.now())
     }
 
@@ -393,6 +538,6 @@ class PhoneActivitySession(
         val statistics = if (failure == null) record.statisticsAt(now).copy(distanceMeters = pendingStatistics.distanceMeters, movingMillis = pendingStatistics.movingMillis)
             else record.statistics
         mutableLive.value = ActivityLiveState(record.owned(), statistics.distanceMeters, statistics.durations(), position, speed,
-            positionAvailability = availability, heartRateAvailability = ActivityDataAvailability.UNAVAILABLE, failure = failure)
+            progress = navigator?.progress, positionAvailability = availability, heartRateAvailability = ActivityDataAvailability.UNAVAILABLE, failure = failure)
     }
 }

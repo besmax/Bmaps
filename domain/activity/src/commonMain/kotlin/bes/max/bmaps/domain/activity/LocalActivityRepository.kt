@@ -13,6 +13,7 @@ import bes.max.bmaps.core.storage.ActivitySpatialStores
 import bes.max.bmaps.core.storage.StoredActivityCheckpoint
 import bes.max.bmaps.core.storage.StoredActivityEvent
 import bes.max.bmaps.core.storage.StoredTelemetry
+import bes.max.bmaps.core.storage.StoredNavigationSnapshot
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.flow.Flow
@@ -44,7 +45,7 @@ class LocalActivityRepository(private val store: LocalActivityStore) : ActivityR
     override suspend fun get(id: String): ActivityResult<ActivityRecord> = store.operation { validateActivityId(id); record(id).owned() }
 
     override suspend fun commit(value: ActivityCommit): ActivityResult<ActivityRecord> = store.operation {
-        val request = value.copy(record = value.record.owned(), samples = value.samples.toList(), events = value.events.toList())
+        val request = value.copy(record = value.record.owned(), samples = value.samples.toList(), events = value.events.toList(), navigationSnapshot = value.navigationSnapshot?.owned())
         validateActivityId(request.record.id)
         val previous = record(request.record.id)
         activityRequire(if (request.record.route == previous.route) ActivityValidation.recordMetadata(request.record) else ActivityValidation.record(request.record))
@@ -57,21 +58,34 @@ class LocalActivityRepository(private val store: LocalActivityStore) : ActivityR
         val events = request.events.map { it.stored() }
         val bytes = (samples.map { it.payload } + events.map { it.payload } + metadata.payload).sumOf { it.encodeToByteArray().size.toLong() }
         if (bytes > ActivityLimits.MAX_WRITE_BYTES) activityFail(ActivityFailure.InvalidInput("batchBytes"))
-        val fingerprint = activityDigest("${request.expectedRevision}\n${metadata.payload}\n" + events.joinToString("\n") { it.payload } + "\n" + samples.joinToString("\n") { it.payload })
+        val navigationSnapshot = request.navigationSnapshot?.let {
+            activityRequire(ActivityValidation.route(it))
+            store.json.encodeToString(it).also { encoded -> if (encoded.encodeToByteArray().size > ActivityLimits.MAX_ROUTE_STORAGE_BYTES) activityFail(ActivityFailure.CapacityExceeded) }
+        }
+        val fingerprint = activityDigest("${request.expectedRevision}\n${metadata.payload}\n" + events.joinToString("\n") { it.payload } + "\n" + samples.joinToString("\n") { it.payload } + "\n" + navigationSnapshot?.let(::activityDigest))
         val duplicate = request.appliedCommandId?.let { activities.commandResult(request.record.id, it) }
         if (duplicate == null) {
             validateChange(previous, request)
             if (request.record.derivedRouteId != null && request.record.derivedRouteId != previous.derivedRouteId &&
                 routes.derived(previous.id) != request.record.derivedRouteId) activityFail(ActivityFailure.InvalidInput("derivedRouteId"))
+            val nav = request.record.navigation
+            if (nav != null) {
+                val route = request.navigationSnapshot ?: with(store) { navigationRoute(request.record) } ?: activityFail(ActivityFailure.InvalidInput("navigationRoute"))
+                activityRequire(ActivityValidation.navigation(nav, route))
+                if (nav.mode == ActivityNavigationMode.PLANNED_ROUTE && (nav.direction != request.record.route?.direction || nav.origin != request.record.route?.start)) activityFail(ActivityFailure.InvalidInput("navigationSelection"))
+            }
+            if (request.navigationSnapshot != null && (nav?.mode != ActivityNavigationMode.RECORDED_RETURN || request.appliedCommandId == null || request.record.lastNavigationCommand?.action != ActivityNavigationAction.RETURN_ALONG_RECORDING)) activityFail(ActivityFailure.InvalidInput("navigationSnapshot"))
             val checkpoint = nextCheckpoint(previous, request)
-            requireCapacity(bytes * 2 + 1_048_576)
+            requireCapacity((bytes + (navigationSnapshot?.encodeToByteArray()?.size ?: 0)) * 2 + 1_048_576)
             val saved = activities.commit(metadata, request.expectedRevision, events, samples, checkpoint,
-                request.record.status != ActivityStatus.COMPLETED, request.appliedCommandId, fingerprint)
+                request.record.status != ActivityStatus.COMPLETED, request.appliedCommandId, fingerprint,
+                request.navigationSnapshot?.let { StoredNavigationSnapshot(it.id, checkNotNull(navigationSnapshot)) })
             store.project(saved)
             with(store) { read(saved) }.owned()
         } else {
             val saved = activities.commit(metadata, request.expectedRevision, events, samples, activities.checkpoint(request.record.id),
-                request.record.status != ActivityStatus.COMPLETED, request.appliedCommandId, fingerprint)
+                request.record.status != ActivityStatus.COMPLETED, request.appliedCommandId, fingerprint,
+                request.navigationSnapshot?.let { StoredNavigationSnapshot(it.id, checkNotNull(navigationSnapshot)) })
             with(store) { read(saved) }.owned()
         }
     }
@@ -99,6 +113,22 @@ class LocalActivityRepository(private val store: LocalActivityStore) : ActivityR
         TelemetryPage(page.map { store.decode<TelemetrySample>(it.payload).also { sample ->
             if (ActivityValidation.sample(sample) != null) activityFail(ActivityFailure.CorruptData)
         } }, if (rows.size > query.limit) page.last().let { TelemetryCursor(it.acquiredAt, it.sourceId, it.id) } else null)
+    }
+
+    override suspend fun navigationRoute(activityId: String): ActivityResult<ActivityRoute?> = store.operation {
+        validateActivityId(activityId)
+        with(store) { navigationRoute(record(activityId)) }?.owned()
+    }
+
+    override suspend fun positions(activityId: String, query: ActivityPositionQuery): ActivityResult<ActivityPositionPage> = store.operation {
+        validateActivityId(activityId)
+        if (query.afterSequence < 0 || query.limit !in 1..ActivityLimits.MAX_PAGE_SIZE) activityFail(ActivityFailure.InvalidInput("positionQuery"))
+        if (activities.get(activityId) == null) activityFail(ActivityFailure.NotFound)
+        val rows = activities.positions(activityId, query.afterSequence, query.limit + 1)
+        val page = rows.take(query.limit)
+        ActivityPositionPage(page.map { store.decode<TelemetrySample>(it.payload).also { sample ->
+            if (ActivityValidation.sample(sample) != null || sample.measurement !is PositionMeasurement) activityFail(ActivityFailure.CorruptData)
+        } }, if (rows.size > query.limit) page.last().sequence else null)
     }
 
     override suspend fun events(activityId: String, query: ActivityEventQuery): ActivityResult<ActivityEventPage> = store.operation {
@@ -198,6 +228,20 @@ class LocalActivityRepository(private val store: LocalActivityStore) : ActivityR
         val recovered = previous.status == ActivityStatus.INTERRUPTED && next.status == ActivityStatus.RECORDING
         if ((next.sessionGeneration != previous.sessionGeneration) != recovered) activityFail(ActivityFailure.StaleSession)
         if (previous.finishedAt != null && next.finishedAt != previous.finishedAt || previous.derivedRouteId != null && next.derivedRouteId != previous.derivedRouteId) activityFail(ActivityFailure.InvalidInput("finishBoundary"))
+        val oldNav = previous.navigation
+        val nextNav = next.navigation
+        val navigationCommandChanged = next.lastNavigationCommand != previous.lastNavigationCommand
+        if (navigationCommandChanged) {
+            val command = next.lastNavigationCommand ?: activityFail(ActivityFailure.InvalidInput("navigationCommand"))
+            if (command.id != value.appliedCommandId || command.sessionGeneration != previous.sessionGeneration ||
+                command.expectedNavigationRevision != (oldNav?.revision ?: 0) || nextNav == null || nextNav.revision != (oldNav?.revision ?: 0) + 1)
+                activityFail(ActivityFailure.RevisionConflict)
+        } else if (oldNav != null) {
+            if (nextNav == null || nextNav.revision != oldNav.revision || nextNav.mode != oldNav.mode || nextNav.routeId != oldNav.routeId ||
+                nextNav.routeRevision != oldNav.routeRevision || nextNav.direction != oldNav.direction || nextNav.origin != oldNav.origin || nextNav.alertsEnabled != oldNav.alertsEnabled)
+                activityFail(ActivityFailure.InvalidInput("navigationControl"))
+            if (nextNav.checkpoint != oldNav.checkpoint && value.samples.none { it.measurement is PositionMeasurement }) activityFail(ActivityFailure.InvalidInput("navigationCheckpoint"))
+        } else if (nextNav != null && (nextNav.mode != ActivityNavigationMode.PLANNED_ROUTE || nextNav.revision != 0L)) activityFail(ActivityFailure.InvalidInput("navigationControl"))
         val lifecycle = value.events.filter { it.kind in LIFECYCLE_EVENTS }
         if (changed) {
             val expected = when (next.status) {
@@ -214,7 +258,7 @@ class LocalActivityRepository(private val store: LocalActivityStore) : ActivityR
 
     private fun validateEvent(value: ActivityEvent) {
         if (!ActivityValidation.id(value.id) || value.sequence <= 0 || !ActivityValidation.time(value.time) ||
-            value.time.monotonicMillis == null || value.relatedId?.let { !ActivityValidation.id(it) } == true) activityFail(ActivityFailure.InvalidInput("event"))
+            value.time.monotonicMillis == null || value.relatedId?.let { !ActivityValidation.id(it) } == true || value.navigationRouteId?.let { !ActivityValidation.id(it) } == true) activityFail(ActivityFailure.InvalidInput("event"))
     }
 
     private fun beforeOrAt(event: ActivityTime, sample: ActivityTime): Boolean =

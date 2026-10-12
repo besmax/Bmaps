@@ -82,12 +82,16 @@ data class ActivityRecord(
     val controlRevision: Long = 0,
     val statistics: ActivityStatistics = ActivityStatistics(),
     val lastCommand: ActivityCommand? = null,
+    val navigation: ActivityNavigationState? = null,
+    val lastNavigationCommand: ActivityNavigationCommand? = null,
 )
 
 @Serializable
 enum class ActivityEventKind {
     STARTED, PAUSED, RESUMED, INTERRUPTED, FINISH_REQUESTED, COMPLETED,
     POSITION_LOST, POSITION_RECOVERED, SOURCE_CONFLICT,
+    ROUTE_DEVIATED, ROUTE_DEVIATION_REMINDER, ROUTE_REJOINED, ROUTE_GAP, ROUTE_END,
+    NAVIGATION_CORRECTED, RETURN_STARTED, PLANNED_GUIDANCE_RESTORED, NAVIGATION_ALERTS_CHANGED,
     WEARABLE_DISCONNECTED, WEARABLE_RECONNECTED, TELEMETRY_GAP, CONTROL_POINT,
 }
 
@@ -98,6 +102,7 @@ data class ActivityEvent(
     val kind: ActivityEventKind,
     val time: ActivityTime,
     val relatedId: String? = null,
+    val navigationRouteId: String? = null,
 )
 
 @Serializable
@@ -110,7 +115,7 @@ data class ActivityDurations(
 )
 
 @Serializable
-enum class RouteMatchQuality { MATCHED, UNCERTAIN, OFF_ROUTE, POSITION_UNAVAILABLE }
+enum class RouteMatchQuality { MATCHED, UNCERTAIN, OFF_ROUTE, POSITION_UNAVAILABLE, SEGMENT_GAP }
 
 @Serializable
 data class RouteProgress(
@@ -120,6 +125,11 @@ data class RouteProgress(
     val remainingRouteMeters: Double? = null,
     val deviationMeters: Double? = null,
     val nextControlPointId: String? = null,
+    val plannedDistanceMeters: Double? = null,
+    val currentLegRemainingMeters: Double? = null,
+    val gap: RouteGap? = null,
+    val endReached: Boolean = false,
+    val uncertainty: RouteUncertainty? = null,
 )
 
 @Serializable
