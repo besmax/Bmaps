@@ -80,6 +80,10 @@ Native acceptance still required: export Android → import iOS and the reverse,
 
 Implementation references: [SQLite snapshot semantics](https://www.sqlite.org/lang_vacuum.html), [Android file URI grants](https://developer.android.com/training/secure-file-sharing/share-file), and [Apple document picker](https://developer.apple.com/documentation/uikit/uidocumentpickerviewcontroller).
 
+## Detailed route import from Map objects — 2026-10-13
+
+Map objects and its import dialog expose an explicit GPX route action using the existing native document picker and viewer-owned Track importer. Detailed routes use the application route catalog and the 32 MB/200,000-point bounds; the existing 4 MB editable annotation import stays independent. The action opens preparation without recording and is unavailable during an active activity or historical review. Multiple imported routes open a chooser; cancellation leaves recording stopped. Native picker/storage/navigation checks remain unperformed. See documents 15 and 22.
+
 ## Generated elevation layer transfer — 2026-10-09
 
 A generated elevation layer is a normal manifest raster asset, included in SQLite snapshots, byte-size/hash accounting, export payloads, import validation, and package identity rebinding. Its optional palette/range metadata and visibility/opacity/order survive transfer. Only the currently referenced version is exported; private generation job/provisional files are excluded. Imported maps include the generated layer in their actual stored size. The new storage transfer scenario is added but not executed. See `21_ELEVATION_COLOR_LAYERS.md`.

@@ -39,9 +39,9 @@ object ActivityValidation {
 
     fun record(value: ActivityRecord): String? = recordMetadata(value) ?: value.route?.let(::selection)
         ?: value.navigation?.takeIf { it.mode == ActivityNavigationMode.PLANNED_ROUTE }?.let {
-            value.route?.let { selection ->
-                if (it.direction != selection.direction || it.origin != selection.start) "navigationSelection" else navigation(it, selection.snapshot)
-            } ?: "navigationRoute"
+            val selection = value.route ?: return@let "navigationRoute"
+            if (it.direction != selection.direction || it.origin != selection.start) "navigationSelection"
+            else navigation(it, selection.snapshot)
         }
 
     fun validRoutePosition(route: ActivityRoute, value: RoutePosition): Boolean = position(route, value)

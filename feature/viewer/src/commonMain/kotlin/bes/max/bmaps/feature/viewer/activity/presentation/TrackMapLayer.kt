@@ -46,6 +46,9 @@ internal object TrackMapLayer {
             if (state.preparing || state.correcting) addAll(paths(state.selectedSection, pyramid, "selected", Color(0xFFE53935)))
         }
     }
+    fun objectPaths(lines: List<TrackLine>, pyramid: TilePyramid?): List<MapPath> =
+        if (pyramid == null) emptyList() else paths(lines, pyramid, "object-route", Color(0xFFE53935)).map { it.copy(clickable = true) }
+
     private fun paths(lines: List<TrackLine>, pyramid: TilePyramid, prefix: String, color: Color): List<MapPath> = buildList {
         lines.forEach { line ->
             var part = 0

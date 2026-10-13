@@ -269,6 +269,7 @@ class TrackViewModel(
     }
 
     fun loadMoreRoutes() = loadRoutes(true)
+    fun refreshRoutes() { if (state.value.choosing && !state.value.busy) { nextRoute = null; loadRoutes(false) } }
     private fun loadRoutes(append: Boolean) = work {
         when (val result =
             routes.routes(ActivityRouteQuery(afterId = if (append) nextRoute else null))) {
@@ -624,9 +625,13 @@ class TrackViewModel(
                 when (val result = routes.saveImported(imported)) {
                     is ActivityResult.Failure -> error(result.reason)
                     is ActivityResult.Success -> if (imported.size == 1) prepare(imported.single()) else {
+                        selected = null
                         nextRoute = null
                         mutableState.update {
-                            it.copy(routes = imported.map { route ->
+                            it.copy(expanded = true, choosing = true, preparing = false, menu = false,
+                                route = null, preview = emptyList<TrackLine>().toImmutableList(),
+                                selectedSection = emptyList<TrackLine>().toImmutableList(),
+                                routes = imported.map { route ->
                                 TrackRouteItem(
                                     route.id,
                                     route.name,

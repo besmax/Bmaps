@@ -84,9 +84,9 @@
     <string name="annotations_save_error">Could not save map objects. Your edits are still available. Check available storage and retry.</string>
     <string name="annotations_vertex_limit">An object can contain up to 1,000 vertices.</string>
     <string name="annotations_import">Import objects</string>
-    <string name="annotations_export">Export GeoJSON</string>
+    <string name="annotations_export">Export map annotations (GeoJSON)</string>
     <string name="annotations_geojson">GeoJSON or GPX</string>
-    <string name="annotations_import_hint">Paste GeoJSON or GPX 1.0/1.1 XML. GPX waypoints become markers; routes and track segments become lines. Names and descriptions are kept; elevation, timestamps, and extensions are ignored. Import adds copies with new IDs. Limits: 4 MB, 1,000 objects, and 1,000 points per object.</string>
+    <string name="annotations_import_hint">Import GeoJSON or GPX 1.0/1.1. GPX tracks and routes become routes with full geometry, separate segments, elevation and time; waypoints become markers. Imports create copies. GPX: 32 MB, 200,000 route points, 100 routes, 1,000 markers. GeoJSON: 4 MB, 1,000 objects, 1,000 points per object.</string>
     <string name="annotations_export_hint">Select and copy the GeoJSON below. It includes all objects in this map.</string>
     <string name="annotations_geojson_error">Unsupported or invalid GeoJSON or GPX. Check coordinates, names, descriptions, and limits: 4 MB, 1,000 objects, 1,000 points per object. Routes and track segments need two distinct points.</string>
     <string name="annotations_export_error">Could not export GeoJSON. Export supports up to 1,000 objects and 4 MB.</string>
@@ -302,4 +302,11 @@
     <string name="history_heart_unavailable">Heart rate: unavailable</string>
     <string name="history_loading">Loading activity…</string>
     <string name="history_open_error">Activity unavailable · open to retry</string>
+    <string name="objects_routes">Routes</string>
+    <string name="objects_routes_error">Could not load routes. Try again.</string>
+    <string name="objects_import_error">Could not import objects. Check the file, coordinates and import limits, or try again.</string>
+    <string name="objects_import_needs_map">Open a map package to import markers or GeoJSON objects. GPX routes can be imported without a map package.</string>
+    <string name="objects_import_partial">Routes have been saved. Other objects have not been confirmed as saved. Retry to finish, or close and keep the saved routes.</string>
+    <string name="objects_import_summary">%1$d routes · %2$d other objects · %3$d points. Confirm to save.</string>
+    <string name="objects_prepare_import">Review import</string>
 </resources>

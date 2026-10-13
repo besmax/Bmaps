@@ -13,6 +13,7 @@ import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationEditorVie
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationFileEvent
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationFileState
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationFileViewModel
+import bes.max.bmaps.feature.viewer.annotations.presentation.MapObjectsState
 import bes.max.bmaps.feature.viewer.annotations.ui.icons.MarkerIcon
 import bes.max.bmaps.feature.viewer.annotations.ui.icons.MarkerIcons
 import androidx.compose.foundation.horizontalScroll
@@ -42,19 +43,17 @@ internal fun AnnotationEditorContent(
     model: AnnotationEditorViewModel,
     state: AnnotationEditorState,
     modifier: Modifier = Modifier,
+    objects: MapObjectsState,
+    objectActions: MapObjectsActions,
 ) {
     val fileModel = metroViewModel<AnnotationFileViewModel>()
     val fileState by fileModel.state.collectAsStateWithLifecycle()
-    val documents = rememberNativeDocuments(fileModel::pick, fileModel::nativeFailure)
+    val documents = rememberNativeDocuments({ it.dispose() }, fileModel::nativeFailure)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(fileModel, model, documents, lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             fileModel.events.collect { event ->
                 when (event) {
-                    is AnnotationFileEvent.Loaded -> {
-                        model.geoJson(true); model.geoJsonText(event.text)
-                    }
-
                     is AnnotationFileEvent.Share -> documents.share(event.document)
                 }
             }
@@ -62,7 +61,7 @@ internal fun AnnotationEditorContent(
     }
 
     state.draft?.takeIf { !state.propertiesOpen }?.let { DraftToolbar(model, state, modifier) }
-    if (state.panel) AnnotationManagerDialog(model, state, fileModel, fileState, documents::pick)
+    if (state.panel) AnnotationManagerDialog(model, state, fileModel, fileState, objects, objectActions)
     state.activeObject?.takeIf { state.objectUi(it.id)?.deleteConfirmation == true }?.let {
         SelectionDeleteDialog(model, state, it)
     }
@@ -114,7 +113,8 @@ private fun AnnotationManagerDialog(
     state: AnnotationEditorState,
     fileModel: AnnotationFileViewModel,
     fileState: AnnotationFileState,
-    pickDocument: () -> Unit,
+    objects: MapObjectsState,
+    objectActions: MapObjectsActions,
 ) {
     val documentsBusy = fileState.busy
     AlertDialog(
@@ -122,13 +122,14 @@ private fun AnnotationManagerDialog(
         title = { Text(stringResource(Res.string.annotations_title)) },
         text = {
             Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
-                AnnotationLayerControls(model, state)
+                AnnotationLayerControls(model, state, objects.hasPackage)
+                MapObjectRouteList(state.routeItems, objects, objectActions, state.busy || objects.busy, { id -> model.select(id) })
                 AnnotationObjectList(model, state)
                 state.error?.let {
                     Text(stringResource(it), color = MaterialTheme.colorScheme.error)
                     TextButton(model::retry) { Text(stringResource(Res.string.viewer_retry)) }
                 }
-                TextButton(pickDocument, enabled = !state.busy && !documentsBusy) {
+                TextButton(objectActions.pick, enabled = !state.busy && !documentsBusy && !objects.busy) {
                     Text(
                         stringResource(Res.string.annotations_pick_file)
                     )
@@ -144,12 +145,12 @@ private fun AnnotationManagerDialog(
                     )
                 }
                 TextButton(
-                    { model.geoJson(true) },
-                    enabled = !state.busy
+                    objectActions.beginImport,
+                    enabled = !state.busy && !objects.busy
                 ) { Text(stringResource(Res.string.annotations_import)) }
                 TextButton(
                     model::exportGeoJson,
-                    enabled = !state.busy
+                    enabled = !state.busy && objects.hasPackage
                 ) { Text(stringResource(Res.string.annotations_export)) }
             }
         },
@@ -160,7 +161,8 @@ private fun AnnotationManagerDialog(
 @Composable
 private fun AnnotationLayerControls(
     model: AnnotationEditorViewModel,
-    state: AnnotationEditorState
+    state: AnnotationEditorState,
+    canCreate: Boolean,
 ) {
     AnnotationKind.entries.forEach { kind ->
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -168,7 +170,7 @@ private fun AnnotationLayerControls(
             Checkbox(state.layers.first { it.kind == kind }.visible, { model.visibility(kind, it) })
             TextButton(
                 { model.start(kind) },
-                enabled = !state.busy
+                enabled = !state.busy && canCreate
             ) { Text(stringResource(Res.string.annotations_add)) }
         }
     }
@@ -189,12 +191,17 @@ private fun AnnotationObjectList(model: AnnotationEditorViewModel, state: Annota
         color = MaterialTheme.colorScheme.error
     )
     if (state.items.isEmpty()) Text(stringResource(Res.string.annotations_empty))
-    state.items.forEach { item ->
-        TextButton({ model.select(item.id) }, enabled = !state.busy) {
-            Text(item.name.ifBlank { stringResource(item.kind.label()) })
-        }
+    state.items.filter { it.kind != AnnotationKind.LINE }.forEach { item ->
+        AnnotationObjectRow(item, state.busy, { id -> model.select(id) })
     }
     if (state.truncated) Text(stringResource(Res.string.annotations_truncated))
+}
+
+@Composable
+private fun AnnotationObjectRow(item: Annotation, busy: Boolean, onSelect: (String) -> Unit) {
+    TextButton({ onSelect(item.id) }, enabled = !busy) {
+        Text(item.name.ifBlank { stringResource(item.kind.label()) })
+    }
 }
 
 @Composable
@@ -388,7 +395,7 @@ private fun GeoJsonDialog(
     model: AnnotationEditorViewModel,
     state: AnnotationEditorState,
     fileModel: AnnotationFileViewModel,
-    fileState: AnnotationFileState
+    fileState: AnnotationFileState,
 ) {
     AlertDialog(
         onDismissRequest = { model.geoJson(false) },
@@ -408,11 +415,13 @@ private fun GeoJsonDialog(
                         )
                     }
                     SelectionContainer { Text(state.geoJson) }
-                } else OutlinedTextField(
-                    state.geoJson,
-                    model::geoJsonText,
-                    enabled = !state.busy,
-                    label = { Text(stringResource(Res.string.annotations_geojson)) })
+                } else {
+                    OutlinedTextField(
+                        state.geoJson,
+                        model::geoJsonText,
+                        enabled = !state.busy,
+                        label = { Text(stringResource(Res.string.annotations_geojson)) })
+                }
                 state.error?.let {
                     Text(
                         stringResource(it),

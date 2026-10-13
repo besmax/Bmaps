@@ -80,6 +80,28 @@ class ActivityContractsTest {
     }
 
     @Test
+    fun plannedNavigationAcceptsValidRecordsAndRejectsMissingOrMismatchedSelection() {
+        val snapshot = route()
+        val time = ActivityTime(1_000, 10, "boot-1")
+        for (direction in RouteDirection.entries) {
+            val start = RoutePosition(1, 0, if (direction == RouteDirection.REVERSE) 1.0 else 0.0)
+            val selection = RouteSelection(snapshot, direction, start)
+            val navigation = ActivityNavigationState(ActivityNavigationMode.PLANNED_ROUTE,
+                snapshot.id, snapshot.revision, direction, start, start)
+            val record = ActivityRecord("activity", 0, "generation", "Trip", ActivityProfile.HIKING,
+                ActivityStatus.RECORDING, time, time, route = selection, navigation = navigation)
+            assertNull(ActivityValidation.record(record))
+            assertEquals("navigationRoute", ActivityValidation.record(record.copy(route = null)))
+            assertEquals("navigationSelection", ActivityValidation.record(record.copy(
+                navigation = navigation.copy(origin = RoutePosition(0, 0, 0.5)))))
+            assertEquals("navigationRoute", ActivityValidation.record(record.copy(
+                navigation = navigation.copy(routeId = "another-route"))))
+            assertEquals("navigationRoute", ActivityValidation.record(record.copy(
+                navigation = navigation.copy(checkpoint = RoutePosition(9, 0, 0.0)))))
+        }
+    }
+
+    @Test
     fun wearableCommandsCannotBecomeUnlimitedDelayedActions() {
         val command = WearableCommand("command", "activity", "generation", 4, WearableCommandAction.PAUSE, 1_000, 6_000)
         assertNull(WearableValidation.command(command))

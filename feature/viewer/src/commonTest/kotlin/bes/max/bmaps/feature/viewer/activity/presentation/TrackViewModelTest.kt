@@ -9,6 +9,8 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.activity.presentation
 
 import androidx.lifecycle.ViewModelStore
+import bes.max.bmaps.core.sharing.PickedDocument
+import kotlinx.io.Buffer
 import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import bes.max.bmaps.core.mapengine.TilePyramid
 import bes.max.bmaps.core.mapengine.ZoomRange
@@ -85,6 +87,29 @@ class TrackViewModelTest {
             assertEquals(1, session.commands.size)
             model.confirmFinish(false)
             assertEquals(ActivityStatus.PAUSED, record.status)
+        }
+    }
+
+    @Test fun directMultiRouteImportOpensChooserAndClearsPreviousPreparation() = runTest {
+        fixture { model, session ->
+            model.selectRoute("route"); runCurrent()
+            model.await { it.preparing && !it.busy }
+            model.collapse()
+            val tracks = (1..2).joinToString("") { index ->
+                """<trk><name>Track $index</name><trkseg><trkpt lat="50" lon="30"/><trkpt lat="50.01" lon="30.01"/></trkseg></trk>"""
+            }
+            model.importGpx(PickedDocument("routes.gpx", {
+                Buffer().apply { write("<gpx version=\"1.1\">$tracks</gpx>".encodeToByteArray()) }
+            }))
+            runCurrent()
+            model.await { !it.busy && it.routes.size == 2 }
+            assertTrue(model.state.value.expanded)
+            assertTrue(model.state.value.choosing)
+            assertFalse(model.state.value.preparing)
+            assertNull(model.state.value.route)
+            assertTrue(model.state.value.preview.isEmpty())
+            assertTrue(model.state.value.selectedSection.isEmpty())
+            assertTrue(session.starts.isEmpty())
         }
     }
 

@@ -11,6 +11,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.annotations.presentation
 
 import bes.max.bmaps.feature.viewer.annotations.ui.icons.MarkerIcons
+import kotlinx.collections.immutable.toImmutableList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
@@ -52,6 +53,9 @@ internal data class AnnotationEditorState(
     val geoJsonExport: Boolean = false,
 ) {
     val source: List<Annotation> get() = if (catalogReady) catalog else items
+    val routeItems = source.filter { it.kind == AnnotationKind.LINE }.map {
+        MapRouteItem(it.id, it.name, 1, it.coordinates.size)
+    }.toImmutableList()
     val activeObjectId: String? get() = layers.firstNotNullOfOrNull { layer ->
         layer.objectStates.entries.firstOrNull { it.value.calloutOpen }?.key
     }

@@ -11,6 +11,8 @@ package bes.max.bmaps.feature.viewer.map.ui
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationEditorState
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationEditorViewModel
 import bes.max.bmaps.feature.viewer.annotations.ui.AnnotationEditorContent
+import bes.max.bmaps.feature.viewer.annotations.ui.MapObjectsActions
+import bes.max.bmaps.feature.viewer.annotations.presentation.MapObjectsState
 import bes.max.bmaps.feature.viewer.position.presentation.MapPositionState
 import bes.max.bmaps.feature.viewer.position.ui.MapPositionOverlay
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerState
@@ -38,6 +40,8 @@ internal fun ViewerBottomContent(
     modifier: Modifier = Modifier,
     singleLine: Boolean = false,
     showPosition: Boolean = true,
+    objects: MapObjectsState,
+    objectActions: MapObjectsActions,
 ) {
     Column(
         modifier.fillMaxWidth().safeDrawingPadding().padding(
@@ -47,7 +51,7 @@ internal fun ViewerBottomContent(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AnnotationEditorContent(annotations, annotationState, Modifier)
+        AnnotationEditorContent(annotations, annotationState, Modifier, objects, objectActions)
         if (showPosition && state.error == null) MapPositionOverlay(positionState, singleLine = singleLine)
     }
 }

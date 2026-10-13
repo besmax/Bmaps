@@ -24,6 +24,15 @@ import nl.adaptivity.xmlutil.xmlStreaming
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
+data class GpxWaypoint(
+    val coordinate: GeographicCoordinate,
+    val name: String,
+    val description: String,
+    val elevation: ElevationMeasurement?,
+    val sourceTimeEpochMillis: Long?,
+)
+data class GpxDocument(val routes: List<ActivityRoute>, val waypoints: List<GpxWaypoint>)
+
 object ActivityRouteGpx {
     suspend fun decode(text: String): List<ActivityRoute> {
         require(text.length <= ActivityLimits.MAX_IMPORT_BYTES)
@@ -32,11 +41,16 @@ object ActivityRouteGpx {
         return decode(Buffer().apply { write(bytes) })
     }
 
-    suspend fun decode(source: RawSource): List<ActivityRoute> = withContext(Dispatchers.IO) {
+    suspend fun decode(source: RawSource): List<ActivityRoute> = decodeDocument(source).routes.also {
+        require(it.isNotEmpty()) { "GPX has no routes" }
+    }
+
+    suspend fun decodeDocument(source: RawSource): GpxDocument = withContext(Dispatchers.IO) {
         val context = currentCoroutineContext()
         val reader = xmlStreaming.newGenericReader(GpxUtf8Reader(source.buffered(), context), expandEntities = false)
         val stack = mutableListOf<Frame>()
         val routes = mutableListOf<ActivityRoute>()
+        val waypoints = mutableListOf<GpxWaypoint>()
         var namespace: String? = null
         var rootSeen = false
         var route: DraftRoute? = null
@@ -87,6 +101,11 @@ object ActivityRouteGpx {
                         val frame = Frame(name, ns)
                         if (ns == namespace && parent != null && parent.namespace == namespace) {
                             when {
+                                stack.size == 1 && name == "wpt" -> {
+                                    require(waypoints.size < 1_000) { "GPX waypoint limit exceeded" }
+                                    frame.waypoint = true
+                                    frame.point = DraftPoint(GeographicCoordinate(requireNotNull(attributes["lat"]).toDouble(), requireNotNull(attributes["lon"]).toDouble()))
+                                }
                                 stack.size == 1 && (name == "trk" || name == "rte") -> {
                                     require(routes.size < ActivityLimits.MAX_IMPORT_ROUTES)
                                     route = DraftRoute()
@@ -104,7 +123,7 @@ object ActivityRouteGpx {
                                     frame.point = DraftPoint(GeographicCoordinate(requireNotNull(attributes["lat"]).toDouble(), requireNotNull(attributes["lon"]).toDouble()))
                                 }
                                 (stack.size == 2 && parent.name in setOf("rte", "trk") && name in setOf("name", "desc", "cmt")) ||
-                                    (parent.point != null && name in setOf("name", "ele", "time")) -> {
+                                    (parent.point != null && (name in setOf("name", "ele", "time") || parent.waypoint && name in setOf("desc", "cmt"))) -> {
                                     require(parent.seen.add(name)) { "Duplicate GPX property" }
                                     frame.text = StringBuilder()
                                 }
@@ -127,6 +146,8 @@ object ActivityRouteGpx {
                                         parent.point!!.elevation = ElevationMeasurement(height, "GPX_UNSPECIFIED")
                                     }
                                     "time" -> parent.point!!.time = Instant.parse(text).toEpochMilliseconds()
+                                    "desc" -> parent.point!!.description = text
+                                    "cmt" -> parent.point!!.comment = text
                                 } else if (parent?.name in setOf("trk", "rte") && stack.size == 2) when (frame.name) {
                                     "name" -> { require(text.length <= 120); requireNotNull(route).name = text }
                                     "desc" -> requireNotNull(route).description = text
@@ -134,6 +155,13 @@ object ActivityRouteGpx {
                                 }
                             }
                             frame.point?.let { point ->
+                                require(ActivityValidation.measurement(PositionMeasurement(point.coordinate, 0.0)) == null)
+                                require(point.time?.let { it >= 0 } != false)
+                                if (frame.waypoint) {
+                                    waypoints += GpxWaypoint(point.coordinate, point.name,
+                                        point.description.ifEmpty { point.comment }, point.elevation, point.time)
+                                    return@let
+                                }
                                 val vertices = requireNotNull(points)
                                 val vertex = RouteVertex(point.coordinate, point.elevation, point.time)
                                 if (vertices.lastOrNull()?.coordinate != vertex.coordinate) vertices += vertex
@@ -166,20 +194,23 @@ object ActivityRouteGpx {
                     else -> Unit
                 }
             }
-            require(rootSeen && stack.isEmpty() && routes.isNotEmpty()) { "GPX has no routes" }
-            routes
+            require(rootSeen && stack.isEmpty() && (routes.isNotEmpty() || waypoints.isNotEmpty())) { "GPX has no objects" }
+            GpxDocument(routes, waypoints)
         } finally { reader.close() }
     }
 
     private class Frame(val name: String, val namespace: String) {
         var text: StringBuilder? = null
         var point: DraftPoint? = null
+        var waypoint = false
         var closesSegment = false
         var closesRoute = false
         val seen = mutableSetOf<String>()
     }
     private class DraftPoint(val coordinate: GeographicCoordinate) {
         var name = ""
+        var description = ""
+        var comment = ""
         var elevation: ElevationMeasurement? = null
         var time: Long? = null
     }

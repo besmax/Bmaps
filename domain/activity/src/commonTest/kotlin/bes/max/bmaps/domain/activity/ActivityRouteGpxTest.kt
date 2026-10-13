@@ -8,12 +8,15 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.domain.activity
 
+import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.Buffer
 import kotlinx.io.RawSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -73,6 +76,62 @@ class ActivityRouteGpxTest {
         val preview = ActivityRoutePreview.create(route, 4).segments.single()
         assertEquals(listOf(0, 1, 2, 3), preview.sourceVertexIndices)
         assertFails { ActivityRoutePreview.create(route, 2) }
+    }
+
+    @Test
+    fun detailedStravaStyleTrackCanBecomeAPlannedActivity() = runTest {
+        val points = (0 until 2_749).joinToString("") { index ->
+            val step = index / 2
+            """<trkpt lat="50" lon="${30.0 + step * 0.00001}"><ele>${100.0 + step}</ele><time>2026-10-07T13:59:42Z</time></trkpt>"""
+        }
+        val route = ActivityRouteGpx.decode("""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <gpx creator="StravaGPX" version="1.1" xmlns="http://www.topografix.com/GPX/1/1"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+              <metadata><time>2026-10-07T13:59:42Z</time></metadata>
+              <trk><name>Synthetic mountain bike ride</name><type>EMountainBikeRide</type><trkseg>$points</trkseg></trk>
+            </gpx>
+        """.trimIndent()).single()
+        assertEquals(1_375, route.segments.single().vertices.size)
+        assertEquals(100.0, route.segments.single().vertices.first().elevation?.meters)
+        assertNotNull(route.segments.single().vertices.last().sourceTimeEpochMillis)
+        assertTrue(RouteNavigationIndex(route).totalMeters > 0.0)
+        val start = RoutePosition(0, 0, 0.0)
+        val selection = RouteSelection(route, RouteDirection.FORWARD, start)
+        assertNull(ActivityValidation.start(ActivityStartRequest("activity", route.name, ActivityProfile.ROAD_TRAVEL, selection)))
+        val time = ActivityTime(1_000, 10, "phone-process")
+        val navigation = ActivityNavigationState(ActivityNavigationMode.PLANNED_ROUTE,
+            route.id, route.revision, selection.direction, start, start)
+        assertNull(ActivityValidation.record(ActivityRecord("activity", 0, "generation", route.name,
+            ActivityProfile.ROAD_TRAVEL, ActivityStatus.RECORDING, time, time, route = selection, navigation = navigation)))
+    }
+
+    @Test
+    fun unifiedGpxPreservesWaypointsAndGroupedRoutes() = runTest {
+        val document = ActivityRouteGpx.decodeDocument(Buffer().apply { write("""
+            <g:gpx xmlns:g="http://www.topografix.com/GPX/1/1" version="1.1">
+              <g:wpt lat="50" lon="30"><g:name>Camp</g:name><g:cmt>Rest</g:cmt><g:ele>-2.5</g:ele><g:time>2026-10-07T13:59:42Z</g:time></g:wpt>
+              <g:trk><g:trkseg><g:trkpt lat="50" lon="30"/><g:trkpt lat="50.1" lon="30.1"/></g:trkseg>
+                <g:trkseg><g:trkpt lat="51" lon="31"/><g:trkpt lat="51.1" lon="31.1"/></g:trkseg></g:trk>
+            </g:gpx>
+        """.trimIndent().encodeToByteArray()) })
+        assertEquals(2, document.routes.single().segments.size)
+        assertEquals("Camp", document.waypoints.single().name)
+        assertEquals("Rest", document.waypoints.single().description)
+        assertEquals(-2.5, document.waypoints.single().elevation?.meters)
+        assertNotNull(document.waypoints.single().sourceTimeEpochMillis)
+        assertEquals(GeographicCoordinate(50.0, 30.0), document.waypoints.single().coordinate)
+    }
+
+    @Test
+    fun waypointOnlyGpxIsSupportedByUnifiedImportAndInvalidWaypointRejectsWholeDocument() = runTest {
+        val xml = "<gpx version=\"1.1\"><wpt lat=\"50\" lon=\"30\"/></gpx>"
+        val document = ActivityRouteGpx.decodeDocument(Buffer().apply { write(xml.encodeToByteArray()) })
+        assertTrue(document.routes.isEmpty())
+        assertEquals(1, document.waypoints.size)
+        assertFails { ActivityRouteGpx.decode(xml) }
+        assertFails { ActivityRouteGpx.decodeDocument(Buffer().apply { write(xml.replace("lat=\"50\"", "lat=\"NaN\"").encodeToByteArray()) }) }
     }
 
     private fun point(latitude: Double, tag: String = "trkpt") = "<$tag lat=\"$latitude\" lon=\"30\"/>"

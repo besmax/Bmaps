@@ -58,6 +58,7 @@ internal fun ViewerMapContent(
     activityPaths: List<MapPath> = emptyList(),
     activityMarkers: List<MapMarker> = emptyList(),
     onActivityClick: ((String, MapPoint) -> Unit)? = null,
+    onObjectRouteClick: () -> Unit = {},
     onFollow: ((String) -> Unit)? = null,
     showCallout: Boolean = true,
     followLength: String? = null,
@@ -82,6 +83,7 @@ internal fun ViewerMapContent(
     }?.overlays ?: fallback
     val handleOverlayClick: (String, MapPoint) -> Unit = { id, point ->
         if (!state.immersive) {
+            if (id.startsWith("track:object-route:")) onObjectRouteClick()
             if (id.startsWith("track:recorded:")) onActivityClick?.invoke(id, point)
             overlays.targets[id]?.let { annotations.clickOverlay(it, point, model.renderer.controller) }
         }
@@ -102,7 +104,7 @@ internal fun ViewerMapContent(
             if (autoDismiss && !annotationState.hasMovingObject) annotations.dismissSelection()
         },
         onLongPress = {
-            if (!state.immersive && state.manifest != null && state.error == null && !annotationState.busy && annotationState.draft == null) {
+            if (!state.immersive && (state.manifest != null || state.vectorOnly) && state.error == null && !annotationState.busy && annotationState.draft == null) {
                 annotations.panel(true)
             }
         }

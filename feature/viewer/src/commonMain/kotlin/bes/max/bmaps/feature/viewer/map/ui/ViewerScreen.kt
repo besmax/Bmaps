@@ -9,6 +9,11 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.map.ui
 
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationEditorViewModel
+import bes.max.bmaps.feature.viewer.annotations.presentation.MapObjectsViewModel
+import bes.max.bmaps.feature.viewer.annotations.presentation.MapObjectsEvent
+import bes.max.bmaps.feature.viewer.annotations.ui.MapObjectsActions
+import bes.max.bmaps.feature.viewer.annotations.ui.MapObjectsImportDialog
+import bes.max.bmaps.feature.viewer.annotations.ui.MapRouteCard
 import bes.max.bmaps.feature.viewer.elevation.presentation.ElevationProgressViewModel
 import bes.max.bmaps.feature.viewer.location.ui.locationMessage
 import bes.max.bmaps.feature.viewer.position.presentation.MapPositionViewModel
@@ -84,11 +89,15 @@ fun ViewerScreen(
     val reviewDocuments = rememberNativeDocuments({ it.dispose() }, review::nativeFailure)
     LaunchedEffect(activityId) { activityId?.let(review::open) }
     LaunchedEffect(initialRouteId) { initialRouteId?.let(track::selectRoute) }
-    val documents = rememberNativeDocuments(track::importGpx, track::nativeFailure)
+    val objects = metroViewModel<MapObjectsViewModel>()
+    val objectState by objects.state.collectAsStateWithLifecycle()
+    LaunchedEffect(packageId) { objects.context(packageId); objects.refresh() }
+    LaunchedEffect(annotationState.panel) { if (annotationState.panel) objects.refresh() }
+    val documents = rememberNativeDocuments(objects::pick, objects::nativeFailure)
     val haptics = LocalHapticFeedback.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val trackActions = remember(track, annotations, documents, model, onHistory) {
-        TrackActions(track::toggle, track::collapse, track::prepareFree, track::chooseRoutes,
+        TrackActions(track::toggle, track::collapse, track::prepareFree, { track.collapse(); annotations.panel(true) },
             track::selectRoute, track::loadMoreRoutes, documents::pick,
             track::profile, track::reverse, track::segment, track::edge,
             track::start, track::pauseResume, track::finish, track::confirmFinish, track::menu,
@@ -96,6 +105,36 @@ fun ViewerScreen(
             track::followPosition, track::inspect, {
                 track.selectionCoordinate()?.let { model.centerLocation(GeographicCoordinate(it.latitude, it.longitude)) }
             }, track::markControlPoint, track::recover, onHistory, track::details)
+    }
+    val canFollow = activityId == null && trackState.metrics == null && !trackState.busy && annotationState.draft == null
+    val objectActions = MapObjectsActions(documents::pick, objects::beginImport, objects::text,
+        objects::prepareText, objects::confirmImport, objects::closeImport, objects::cancel,
+        objects::more, objects::refresh, objects::select,
+        if (canFollow) ({ id ->
+            annotations.panel(false); annotations.dismissSelection(); objects.callout(false); track.selectRoute(id)
+        }) else null,
+        if (canFollow) ({ id ->
+            annotationState.source.firstOrNull { it.id == id }?.let { route ->
+                annotations.panel(false); objects.clearSelection(); track.followAnnotation(route); annotations.dismissSelection()
+            }
+        }) else null)
+    LaunchedEffect(objects, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            objects.events.collect { event ->
+                when (event) {
+                    MapObjectsEvent.Imported -> { annotations.retry(); track.refreshRoutes() }
+                    is MapObjectsEvent.Selected -> { annotations.panel(false); annotations.dismissSelection() }
+                }
+            }
+        }
+    }
+    LaunchedEffect(objectState.selection?.id, camera?.session) {
+        objectState.selection?.lines?.let { lines ->
+            model.fitCoordinates(lines.flatMap { line -> line.points.map { GeographicCoordinate(it.latitude, it.longitude) } })
+        }
+    }
+    LaunchedEffect(annotationState.activeObjectId) {
+        if (annotationState.activeObjectId != null) objects.clearSelection()
     }
     LaunchedEffect(track, haptics, lifecycle, onReview) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -155,6 +194,9 @@ fun ViewerScreen(
         TrackMapLayer.paths(TrackState(planned = reviewState.planned, recorded = reviewState.recorded), state.annotationPyramid)
             .map { it.copy(clickable = it.id.startsWith("track:recorded:")) }
     }
+    val objectPaths = remember(objectState.selection, state.annotationPyramid) {
+        TrackMapLayer.objectPaths(objectState.selection?.lines.orEmpty(), state.annotationPyramid)
+    }
     val selectionLabel = stringResource(Res.string.history_selected_position)
     val reviewMarkers = remember(reviewState.selectedPosition, state.annotationPyramid, selectionLabel) {
         reviewState.selectedPosition?.let { coordinate ->
@@ -200,10 +242,11 @@ fun ViewerScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
         ViewerMapContent(model, state, annotations, annotationState, camera, calloutAnimated, autoDismiss,
-            locationOverlays, { location.cancelCenter(); track.inspect() },
-            activityPaths = if (activityId == null) trackPaths else reviewPaths,
+            locationOverlays, { location.cancelCenter(); track.inspect(); if (autoDismiss) objects.callout(false) },
+            activityPaths = if (activityId == null) trackPaths + objectPaths.takeIf { !trackState.preparing && trackState.metrics == null && annotationState.layers.any { it.kind == bes.max.bmaps.domain.mapbuilder.AnnotationKind.LINE && it.visible } }.orEmpty() else reviewPaths,
             activityMarkers = if (activityId == null) emptyList() else reviewMarkers,
             onActivityClick = { id, point -> review.selectMap(id, point, state.annotationPyramid) },
+            onObjectRouteClick = { objects.callout(true); annotations.dismissSelection() },
             onFollow = if (activityId == null && trackState.metrics == null && annotationState.draft == null) { id ->
                 annotationState.source.firstOrNull { it.id == id }?.let { annotation ->
                     track.followAnnotation(annotation)
@@ -213,7 +256,13 @@ fun ViewerScreen(
             showCallout = activityId == null && !trackState.expanded,
             followLength = trackState.selectedAnnotationLength.takeIf { trackState.selectedAnnotationId == annotationState.activeObjectId },
         )
+        MapObjectsImportDialog(objectState, objectActions)
         if (!state.immersive) {
+            if (activityId == null && objectState.callout && !trackState.expanded && annotationState.draft == null) {
+                objectState.selection?.let { selection -> MapRouteCard(selection, { objects.callout(false) },
+                    objectActions.follow?.let { follow -> { follow(selection.id) } },
+                    Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(start = 16.dp, top = 80.dp, end = 80.dp)) }
+            }
             if (state.vectorOnly) Text(stringResource(Res.string.history_neutral_map),
                 Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(start = 80.dp, end = 80.dp, top = 16.dp),
                 style = MaterialTheme.typography.bodySmall, maxLines = 2)
@@ -225,6 +274,8 @@ fun ViewerScreen(
                 Modifier.align(Alignment.BottomCenter).onSizeChanged { bottomHeight = with(density) { it.height.toDp() } },
                 singleLine = maxWidth > maxHeight,
                 showPosition = activityId == null && !trackState.expanded,
+                objects = objectState,
+                objectActions = objectActions,
             )
             if (activityId != null) ReviewPanel(reviewState, review::panel, review::series, review::selectTime,
                 review::eventList, review::exportOptions, review::retry,
