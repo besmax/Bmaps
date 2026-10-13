@@ -65,7 +65,7 @@ data class ActivityNavigationAlert(
 )
 
 data class ActivityPositionQuery(val afterSequence: Long = 0, val limit: Int = 500)
-data class ActivityPositionPage(val items: List<TelemetrySample>, val nextSequence: Long?)
+data class ActivityPositionPage(val items: List<TelemetrySample>, val nextSequence: Long?, val lastSequence: Long? = null)
 
 data class RouteNavigationPolicy(
     val onRouteMeters: Double,

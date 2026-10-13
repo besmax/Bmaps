@@ -40,6 +40,7 @@ import bes.max.bmaps.core.mapengine.CurrentLocationMarker
 import bes.max.bmaps.core.mapengine.MapCameraSnapshot
 import bes.max.bmaps.core.mapengine.MapMarker
 import bes.max.bmaps.core.mapengine.MapPoint
+import bes.max.bmaps.core.mapengine.MapPath
 import bes.max.bmaps.core.mapengine.RasterMap
 import bes.max.bmaps.core.mapengine.positionOf
 
@@ -54,6 +55,10 @@ internal fun ViewerMapContent(
     autoDismiss: Boolean,
     location: CurrentLocationOverlays = CurrentLocationOverlays(),
     onLocationGesture: () -> Unit = {},
+    activityPaths: List<MapPath> = emptyList(),
+    onFollow: ((String) -> Unit)? = null,
+    showCallout: Boolean = true,
+    followLength: String? = null,
 ) {
     val markerGrowth = remember { Animatable(1f) }
     val placementVersion = annotationState.markerPlacementVersion
@@ -85,7 +90,7 @@ internal fun ViewerMapContent(
             overlays.targets[it.id] is AnnotationHit.Vertex &&
                 (state.immersive || annotationState.draft?.kind == AnnotationKind.MARKER)
         } + location.markers,
-        overlays.paths + location.paths,
+        overlays.paths + location.paths + activityPaths,
         handleOverlayClick,
         onGestureStart = {
             onLocationGesture()
@@ -107,8 +112,8 @@ internal fun ViewerMapContent(
             handleOverlayClick(marker.id, marker.position)
         }
     }
-    if (!state.immersive) {
-        ViewerObjectCallout(model, state, annotations, annotationState, camera, calloutAnimated)
+    if (!state.immersive && showCallout) {
+        ViewerObjectCallout(model, state, annotations, annotationState, camera, calloutAnimated, onFollow, followLength)
     }
 }
 
@@ -161,6 +166,8 @@ private fun ViewerObjectCallout(
     annotationState: AnnotationEditorState,
     camera: MapCameraSnapshot?,
     animated: Boolean,
+    onFollow: ((String) -> Unit)?,
+    followLength: String?,
 ) {
     val activeObject = annotationState.activeObject
     val activeObjectUi = annotationState.activeObjectUi
@@ -197,6 +204,10 @@ private fun ViewerObjectCallout(
         busy = annotationState.busy,
         moving = activeObjectUi?.moving == true,
         error = annotationState.error,
+        routeLength = followLength,
+        onFollow = onFollow?.takeIf { activeObject?.kind == AnnotationKind.LINE }?.let { callback ->
+            { activeObject?.id?.let(callback) }
+        },
         onEdit = { activeObject?.let { annotations.edit(it.id) } },
         onMove = { activeObject?.let { annotations.moveObject(it.id) } },
         onDelete = { activeObject?.let { annotations.confirmDelete(it.id, true) } },

@@ -324,13 +324,15 @@ class PhoneActivitySession(
             ActivityAction.FINISH -> ActivityEventKind.FINISH_REQUESTED
             ActivityAction.INTERRUPT -> ActivityEventKind.INTERRUPTED
             ActivityAction.COMPLETE -> ActivityEventKind.COMPLETED
+            ActivityAction.MARK_CONTROL_POINT -> ActivityEventKind.CONTROL_POINT
         }
         val updated = record.copy(revision = record.revision + 1, controlRevision = record.controlRevision + if (changed) 1 else 0,
             status = next, updatedAt = time, statistics = record.statisticsAt(time), navigation = navigator?.state,
             sessionGeneration = if (record.status == ActivityStatus.INTERRUPTED && next == ActivityStatus.RECORDING) activityIdentity() else record.sessionGeneration,
             finishedAt = if (next == ActivityStatus.FINALIZING && record.finishedAt == null) time else record.finishedAt,
             lastCommand = command ?: record.lastCommand)
-        val event = if (changed) listOf(ActivityEvent(activityIdentity(), eventSequence + 1, kind, time)) else emptyList()
+        val event = if (changed || action == ActivityAction.MARK_CONTROL_POINT) listOf(ActivityEvent(activityIdentity(), eventSequence + 1, kind, time,
+            relatedId = if (action == ActivityAction.MARK_CONTROL_POINT) position?.id?.takeIf { availability == ActivityDataAvailability.LIVE } else null)) else emptyList()
         val result = repository.commit(ActivityCommit(record.revision, updated, events = event, appliedCommandId = command?.id))
         if (result is ActivityResult.Success) {
             current = result.value

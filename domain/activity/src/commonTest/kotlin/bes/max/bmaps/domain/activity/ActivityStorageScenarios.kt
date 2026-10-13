@@ -61,6 +61,11 @@ class ActivityStorageScenarios(private val database: (String) -> PackageDatabase
         val second = f.activities.positions(record.id, ActivityPositionQuery(first.nextSequence!!, 1)).success()
         assertEquals(listOf("p1", "p2"), (first.items + second.items).map { it.id })
         assertNull(second.nextSequence)
+        assertNotNull(second.lastSequence)
+        assertTrue(second.lastSequence!! > first.lastSequence!!)
+        val emptyTail = f.activities.positions(record.id, ActivityPositionQuery(second.lastSequence!!, 1)).success()
+        assertTrue(emptyTail.items.isEmpty())
+        assertNull(emptyTail.lastSequence)
         assertTrue(f.routes.routes(ActivityRouteQuery()).success().items.isEmpty())
         val path = Path(f.root, "activities", "activity.sqlite").toString()
         BundledSQLiteDriver().open(path).use { db ->

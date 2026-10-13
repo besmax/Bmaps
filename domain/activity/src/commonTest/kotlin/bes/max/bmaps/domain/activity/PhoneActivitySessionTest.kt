@@ -18,6 +18,26 @@ import kotlin.test.*
 @OptIn(ExperimentalCoroutinesApi::class)
 class PhoneActivitySessionTest {
     @Test
+    fun manualControlPointIsDurableDeduplicatedAndDoesNotChangeLifecycle() = runTest {
+        fixture { f ->
+            f.start()
+            f.fix(55.0)
+            advanceTimeBy(1000); runCurrent()
+            val command = f.command(ActivityAction.MARK_CONTROL_POINT)
+            val recorded = f.session.apply(command).success()
+            val marked = f.repository.eventLog.single { it.kind == ActivityEventKind.CONTROL_POINT }
+            assertNotNull(marked.relatedId)
+            assertEquals(ActivityStatus.RECORDING, recorded.status)
+            assertEquals(command.expectedControlRevision, recorded.controlRevision)
+            f.session.apply(command).success()
+            assertEquals(1, f.repository.eventLog.count { it.kind == ActivityEventKind.CONTROL_POINT })
+            f.session.apply(f.command(ActivityAction.PAUSE)).success()
+            assertIs<ActivityResult.Failure>(f.session.apply(f.command(ActivityAction.MARK_CONTROL_POINT)))
+            assertEquals(1, f.repository.eventLog.count { it.kind == ActivityEventKind.CONTROL_POINT })
+        }
+    }
+
+    @Test
     fun pauseStopsEveryPhoneChannelAndResumeBreaksPath() = runTest {
         fixture { f ->
             f.start()

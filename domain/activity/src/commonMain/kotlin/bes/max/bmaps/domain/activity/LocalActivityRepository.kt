@@ -128,7 +128,7 @@ class LocalActivityRepository(private val store: LocalActivityStore) : ActivityR
         val page = rows.take(query.limit)
         ActivityPositionPage(page.map { store.decode<TelemetrySample>(it.payload).also { sample ->
             if (ActivityValidation.sample(sample) != null || sample.measurement !is PositionMeasurement) activityFail(ActivityFailure.CorruptData)
-        } }, if (rows.size > query.limit) page.last().sequence else null)
+        } }, if (rows.size > query.limit) page.last().sequence else null, page.lastOrNull()?.sequence)
     }
 
     override suspend fun events(activityId: String, query: ActivityEventQuery): ActivityResult<ActivityEventPage> = store.operation {

@@ -86,6 +86,14 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
         else applyPendingLocation()
     }
 
+    fun followActivityLocation(coordinate: GeographicCoordinate) {
+        val layer = state.value.manifest?.layers?.firstOrNull() ?: return
+        val covered = WebMercator.splitBounds(layer.bounds).orEmpty().any { bounds ->
+            coordinate.latitude in bounds.south..bounds.north && coordinate.longitude in bounds.west..bounds.east
+        }
+        if (covered) centerLocation(coordinate)
+    }
+
     internal fun locationCameraResult(result: CameraMoveResult) {
         if (result.requestId < 0 && result.outcome == CameraMoveOutcome.REJECTED) {
             channel.trySend(Res.string.location_center_failed)

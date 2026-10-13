@@ -20,6 +20,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import bes.max.bmaps.core.sharing.rememberNativeDocuments
+import bes.max.bmaps.feature.viewer.activity.presentation.*
+import bes.max.bmaps.feature.viewer.activity.ui.*
+import org.jetbrains.compose.resources.getString
+import kotlinx.coroutines.flow.collectLatest
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bes.max.bmaps.domain.mapbuilder.PackageId
 import bes.max.bmaps.core.location.*
@@ -57,10 +66,57 @@ fun ViewerScreen(
     val annotationState by annotations.state.collectAsStateWithLifecycle()
     val camera by model.renderer.camera.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
+    val track = metroViewModel<TrackViewModel>()
+    val trackState by track.state.collectAsStateWithLifecycle()
+    val documents = rememberNativeDocuments(track::importGpx, track::nativeFailure)
+    val haptics = LocalHapticFeedback.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val trackActions = remember(track, annotations, documents, model) {
+        TrackActions(track::toggle, track::collapse, track::prepareFree, track::chooseRoutes,
+            track::selectRoute, track::loadMoreRoutes, documents::pick,
+            track::profile, track::reverse, track::segment, track::edge,
+            track::start, track::pauseResume, track::finish, track::confirmFinish, track::menu,
+            track::returnAlongRecording, track::followPlanned, track::correct, track::applyCorrection, track::toggleAlerts,
+            track::followPosition, track::inspect, {
+                track.selectionCoordinate()?.let { model.centerLocation(GeographicCoordinate(it.latitude, it.longitude)) }
+            }, track::markControlPoint, track::recover, track::details)
+    }
+    LaunchedEffect(track, haptics, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            track.events.collectLatest { event ->
+                when (event) {
+                    is TrackEvent.Message -> {
+                        if (event.haptic) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (!model.state.value.immersive) {
+                            snackbar.currentSnackbarData?.dismiss()
+                            snackbar.showSnackbar(getString(event.text))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    LaunchedEffect(trackState.following, trackState.positionId, trackState.position) {
+        if (trackState.following) trackState.position?.let {
+            model.followActivityLocation(GeographicCoordinate(it.latitude, it.longitude))
+        }
+    }
+    LaunchedEffect(track, state.annotationPyramid) { track.mapCoverage(state.annotationPyramid) }
+    LaunchedEffect(annotationState.activeObject) {
+        track.inspectAnnotation(annotationState.activeObject)
+    }
+    LaunchedEffect(annotationState.draft?.id, annotationState.panel) {
+        if (annotationState.draft != null || annotationState.panel) track.collapse()
+    }
+    val trackPaths = remember(trackState.planned, trackState.guidance, trackState.recorded, trackState.preview,
+        trackState.preparing, trackState.correcting, trackState.selectedSection, trackState.metrics?.returning, state.annotationPyramid) {
+        TrackMapLayer.paths(trackState, state.annotationPyramid)
+    }
+    val density = LocalDensity.current
+    var bottomHeight by remember { mutableStateOf(0.dp) }
     val location = metroViewModel<LocationViewModel>()
     val locationState by location.state.collectAsStateWithLifecycle()
     val locationAccess = LocationTracking(location, onStopped = model::cancelLocationMove)
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val locationLabel = stringResource(Res.string.my_location)
     val coordinate = locationState.fix?.let { GeographicCoordinate(it.latitude, it.longitude) }?.takeIf { fix ->
         state.manifest?.layers?.firstOrNull()?.bounds?.let { bounds ->
@@ -93,15 +149,37 @@ fun ViewerScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         ViewerMapContent(model, state, annotations, annotationState, camera, calloutAnimated, autoDismiss,
-            locationOverlays, location::cancelCenter)
+            locationOverlays, { location.cancelCenter(); track.inspect() },
+            activityPaths = trackPaths,
+            onFollow = if (trackState.metrics == null && annotationState.draft == null) { id ->
+                annotationState.source.firstOrNull { it.id == id }?.let { annotation ->
+                    track.followAnnotation(annotation)
+                    annotations.dismissSelection()
+                }
+            } else null,
+            showCallout = !trackState.expanded,
+            followLength = trackState.selectedAnnotationLength.takeIf { trackState.selectedAnnotationId == annotationState.activeObjectId },
+        )
         if (!state.immersive) {
             if (positionState.coordinate != null && state.error == null) {
                 MapCrosshair(Modifier.align(Alignment.Center))
             }
             ViewerBottomContent(
                 state, annotations, annotationState, positionState,
-                Modifier.align(Alignment.BottomCenter),
+                Modifier.align(Alignment.BottomCenter).onSizeChanged { bottomHeight = with(density) { it.height.toDp() } },
                 singleLine = maxWidth > maxHeight,
+                showPosition = !trackState.expanded,
+            )
+            if (annotationState.draft == null || trackState.metrics != null) TrackControls(
+                trackState, trackActions,
+                Modifier.align(if (maxWidth > maxHeight && trackState.expanded) Alignment.CenterStart else Alignment.BottomStart)
+                    .safeDrawingPadding().padding(start = 16.dp, end = 80.dp,
+                        bottom = if (trackState.expanded) 16.dp else bottomHeight + 8.dp)
+                    .widthIn(max = (maxWidth - 112.dp).coerceAtLeast(120.dp))
+                    .heightIn(max = (maxHeight * 0.6f).coerceAtLeast(48.dp)),
+                outsideCoverage = trackState.position?.let {
+                    state.annotationPyramid?.positionOf(GeographicCoordinate(it.latitude, it.longitude)) == null
+                } == true,
             )
             ViewerMapControls(model, state, annotations, onBack,
                 landscape = maxWidth > maxHeight,
@@ -112,10 +190,10 @@ fun ViewerScreen(
                     when (locationState.status) {
                         LocationStatus.PERMISSION_DENIED, LocationStatus.PRECISE_PERMISSION_REQUIRED -> locationAccess.requestPermission(openSettingsIfDenied = true)
                         LocationStatus.DISABLED -> locationAccess.openSettings()
-                        else -> location.center()
+                        else -> { track.followPosition(); location.center() }
                     }
                 },
-                onInteraction = { location.cancelCenter(); model.cancelLocationMove() },
+                onInteraction = { track.inspect(); location.cancelCenter(); model.cancelLocationMove() },
             )
             state.error?.let { error ->
                 ViewerError(
@@ -130,5 +208,6 @@ fun ViewerScreen(
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
         }
     }
+    if (!state.immersive) TrackDialogs(trackState, trackActions)
     if (!state.immersive) ViewerDialogs(model, state, annotations, annotationState, reliefProgress, relief::cancel)
 }

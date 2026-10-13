@@ -37,6 +37,7 @@ internal fun ViewerBottomContent(
     positionState: MapPositionState,
     modifier: Modifier = Modifier,
     singleLine: Boolean = false,
+    showPosition: Boolean = true,
 ) {
     Column(
         modifier.fillMaxWidth().safeDrawingPadding().padding(
@@ -47,7 +48,7 @@ internal fun ViewerBottomContent(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         AnnotationEditorContent(annotations, annotationState, Modifier)
-        if (state.error == null) MapPositionOverlay(positionState, singleLine = singleLine)
+        if (showPosition && state.error == null) MapPositionOverlay(positionState, singleLine = singleLine)
     }
 }
 

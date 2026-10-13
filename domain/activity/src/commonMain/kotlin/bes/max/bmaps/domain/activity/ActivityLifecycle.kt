@@ -9,7 +9,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.domain.activity
 
 @kotlinx.serialization.Serializable
-enum class ActivityAction { PAUSE, RESUME, FINISH, INTERRUPT, COMPLETE }
+enum class ActivityAction { PAUSE, RESUME, FINISH, INTERRUPT, COMPLETE, MARK_CONTROL_POINT }
 
 object ActivityLifecycle {
     fun next(status: ActivityStatus, action: ActivityAction): ActivityStatus? = when (action) {
@@ -30,6 +30,7 @@ object ActivityLifecycle {
             ActivityStatus.RECORDING, ActivityStatus.PAUSED, ActivityStatus.INTERRUPTED -> ActivityStatus.INTERRUPTED
             else -> null
         }
+        ActivityAction.MARK_CONTROL_POINT -> status.takeIf { it == ActivityStatus.RECORDING }
         ActivityAction.COMPLETE -> when (status) {
             ActivityStatus.FINALIZING, ActivityStatus.COMPLETED -> ActivityStatus.COMPLETED
             else -> null
