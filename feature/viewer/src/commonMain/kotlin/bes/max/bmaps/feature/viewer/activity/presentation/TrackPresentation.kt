@@ -51,6 +51,7 @@ internal data class TrackState(
     val error: StringResource? = null,
 )
 internal sealed interface TrackEvent {
+    data class Completed(val activityId: String) : TrackEvent
     data class Message(val text: StringResource, val haptic: Boolean = false) : TrackEvent
 }
 

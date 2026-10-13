@@ -25,7 +25,7 @@ import org.jetbrains.compose.resources.getString
 
 @Composable
 internal fun ViewerScreenEffects(
-    packageId: PackageId,
+    packageId: PackageId?,
     model: ViewerViewModel,
     position: MapPositionViewModel,
     annotations: AnnotationEditorViewModel,
@@ -51,10 +51,10 @@ internal fun ViewerScreenEffects(
         }
     }
 
-    LaunchedEffect(packageId, position, model) { position.open(packageId, model.renderer.camera) }
+    LaunchedEffect(packageId, position, model) { packageId?.let { position.open(it, model.renderer.camera) } }
     LaunchedEffect(packageId, model, annotations) {
-        annotations.open(packageId)
-        model.open(packageId)
+        if (packageId != null) { annotations.open(packageId); model.open(packageId) }
+        else model.openActivityMap()
     }
     LaunchedEffect(model, annotations) {
         model.annotationEvents.collect { (pyramid, event) ->

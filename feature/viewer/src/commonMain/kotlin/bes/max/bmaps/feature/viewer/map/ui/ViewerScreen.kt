@@ -19,6 +19,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
+import bes.max.bmaps.core.mapengine.MapMarker
+import bes.max.bmaps.feature.viewer.history.presentation.ReviewViewModel
+import bes.max.bmaps.feature.viewer.history.presentation.HistoryEvent
+import bes.max.bmaps.feature.viewer.history.ui.ReviewPanel
+import bes.max.bmaps.feature.viewer.history.ui.ReviewDialogs
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -45,16 +52,20 @@ import dev.zacsweers.metrox.viewmodel.metroViewModel
 
 @Composable
 fun ViewerScreen(
-    packageId: PackageId,
+    packageId: PackageId?,
     onBack: () -> Unit,
     calloutAnimated: Boolean = true,
     autoDismiss: Boolean = true,
+    activityId: String? = null,
+    initialRouteId: String? = null,
+    onHistory: () -> Unit = {},
+    onReview: (String) -> Unit = {},
 ) {
     val model = metroViewModel<ViewerViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
     val relief = metroViewModel<ElevationProgressViewModel>()
     val reliefProgress by relief.state.collectAsStateWithLifecycle()
-    LaunchedEffect(packageId) { relief.open(packageId) }
+    LaunchedEffect(packageId) { packageId?.let(relief::open) }
     LaunchedEffect(reliefProgress.job?.token, reliefProgress.job?.state, state.manifest) {
         val job = reliefProgress.job
         if (job?.state == bes.max.bmaps.domain.mapbuilder.ElevationGenerationState.COMPLETED &&
@@ -68,10 +79,15 @@ fun ViewerScreen(
     val snackbar = remember { SnackbarHostState() }
     val track = metroViewModel<TrackViewModel>()
     val trackState by track.state.collectAsStateWithLifecycle()
+    val review = metroViewModel<ReviewViewModel>()
+    val reviewState by review.state.collectAsStateWithLifecycle()
+    val reviewDocuments = rememberNativeDocuments({ it.dispose() }, review::nativeFailure)
+    LaunchedEffect(activityId) { activityId?.let(review::open) }
+    LaunchedEffect(initialRouteId) { initialRouteId?.let(track::selectRoute) }
     val documents = rememberNativeDocuments(track::importGpx, track::nativeFailure)
     val haptics = LocalHapticFeedback.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val trackActions = remember(track, annotations, documents, model) {
+    val trackActions = remember(track, annotations, documents, model, onHistory) {
         TrackActions(track::toggle, track::collapse, track::prepareFree, track::chooseRoutes,
             track::selectRoute, track::loadMoreRoutes, documents::pick,
             track::profile, track::reverse, track::segment, track::edge,
@@ -79,12 +95,13 @@ fun ViewerScreen(
             track::returnAlongRecording, track::followPlanned, track::correct, track::applyCorrection, track::toggleAlerts,
             track::followPosition, track::inspect, {
                 track.selectionCoordinate()?.let { model.centerLocation(GeographicCoordinate(it.latitude, it.longitude)) }
-            }, track::markControlPoint, track::recover, track::details)
+            }, track::markControlPoint, track::recover, onHistory, track::details)
     }
-    LaunchedEffect(track, haptics, lifecycle) {
+    LaunchedEffect(track, haptics, lifecycle, onReview) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             track.events.collectLatest { event ->
                 when (event) {
+                    is TrackEvent.Completed -> onReview(event.activityId)
                     is TrackEvent.Message -> {
                         if (event.haptic) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (!model.state.value.immersive) {
@@ -97,7 +114,7 @@ fun ViewerScreen(
         }
     }
     LaunchedEffect(trackState.following, trackState.positionId, trackState.position) {
-        if (trackState.following) trackState.position?.let {
+        if (activityId == null && trackState.following) trackState.position?.let {
             model.followActivityLocation(GeographicCoordinate(it.latitude, it.longitude))
         }
     }
@@ -112,6 +129,40 @@ fun ViewerScreen(
         trackState.preparing, trackState.correcting, trackState.selectedSection, trackState.metrics?.returning, state.annotationPyramid) {
         TrackMapLayer.paths(trackState, state.annotationPyramid)
     }
+    LaunchedEffect(review, lifecycle, reviewDocuments) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            review.events.collect { event -> when (event) {
+                is HistoryEvent.Share -> reviewDocuments.share(event.document)
+                is HistoryEvent.Message -> snackbar.showSnackbar(getString(event.message))
+            } }
+        }
+    }
+    LaunchedEffect(trackState.preview, trackState.preparing, trackState.recorded, camera?.session, activityId) {
+        if (activityId == null) model.focusActivityPreview(if (trackState.preparing) trackState.preview else trackState.recorded)
+    }
+    LaunchedEffect(reviewState.loading, reviewState.fitPending, camera?.session) {
+        if (activityId != null && !reviewState.loading && reviewState.fitPending && camera != null) {
+            val points = reviewState.positions.map { GeographicCoordinate(it.coordinate.latitude, it.coordinate.longitude) } +
+                reviewState.planned.flatMap { line -> line.points.map { GeographicCoordinate(it.latitude, it.longitude) } }
+            model.fitCoordinates(points)
+            review.fitted()
+        }
+    }
+    LaunchedEffect(reviewState.selectedPosition) {
+        reviewState.selectedPosition?.let { model.centerLocation(GeographicCoordinate(it.latitude, it.longitude)) }
+    }
+    val reviewPaths = remember(reviewState.planned, reviewState.recorded, state.annotationPyramid) {
+        TrackMapLayer.paths(TrackState(planned = reviewState.planned, recorded = reviewState.recorded), state.annotationPyramid)
+            .map { it.copy(clickable = it.id.startsWith("track:recorded:")) }
+    }
+    val selectionLabel = stringResource(Res.string.history_selected_position)
+    val reviewMarkers = remember(reviewState.selectedPosition, state.annotationPyramid, selectionLabel) {
+        reviewState.selectedPosition?.let { coordinate ->
+            state.annotationPyramid?.positionOf(GeographicCoordinate(coordinate.latitude, coordinate.longitude))?.let { point ->
+                listOf(MapMarker("history:selected", point, "place", Color(0xFFFFB300), selectionLabel, zIndex = 10f))
+            }
+        }.orEmpty()
+    }
     val density = LocalDensity.current
     var bottomHeight by remember { mutableStateOf(0.dp) }
     val location = metroViewModel<LocationViewModel>()
@@ -119,7 +170,7 @@ fun ViewerScreen(
     val locationAccess = LocationTracking(location, onStopped = model::cancelLocationMove)
     val locationLabel = stringResource(Res.string.my_location)
     val coordinate = locationState.fix?.let { GeographicCoordinate(it.latitude, it.longitude) }?.takeIf { fix ->
-        state.manifest?.layers?.firstOrNull()?.bounds?.let { bounds ->
+        state.vectorOnly || state.manifest?.layers?.firstOrNull()?.bounds?.let { bounds ->
             WebMercator.splitBounds(bounds).orEmpty().any {
                 fix.latitude in it.south..it.north && fix.longitude in it.west..it.east
             }
@@ -147,20 +198,25 @@ fun ViewerScreen(
         if (state.immersive) snackbar.currentSnackbarData?.dismiss()
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceVariant)) {
         ViewerMapContent(model, state, annotations, annotationState, camera, calloutAnimated, autoDismiss,
             locationOverlays, { location.cancelCenter(); track.inspect() },
-            activityPaths = trackPaths,
-            onFollow = if (trackState.metrics == null && annotationState.draft == null) { id ->
+            activityPaths = if (activityId == null) trackPaths else reviewPaths,
+            activityMarkers = if (activityId == null) emptyList() else reviewMarkers,
+            onActivityClick = { id, point -> review.selectMap(id, point, state.annotationPyramid) },
+            onFollow = if (activityId == null && trackState.metrics == null && annotationState.draft == null) { id ->
                 annotationState.source.firstOrNull { it.id == id }?.let { annotation ->
                     track.followAnnotation(annotation)
                     annotations.dismissSelection()
                 }
             } else null,
-            showCallout = !trackState.expanded,
+            showCallout = activityId == null && !trackState.expanded,
             followLength = trackState.selectedAnnotationLength.takeIf { trackState.selectedAnnotationId == annotationState.activeObjectId },
         )
         if (!state.immersive) {
+            if (state.vectorOnly) Text(stringResource(Res.string.history_neutral_map),
+                Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(start = 80.dp, end = 80.dp, top = 16.dp),
+                style = MaterialTheme.typography.bodySmall, maxLines = 2)
             if (positionState.coordinate != null && state.error == null) {
                 MapCrosshair(Modifier.align(Alignment.Center))
             }
@@ -168,9 +224,14 @@ fun ViewerScreen(
                 state, annotations, annotationState, positionState,
                 Modifier.align(Alignment.BottomCenter).onSizeChanged { bottomHeight = with(density) { it.height.toDp() } },
                 singleLine = maxWidth > maxHeight,
-                showPosition = !trackState.expanded,
+                showPosition = activityId == null && !trackState.expanded,
             )
-            if (annotationState.draft == null || trackState.metrics != null) TrackControls(
+            if (activityId != null) ReviewPanel(reviewState, review::panel, review::series, review::selectTime,
+                review::eventList, review::exportOptions, review::retry,
+                Modifier.align(if (maxWidth > maxHeight && reviewState.panelExpanded) Alignment.CenterStart else Alignment.BottomStart)
+                    .safeDrawingPadding().padding(start = 16.dp, end = 80.dp, bottom = 16.dp)
+                    .heightIn(max = maxHeight * 0.6f))
+            if (activityId == null && (annotationState.draft == null || trackState.metrics != null)) TrackControls(
                 trackState, trackActions,
                 Modifier.align(if (maxWidth > maxHeight && trackState.expanded) Alignment.CenterStart else Alignment.BottomStart)
                     .safeDrawingPadding().padding(start = 16.dp, end = 80.dp,
@@ -200,7 +261,7 @@ fun ViewerScreen(
                     error = error,
                     onRetry = {
                         model.retry()
-                        position.open(packageId, model.renderer.camera, retry = true)
+                        packageId?.let { position.open(it, model.renderer.camera, retry = true) }
                     },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
@@ -208,6 +269,7 @@ fun ViewerScreen(
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
         }
     }
-    if (!state.immersive) TrackDialogs(trackState, trackActions)
+    if (!state.immersive && activityId == null) TrackDialogs(trackState, trackActions)
+    if (!state.immersive && activityId != null) ReviewDialogs(reviewState, review::selectTime, review::eventList, review::export, { review.exportOptions(false) })
     if (!state.immersive) ViewerDialogs(model, state, annotations, annotationState, reliefProgress, relief::cancel)
 }

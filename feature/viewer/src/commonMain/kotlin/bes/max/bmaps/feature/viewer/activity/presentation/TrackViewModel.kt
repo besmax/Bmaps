@@ -479,7 +479,7 @@ class TrackViewModel(
             is ActivityResult.Failure -> error(result.reason)
             is ActivityResult.Success -> {
                 mutableState.update { it.copy(finishConfirmation = false, error = null) }
-                if (action == ActivityAction.FINISH) channel.trySend(TrackEvent.Message(Res.string.track_completed))
+                if (action == ActivityAction.FINISH) channel.trySend(TrackEvent.Completed(record.id))
                 if (action == ActivityAction.MARK_CONTROL_POINT) channel.trySend(
                     TrackEvent.Message(
                         Res.string.track_point_saved

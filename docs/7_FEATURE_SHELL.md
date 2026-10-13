@@ -70,3 +70,7 @@ Static syntax, resources, and notice checks do not establish compilation or runt
 ```
 
 Native acceptance: change all settings independently; verify live theme, coordinate display, and clustering after Back and relaunch. Rotate while writing, test portrait/landscape and narrow split windows, scroll both landscape columns, check large text/touch targets and system Back, and compare the About version code against the installed APK/IPA metadata. Confirm read/write failure recovery and that all licensing content remains visible offline.
+
+## Track T5 root composition — 2026-10-13
+
+The library action menu exposes Activities through a callback, with no viewer import in the library. The umbrella wires the viewer-owned `activities` history screen, `track-map` live vector viewer, `track-map/{routeId}` preparation, `activity/{activityId}` package-free review and `viewer/{packageId}/activity/{activityId}` package-context review. These destinations retain the existing fullscreen viewer/shell policy. Opening history or a track map does not start recording. Successful foreground finish opens review; Back releases entry-owned presentation while the application session retains recording ownership. Settings and constructor destinations are unchanged. See `22_TRACK_MODE_AND_TELEMETRY.md`; builds, navigation and native acceptance remain unrun.

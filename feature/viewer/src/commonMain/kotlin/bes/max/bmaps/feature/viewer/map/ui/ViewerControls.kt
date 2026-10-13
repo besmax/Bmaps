@@ -72,7 +72,7 @@ internal fun BoxScope.ViewerMapControls(
     )
 
     val layers: @Composable () -> Unit = {
-        MapIconButton(
+        if (!state.vectorOnly) MapIconButton(
             onClick = { onInteraction(); model.showLayers() },
             iconResId = MapIcons.layers,
             contentDescription = stringResource(Res.string.layers_title),
@@ -100,7 +100,7 @@ internal fun BoxScope.ViewerMapControls(
                 iconResId = if (locationUnavailable) MapIcons.myLocationOff else MapIcons.myLocation,
                 iconTint = if (locationUnavailable) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 contentDescription = locationDescription ?: stringResource(Res.string.my_location),
-                enabled = state.manifest != null && state.error == null,
+                enabled = (state.vectorOnly || state.manifest != null) && state.error == null,
             )
             if (state.manifest?.layers.orEmpty().any { it.attribution.isNotEmpty() }) {
                 MapIconButton(

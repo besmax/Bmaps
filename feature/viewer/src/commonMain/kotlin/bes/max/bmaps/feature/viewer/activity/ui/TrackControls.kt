@@ -32,7 +32,7 @@ internal class TrackActions(
     val menu: (Boolean) -> Unit, val returnRecording: () -> Unit, val followPlanned: () -> Unit,
     val correct: () -> Unit, val applyCorrection: () -> Unit, val toggleAlerts: () -> Unit,
     val followPosition: () -> Unit, val inspect: () -> Unit, val showSelection: () -> Unit,
-    val mark: () -> Unit, val recover: () -> Unit, val details: (Boolean) -> Unit,
+    val mark: () -> Unit, val recover: () -> Unit, val history: () -> Unit, val details: (Boolean) -> Unit,
 )
 
 @Composable
@@ -58,7 +58,7 @@ internal fun TrackControls(state: TrackState, actions: TrackActions, modifier: M
                     state.choosing -> TrackRouteList(state.routes, state.moreRoutes, state.busy, actions.selectRoute, actions.moreRoutes, actions.importGpx)
                     state.preparing || state.correcting -> TrackPreparation(state, actions)
                     state.metrics != null -> TrackActive(state.metrics, state, actions)
-                    else -> TrackStartMenu(state.busy, actions.record, actions.routes)
+                    else -> TrackStartMenu(state.busy, actions.record, actions.routes, actions.history)
                 }
                 if (outsideCoverage) Text(stringResource(Res.string.track_outside_coverage), style = MaterialTheme.typography.bodySmall)
                 if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -70,9 +70,10 @@ internal fun TrackControls(state: TrackState, actions: TrackActions, modifier: M
 }
 
 @Composable
-private fun TrackStartMenu(busy: Boolean, onRecord: () -> Unit, onRoutes: () -> Unit) {
+private fun TrackStartMenu(busy: Boolean, onRecord: () -> Unit, onRoutes: () -> Unit, onHistory: () -> Unit) {
     TextButton(onRecord, enabled = !busy) { Text(stringResource(Res.string.track_record)) }
     TextButton(onRoutes, enabled = !busy) { Text(stringResource(Res.string.track_follow_route)) }
+    TextButton(onHistory, enabled = !busy) { Text(stringResource(Res.string.history_title)) }
 }
 
 @Composable
@@ -200,6 +201,7 @@ private fun TrackOverflow(expanded: Boolean, metrics: TrackMetrics, actions: Tra
     DropdownMenu(expanded, { actions.menu(false) }) {
         TrackMenuItem(Res.string.track_finish, enabled = !metrics.failed) { actions.menu(false); actions.confirmFinish(true) }
         if (metrics.recording) TrackMenuItem(Res.string.track_mark_point) { actions.menu(false); actions.mark() }
+        TrackMenuItem(Res.string.history_title) { actions.menu(false); actions.history() }
         TrackMenuItem(Res.string.track_metrics) { actions.menu(false); actions.details(true) }
         if (metrics.hasNavigation && !metrics.failed && !metrics.finalizing) {
             TrackMenuItem(Res.string.track_correct_section) { actions.menu(false); actions.correct() }

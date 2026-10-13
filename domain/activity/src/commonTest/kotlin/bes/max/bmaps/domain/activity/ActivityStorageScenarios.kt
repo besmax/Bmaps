@@ -17,6 +17,8 @@ import bes.max.bmaps.core.storage.ActivityStorageLocation
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.io.*
+import kotlinx.serialization.json.*
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
 import kotlinx.io.files.SystemTemporaryDirectory
@@ -154,8 +156,31 @@ class ActivityStorageScenarios(private val database: (String) -> PackageDatabase
         assertEquals(5, ids.size)
         assertEquals(ids.size, ids.distinct().size)
         assertTrue("hr-paused" !in ids)
+        val exporter = ActivityExporter(f.activities, f.routes)
+        val pathExport = Buffer()
+        exporter.recordedPath(current.id, pathExport)
+        val decoded = ActivityRouteGpx.decode(pathExport.readByteArray().decodeToString()).single()
+        assertEquals(listOf(2, 2), decoded.segments.map { it.vertices.size })
+        assertEquals(1100L, decoded.segments.first().vertices.first().sourceTimeEpochMillis)
+        val telemetryExport = Buffer()
+        exporter.telemetry(current.id, telemetryExport)
+        val json = Json.parseToJsonElement(telemetryExport.readByteArray().decodeToString()).jsonObject
+        assertEquals(1, json.getValue("version").jsonPrimitive.int)
+        val exported = json.getValue("samples").jsonArray
+        assertEquals(5, exported.size)
+        val heart = exported.first { it.jsonObject.getValue("id").jsonPrimitive.content == "hr-before-pause" }.jsonObject
+        assertEquals(1300L, heart.getValue("acquiredAt").jsonObject.getValue("epochMillis").jsonPrimitive.long)
+        assertEquals(5200L, heart.getValue("receivedAt").jsonObject.getValue("epochMillis").jsonPrimitive.long)
+        current = f.activities.commit(ActivityCommit(current.revision, current.copy(revision = current.revision + 1, name = "Renamed activity"))).success()
+        val renamed = f.routes.save(derived.copy(revision = 1, name = "Renamed route"), 0).success()
+        f.reopen()
+        assertEquals("Renamed activity", f.activities.history(ActivityHistoryQuery(nameContains = "Renamed")).success().items.single().name)
+        assertEquals(renamed, f.routes.get(derived.id).success())
+        f.routes.delete(derived.id).success()
+        val replacement = assertNotNull(f.routes.derive(current.id, "replacement").success())
+        assertEquals(replacement, f.routes.derive(current.id, "duplicate-replacement").success())
         f.activities.delete(current.id).success()
-        assertEquals(derived, f.routes.get(derived.id).success())
+        assertEquals(replacement, f.routes.get(replacement.id).success())
         assertEquals(ActivityFailure.NotFound, assertIs<ActivityResult.Failure>(f.activities.create(record(current.id), started())).reason)
     }
 

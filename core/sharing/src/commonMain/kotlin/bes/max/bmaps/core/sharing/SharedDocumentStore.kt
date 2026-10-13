@@ -31,7 +31,7 @@ class SharedDocumentStore(private val location: SharingLocation) {
 
     suspend fun create(extension: String, mimeType: String, write: suspend (RawSink) -> Unit): SharedDocument = withContext(Dispatchers.IO) {
         mutex.withLock {
-            require(extension in setOf("bmaps", "geojson"))
+            require(extension in setOf("bmaps", "geojson", "gpx", "json"))
             val fs = SystemFileSystem
             val root = Path(location.path)
             fs.createDirectories(root)

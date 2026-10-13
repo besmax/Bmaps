@@ -56,6 +56,8 @@ internal fun ViewerMapContent(
     location: CurrentLocationOverlays = CurrentLocationOverlays(),
     onLocationGesture: () -> Unit = {},
     activityPaths: List<MapPath> = emptyList(),
+    activityMarkers: List<MapMarker> = emptyList(),
+    onActivityClick: ((String, MapPoint) -> Unit)? = null,
     onFollow: ((String) -> Unit)? = null,
     showCallout: Boolean = true,
     followLength: String? = null,
@@ -80,6 +82,7 @@ internal fun ViewerMapContent(
     }?.overlays ?: fallback
     val handleOverlayClick: (String, MapPoint) -> Unit = { id, point ->
         if (!state.immersive) {
+            if (id.startsWith("track:recorded:")) onActivityClick?.invoke(id, point)
             overlays.targets[id]?.let { annotations.clickOverlay(it, point, model.renderer.controller) }
         }
     }
@@ -89,7 +92,7 @@ internal fun ViewerMapContent(
         overlays.markers.filterNot {
             overlays.targets[it.id] is AnnotationHit.Vertex &&
                 (state.immersive || annotationState.draft?.kind == AnnotationKind.MARKER)
-        } + location.markers,
+        } + location.markers + activityMarkers,
         overlays.paths + location.paths + activityPaths,
         handleOverlayClick,
         onGestureStart = {

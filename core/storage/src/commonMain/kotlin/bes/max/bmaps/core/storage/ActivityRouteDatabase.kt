@@ -39,7 +39,8 @@ class ActivityRouteDatabase internal constructor(private val sql: SpatialSql) {
 
     suspend fun derive(activityId: String, value: StoredActivityRoute): String = sql.transaction {
         val existing = derived(activityId)
-        if (existing != null) return@transaction existing
+        if (existing != null && get(existing) != null) return@transaction existing
+        if (existing != null) sql.execute("DELETE FROM route_derivations WHERE activity_id=?", activityId)
         put(value, null)
         sql.execute("INSERT INTO route_derivations(activity_id, route_id) VALUES(?, ?)", activityId, value.id)
         value.id

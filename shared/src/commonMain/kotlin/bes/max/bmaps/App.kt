@@ -29,6 +29,7 @@ import bes.max.bmaps.feature.shell.navigation.ui.AppShell
 import bes.max.bmaps.feature.shell.settings.ui.SettingsScreen
 import bes.max.bmaps.feature.shell.navigation.ui.ShellDestination
 import bes.max.bmaps.feature.viewer.map.ui.ViewerScreen
+import bes.max.bmaps.feature.viewer.history.ui.HistoryScreen
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 
 @Composable
@@ -43,8 +44,8 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
             entry?.destination?.route
         }
         AppShell(
-            destination = ShellDestination.entries.firstOrNull { it.route == route || (it == ShellDestination.VIEWER && route == ViewerRoute) } ?: ShellDestination.LIBRARY,
-            fullScreen = route == MapRoute || route == MapSettingsRoute || route == ViewerRoute || route == SettingsRoute,
+            destination = ShellDestination.entries.firstOrNull { it.route == route || (it == ShellDestination.VIEWER && route in ViewerRoutes) } ?: ShellDestination.LIBRARY,
+            fullScreen = route == MapRoute || route == MapSettingsRoute || route in ViewerRoutes || route == HistoryRoute || route == SettingsRoute,
             onBack = { navigation.popBackStack() },
             onNavigate = navigation::openDestination,
             onPreferences = { navigation.navigate(SettingsRoute) { launchSingleTop = true } },
@@ -53,7 +54,8 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
                 composable(ShellDestination.LIBRARY.route) {
                     LibraryScreen(onBuildMap = { navigate(ShellDestination.CONSTRUCTOR) },
                         onCredentials = { navigation.navigate("provider-credentials/$it") },
-                        onOpenMap = { navigation.navigate("viewer/${it.value}") { launchSingleTop = true } })
+                        onOpenMap = { navigation.navigate("viewer/${it.value}") { launchSingleTop = true } },
+                        onActivities = { navigation.navigate(HistoryRoute) { launchSingleTop = true } })
                 }
                 composable(ShellDestination.CONSTRUCTOR.route) {
                     ConstructorScreen(onOpenLibrary = { navigate(ShellDestination.LIBRARY) },
@@ -80,7 +82,37 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
                 }
                 composable(ViewerRoute) { viewerEntry ->
                     val id = viewerEntry.arguments?.read { getString("packageId") }.orEmpty()
-                    ViewerScreen(PackageId(id), onBack = { navigation.popBackStack() })
+                    ViewerScreen(PackageId(id), onBack = { navigation.popBackStack() },
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
+                        onReview = { activity -> navigation.navigate("viewer/$id/activity/$activity") })
+                }
+                composable(HistoryRoute) {
+                    HistoryScreen(onBack = { navigation.popBackStack() },
+                        onReview = { navigation.navigate("activity/$it") },
+                        onRecord = { navigation.navigate(TrackMapRoute) { launchSingleTop = true } },
+                        onFollow = { navigation.navigate("track-map/$it") })
+                }
+                composable(TrackMapRoute) {
+                    ViewerScreen(null, onBack = { navigation.popBackStack() },
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
+                        onReview = { navigation.navigate("activity/$it") })
+                }
+                composable(SavedRouteRoute) { routeEntry ->
+                    val id = routeEntry.arguments?.read { getString("routeId") }.orEmpty()
+                    ViewerScreen(null, onBack = { navigation.popBackStack() }, initialRouteId = id,
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
+                        onReview = { navigation.navigate("activity/$it") })
+                }
+                composable(ActivityReviewRoute) { reviewEntry ->
+                    val id = reviewEntry.arguments?.read { getString("activityId") }.orEmpty()
+                    ViewerScreen(null, onBack = { navigation.popBackStack() }, activityId = id,
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } })
+                }
+                composable(PackageActivityReviewRoute) { reviewEntry ->
+                    val id = reviewEntry.arguments?.read { getString("activityId") }.orEmpty()
+                    val map = reviewEntry.arguments?.read { getString("packageId") }.orEmpty()
+                    ViewerScreen(PackageId(map), onBack = { navigation.popBackStack() }, activityId = id,
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } })
                 }
                 dialog("provider-credentials/{identifier}") { entry ->
                     val identifier = entry.arguments?.read { getString("identifier") }
@@ -107,3 +139,10 @@ private const val MapRoute = "map/{provider}/{style}"
 private const val MapSettingsRoute = "map-settings"
 
 private const val ViewerRoute = "viewer/{packageId}"
+
+private const val HistoryRoute = "activities"
+private const val TrackMapRoute = "track-map"
+private const val SavedRouteRoute = "track-map/{routeId}"
+private const val ActivityReviewRoute = "activity/{activityId}"
+private const val PackageActivityReviewRoute = "viewer/{packageId}/activity/{activityId}"
+private val ViewerRoutes = setOf(ViewerRoute, TrackMapRoute, SavedRouteRoute, ActivityReviewRoute, PackageActivityReviewRoute)

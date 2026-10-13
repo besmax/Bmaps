@@ -67,7 +67,7 @@ class LocalActivityRouteRepository(private val store: LocalActivityStore) : Acti
         val activity = with(store) { read(activities.get(activityId) ?: activityFail(ActivityFailure.NotFound)) }
         if (activity.status != ActivityStatus.FINALIZING && activity.status != ActivityStatus.COMPLETED) activityFail(ActivityFailure.ActivityBusy)
         val existing = routes.derived(activityId)
-        if (existing != null) return@operation readRoute(existing).owned()
+        if (existing != null && routes.get(existing) != null) return@operation readRoute(existing).owned()
         val segments = mutableListOf<RouteSegment>()
         var currentId: String? = null
         var vertices = mutableListOf<RouteVertex>()
