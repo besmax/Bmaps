@@ -32,7 +32,9 @@ internal fun ViewerScreenEffects(
     pyramid: TilePyramid?,
     camera: MapCameraSnapshot?,
     snackbar: SnackbarHostState,
+    onMapTap: (bes.max.bmaps.core.mapengine.MapPoint) -> Boolean = { false },
 ) {
+    val mapTap by rememberUpdatedState(onMapTap)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val density = LocalDensity.current.density
     LaunchedEffect(annotations, pyramid, camera, density) {
@@ -58,6 +60,7 @@ internal fun ViewerScreenEffects(
     }
     LaunchedEffect(model, annotations) {
         model.annotationEvents.collect { (pyramid, event) ->
+            if (event is MapEvent.Tap && mapTap(event.position)) return@collect
             if (event !is MapEvent.Tap || !model.state.value.immersive) {
                 annotations.mapEvent(pyramid, event)
             }

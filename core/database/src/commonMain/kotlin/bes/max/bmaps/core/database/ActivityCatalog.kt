@@ -47,6 +47,18 @@ abstract class ActivityCatalogDao {
     @Upsert abstract suspend fun putActivities(rows: List<ActivityCatalogRecord>)
     @Upsert abstract suspend fun putRoutes(rows: List<ActivityRouteCatalogRecord>)
 
+    @Query("DELETE FROM activity_route_catalog WHERE substr(generation,1,8) = 'package:' AND generation = :generation")
+    abstract suspend fun deletePackageRoutes(generation: String)
+
+    @Transaction
+    open suspend fun replacePackageRoutes(generation: String, rows: List<ActivityRouteCatalogRecord>) {
+        deletePackageRoutes(generation)
+        putRoutes(rows)
+    }
+
+    @Query("SELECT count(*) FROM activity_catalog WHERE status != 'COMPLETED' AND substr(routeId,1,length(:prefix)) = :prefix")
+    abstract suspend fun activeForPackage(prefix: String): Long
+
     @Query("DELETE FROM activity_catalog WHERE id=:id")
     abstract suspend fun deleteActivity(id: String)
 
@@ -56,7 +68,7 @@ abstract class ActivityCatalogDao {
     @Query("DELETE FROM activity_catalog WHERE generation != :generation")
     protected abstract suspend fun pruneActivities(generation: String)
 
-    @Query("DELETE FROM activity_route_catalog WHERE generation != :generation")
+    @Query("DELETE FROM activity_route_catalog WHERE generation != :generation AND substr(generation,1,8) != 'package:'")
     protected abstract suspend fun pruneRoutes(generation: String)
 
     @Transaction
@@ -77,8 +89,8 @@ abstract class ActivityCatalogDao {
         firstPage: Boolean, started: Long, id: String, count: Int,
     ): List<ActivityCatalogRecord>
 
-    @Query("SELECT * FROM activity_route_catalog WHERE id > :after AND instr(lower(name), lower(:name)) > 0 ORDER BY id LIMIT :count")
-    abstract suspend fun routes(after: String, name: String, count: Int): List<ActivityRouteCatalogRecord>
+    @Query("SELECT * FROM activity_route_catalog WHERE id > :after AND instr(lower(name), lower(:name)) > 0 AND (:prefix = '' OR substr(id,1,length(:prefix)) = :prefix) ORDER BY id LIMIT :count")
+    abstract suspend fun routes(after: String, name: String, count: Int, prefix: String = ""): List<ActivityRouteCatalogRecord>
 }
 
 @Inject

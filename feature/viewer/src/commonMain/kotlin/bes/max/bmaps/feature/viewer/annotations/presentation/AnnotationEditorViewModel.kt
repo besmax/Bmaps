@@ -53,6 +53,9 @@ internal data class AnnotationEditorState(
     val geoJsonExport: Boolean = false,
 ) {
     val source: List<Annotation> get() = if (catalogReady) catalog else items
+    val objectItems = items.filter { it.kind != AnnotationKind.LINE }.map {
+        MapAnnotationItem(it.id, it.name, it.kind)
+    }.toImmutableList()
     val routeItems = source.filter { it.kind == AnnotationKind.LINE }.map {
         MapRouteItem(it.id, it.name, 1, it.coordinates.size)
     }.toImmutableList()

@@ -24,6 +24,9 @@ import bes.max.bmaps.feature.viewer.annotations.ui.icons.MovingMarkerIcon
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerState
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerViewModel
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -58,7 +61,12 @@ internal fun ViewerMapContent(
     activityPaths: List<MapPath> = emptyList(),
     activityMarkers: List<MapMarker> = emptyList(),
     onActivityClick: ((String, MapPoint) -> Unit)? = null,
-    onObjectRouteClick: () -> Unit = {},
+    onObjectRouteClick: (String) -> Unit = {},
+    navigatorMarker: Boolean = false,
+    markerCourse: Float? = null,
+    onMapPan: () -> Unit = {},
+    onStartPick: ((MapPoint) -> Unit)? = null,
+    startBearing: Float? = null,
     onFollow: ((String) -> Unit)? = null,
     showCallout: Boolean = true,
     followLength: String? = null,
@@ -82,8 +90,9 @@ internal fun ViewerMapContent(
             it.display.camera?.session == camera?.session
     }?.overlays ?: fallback
     val handleOverlayClick: (String, MapPoint) -> Unit = { id, point ->
-        if (!state.immersive) {
-            if (id.startsWith("track:object-route:")) onObjectRouteClick()
+        if (onStartPick != null) onStartPick(point)
+        else if (!state.immersive) {
+            if (id.startsWith("track:object-route:")) onObjectRouteClick(id.removePrefix("track:object-route:").substringBefore('~'))
             if (id.startsWith("track:recorded:")) onActivityClick?.invoke(id, point)
             overlays.targets[id]?.let { annotations.clickOverlay(it, point, model.renderer.controller) }
         }
@@ -103,13 +112,17 @@ internal fun ViewerMapContent(
             annotations.cancelExpansion()
             if (autoDismiss && !annotationState.hasMovingObject) annotations.dismissSelection()
         },
+        onPan = onMapPan,
         onLongPress = {
-            if (!state.immersive && (state.manifest != null || state.vectorOnly) && state.error == null && !annotationState.busy && annotationState.draft == null) {
+            if (onStartPick == null && !navigatorMarker && !state.immersive && (state.manifest != null || state.vectorOnly) && state.error == null && !annotationState.busy && annotationState.draft == null) {
                 annotations.panel(true)
             }
         }
     ) { marker ->
-        if (marker.id == CURRENT_LOCATION_MARKER) CurrentLocationMarker(marker.label)
+        if (marker.id == CURRENT_LOCATION_MARKER) CurrentLocationMarker(marker.label, navigatorMarker, markerCourse)
+        else if (marker.id == "track:start") Box(
+            Modifier.size(44.dp).border(2.dp, Color(0xFFFFB300), CircleShape), contentAlignment = Alignment.Center,
+        ) { CurrentLocationMarker(marker.label, navigator = true, courseDegrees = startBearing) }
         else ViewerMarker(
             marker, overlays.targets[marker.id], annotationState, showSelection = !state.immersive,
             placementProgress = { if (lastPlacementVersion == placementVersion) markerGrowth.value else 0f },

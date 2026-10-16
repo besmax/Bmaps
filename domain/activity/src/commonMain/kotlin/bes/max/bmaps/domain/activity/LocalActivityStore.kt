@@ -120,12 +120,15 @@ class LocalActivityStore(private val storage: ActivityFileStorage, private val c
     internal suspend fun project(value: StoredActivity) {
         val record = decodeRecord(value)
         records.putActivities(listOf(ActivityCatalogRecord(record.id, record.name, record.profile.name, record.status.name,
-            record.revision, record.startedAt.epochMillis, record.finishedAt?.epochMillis, value.routeId, projectionGeneration)))
+            record.revision, record.startedAt.epochMillis, record.finishedAt?.epochMillis, record.packageId?.let { "map:$it:${value.routeId.orEmpty()}" } ?: value.routeId, projectionGeneration)))
     }
 
-    internal suspend fun project(value: StoredActivityRoute) = records.putRoutes(listOf(ActivityRouteCatalogRecord(
+    internal suspend fun project(value: StoredActivityRoute) {
+        if (routePackageId(value.id) != null) return
+        records.putRoutes(listOf(ActivityRouteCatalogRecord(
         value.id, value.name, value.revision, value.vertexCount, value.segmentCount, projectionGeneration,
     )))
+    }
 
     private suspend fun ActivitySpatialStores.reconcileProjection() {
         projectionGeneration = Uuid.random().toString()

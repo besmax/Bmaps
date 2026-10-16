@@ -175,6 +175,7 @@ data class PackageRecordPage(val items: List<PackageRecord>, val nextCursor: Str
 @Inject
 @SingleIn(AppScope::class)
 class PackageCatalog(database: PackageDatabase) {
+    val activityRecords: ActivityCatalogDao = database.activities()
     val records: PackageDao = database.packages()
 
     fun observe(filter: PackageFilter, limit: Int, cursor: String?): Flow<PackageRecordPage> {

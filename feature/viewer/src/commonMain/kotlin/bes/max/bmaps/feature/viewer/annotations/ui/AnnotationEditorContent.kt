@@ -14,6 +14,7 @@ import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationFileEvent
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationFileState
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationFileViewModel
 import bes.max.bmaps.feature.viewer.annotations.presentation.MapObjectsState
+import bes.max.bmaps.feature.viewer.annotations.presentation.MapAnnotationItem
 import bes.max.bmaps.feature.viewer.annotations.ui.icons.MarkerIcon
 import bes.max.bmaps.feature.viewer.annotations.ui.icons.MarkerIcons
 import androidx.compose.foundation.horizontalScroll
@@ -191,14 +192,14 @@ private fun AnnotationObjectList(model: AnnotationEditorViewModel, state: Annota
         color = MaterialTheme.colorScheme.error
     )
     if (state.items.isEmpty()) Text(stringResource(Res.string.annotations_empty))
-    state.items.filter { it.kind != AnnotationKind.LINE }.forEach { item ->
+    state.objectItems.forEach { item ->
         AnnotationObjectRow(item, state.busy, { id -> model.select(id) })
     }
     if (state.truncated) Text(stringResource(Res.string.annotations_truncated))
 }
 
 @Composable
-private fun AnnotationObjectRow(item: Annotation, busy: Boolean, onSelect: (String) -> Unit) {
+private fun AnnotationObjectRow(item: MapAnnotationItem, busy: Boolean, onSelect: (String) -> Unit) {
     TextButton({ onSelect(item.id) }, enabled = !busy) {
         Text(item.name.ifBlank { stringResource(item.kind.label()) })
     }

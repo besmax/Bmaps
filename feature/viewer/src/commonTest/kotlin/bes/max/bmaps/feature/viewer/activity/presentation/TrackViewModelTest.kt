@@ -9,8 +9,6 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.activity.presentation
 
 import androidx.lifecycle.ViewModelStore
-import bes.max.bmaps.core.sharing.PickedDocument
-import kotlinx.io.Buffer
 import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import bes.max.bmaps.core.mapengine.TilePyramid
 import bes.max.bmaps.core.mapengine.ZoomRange
@@ -48,6 +46,40 @@ class TrackViewModelTest {
             model.inspect()
             assertFalse(model.state.value.following)
             assertEquals(1, session.starts.size)
+        }
+    }
+
+    @Test fun mapSelectionCanBeCancelledAndConfirmedWithoutStartingRecording() = runTest {
+        fixture { model, session ->
+            model.selectRoute("route")
+            runCurrent()
+            model.await { it.preparing && !it.busy }
+            val original = model.state.value.startCoordinate
+            val world = TilePyramid(ZoomRange(0, 0))
+            val point = requireNotNull(bes.max.bmaps.core.mapengine.WebMercator.normalized(GeographicCoordinate(55.0005, 37.0)))
+            val camera = bes.max.bmaps.core.mapengine.MapCameraSnapshot(1, world,
+                bes.max.bmaps.core.mapengine.MapViewport(point),
+                bes.max.bmaps.core.mapengine.MapWindow(point.x - 0.00001, point.y - 0.00001, point.x + 0.00001, point.y + 0.00001),
+                androidx.compose.ui.unit.IntSize(1000, 1000), 1.0, 16.0)
+            model.beginStartPick()
+            model.pickStart(point, camera, 1f)
+            runCurrent()
+            model.await { !it.pickLoading && it.pickOptions.isNotEmpty() }
+            assertTrue(model.state.value.startFraction in 0.49..0.51)
+            assertTrue(session.starts.isEmpty())
+            model.closeStartPick(false)
+            assertEquals(original, model.state.value.startCoordinate)
+            assertTrue(model.state.value.expanded)
+            model.beginStartPick()
+            model.pickStart(point, camera, 1f)
+            runCurrent()
+            model.await { !it.pickLoading && it.pickOptions.isNotEmpty() }
+            model.closeStartPick(true)
+            assertFalse(model.state.value.pickingStart)
+            model.start()
+            runCurrent()
+            model.await { it.metrics != null && !it.busy }
+            assertTrue(requireNotNull(session.starts.single().route).start.fraction in 0.49..0.51)
         }
     }
 
@@ -90,26 +122,37 @@ class TrackViewModelTest {
         }
     }
 
-    @Test fun directMultiRouteImportOpensChooserAndClearsPreviousPreparation() = runTest {
+    @Test fun pausedMapCourseDoesNotWriteTelemetryAndRetainsLastMarkerDirection() = runTest {
         fixture { model, session ->
-            model.selectRoute("route"); runCurrent()
-            model.await { it.preparing && !it.busy }
-            model.collapse()
-            val tracks = (1..2).joinToString("") { index ->
-                """<trk><name>Track $index</name><trkseg><trkpt lat="50" lon="30"/><trkpt lat="50.01" lon="30.01"/></trkseg></trk>"""
-            }
-            model.importGpx(PickedDocument("routes.gpx", {
-                Buffer().apply { write("<gpx version=\"1.1\">$tracks</gpx>".encodeToByteArray()) }
-            }))
+            model.prepareFree(); model.start(); runCurrent()
+            model.await { it.metrics != null && !it.busy }
+            val fix = bes.max.bmaps.core.location.LocationFix(50.0, 30.0, 3.0, 1_000,
+                speedMetersPerSecond = 3.0, courseDegrees = 359.0)
+            model.mapLocation(fix, true)
+            assertNotNull(model.state.value.markerCourse)
+            model.pauseResume(); runCurrent()
+            model.await { it.metrics?.resumable == true && !it.busy }
+            model.mapLocation(fix.copy(speedMetersPerSecond = 0.0, courseDegrees = 10.0), true)
+            assertEquals(359f, model.state.value.markerCourse)
+            assertEquals("—", model.state.value.metrics?.course)
+            model.mapLocation(fix, false)
+            assertNull(model.state.value.markerCourse)
+            assertEquals(1, session.commands.size)
+        }
+    }
+
+    @Test fun completedLiveSnapshotClearsIndicatorAndAllowsAnotherPreparation() = runTest {
+        fixture { model, session ->
+            model.prepareFree(); model.start(); runCurrent()
+            model.await { it.metrics != null && !it.busy }
+            val live = assertNotNull(session.live.value)
+            session.live.value = live.copy(record = live.record.copy(status = ActivityStatus.COMPLETED,
+                finishedAt = live.record.updatedAt))
             runCurrent()
-            model.await { !it.busy && it.routes.size == 2 }
-            assertTrue(model.state.value.expanded)
-            assertTrue(model.state.value.choosing)
-            assertFalse(model.state.value.preparing)
-            assertNull(model.state.value.route)
-            assertTrue(model.state.value.preview.isEmpty())
-            assertTrue(model.state.value.selectedSection.isEmpty())
-            assertTrue(session.starts.isEmpty())
+            model.await { it.metrics == null }
+            model.prepareFree()
+            assertTrue(model.state.value.preparing)
+            assertTrue(session.commands.isEmpty())
         }
     }
 
@@ -120,6 +163,7 @@ class TrackViewModelTest {
         try {
             val model = TrackViewModel(session, TrackTestRepository(session), TrackTestRoutes())
             store.put("track", model)
+            model.context("map")
             runCurrent()
             block(model, session)
         } finally {

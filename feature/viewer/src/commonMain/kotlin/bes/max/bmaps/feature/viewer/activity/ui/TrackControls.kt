@@ -36,37 +36,37 @@ internal class TrackActions(
 )
 
 @Composable
-internal fun TrackControls(state: TrackState, actions: TrackActions, modifier: Modifier = Modifier, outsideCoverage: Boolean = false) {
-    Surface(modifier.widthIn(max = if (state.expanded) 300.dp else 220.dp),
-        shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-        shadowElevation = 2.dp,
-    ) {
-        if (!state.expanded) {
-            TextButton(actions.toggle, Modifier.heightIn(min = 48.dp)) {
-                val metrics = state.metrics
-                Text(if (state.error != null) stringResource(state.error) else if (metrics == null) stringResource(Res.string.track_title) else
-                    "${stringResource(metrics.status)} · ${metrics.elapsed} · ${metrics.primary}",
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-        } else {
-            Column(Modifier.padding(horizontal = 12.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(stringResource(Res.string.track_title), Modifier.weight(1f).padding(top = 14.dp), style = MaterialTheme.typography.titleSmall)
-                    TextButton(actions.collapse) { Text(stringResource(Res.string.track_collapse)) }
-                }
+internal fun TrackPreparationDialog(state: TrackState, actions: TrackActions) {
+    if (!state.expanded || (state.metrics != null && !state.correcting)) return
+    AlertDialog(
+        onDismissRequest = { if (!state.busy) actions.collapse() },
+        title = { Text(stringResource(if (state.correcting) Res.string.track_correct_section else Res.string.track_start_settings)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {
                     state.choosing -> TrackRouteList(state.routes, state.moreRoutes, state.busy, actions.selectRoute, actions.moreRoutes, actions.importGpx)
-                    state.preparing || state.correcting -> TrackPreparation(state, actions)
-                    state.metrics != null -> TrackActive(state.metrics, state, actions)
+                    state.preparing || state.correcting -> {
+                        TrackPreparation(state, actions)
+                        if (!state.correcting) {
+                            TextButton(actions.routes, enabled = !state.busy) { Text(stringResource(Res.string.track_follow_route)) }
+                            if (state.route != null) TextButton(actions.record, enabled = !state.busy) { Text(stringResource(Res.string.track_record)) }
+                        }
+                    }
                     else -> TrackStartMenu(state.busy, actions.record, actions.routes, actions.history)
                 }
-                if (outsideCoverage) Text(stringResource(Res.string.track_outside_coverage), style = MaterialTheme.typography.bodySmall)
                 if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-                Spacer(Modifier.height(6.dp))
+                state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
             }
-        }
-    }
+        },
+        confirmButton = {
+            if (state.preparing || state.correcting) TextButton(
+                if (state.correcting) actions.applyCorrection else actions.start, enabled = !state.busy,
+            ) { Text(stringResource(if (state.correcting) Res.string.track_apply_section else Res.string.track_start)) }
+        },
+        dismissButton = {
+            TextButton(actions.collapse, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) }
+        },
+    )
 }
 
 @Composable
@@ -110,13 +110,14 @@ private fun TrackPreparation(state: TrackState, actions: TrackActions) {
             FilterChip(state.reverse, { actions.reverse(true) }, label = { Text(stringResource(Res.string.track_reverse)) }, enabled = !state.busy)
         }
     }
-    if (state.route != null) TrackSectionSelector(state.segment, state.edge, state.route.segments, state.route.edges,
-        !state.busy, actions.segment, actions.edge, actions.showSelection)
-    if (!state.correcting) Text(stringResource(Res.string.track_phone_only), style = MaterialTheme.typography.bodySmall)
-    Button(if (state.correcting) actions.applyCorrection else actions.start,
-        enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(if (state.correcting) Res.string.track_apply_section else Res.string.track_start))
+    if (state.route != null) {
+        Text(stringResource(Res.string.track_start_distance, state.startDistance))
+        TextButton(actions.showSelection, enabled = !state.busy) { Text(stringResource(Res.string.track_pick_on_map)) }
+        if (!state.correcting) TextButton({ actions.reverse(state.reverse) }, enabled = !state.busy) {
+            Text(stringResource(Res.string.track_start_at_beginning))
+        }
     }
+    if (!state.correcting) Text(stringResource(Res.string.track_phone_only), style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable
@@ -134,70 +135,30 @@ private fun TrackProfileItem(index: Int, label: StringResource, selected: Boolea
 }
 
 @Composable
-private fun TrackSectionSelector(segment: Int, edge: Int, segments: Int, edges: Int, enabled: Boolean,
-    onSegment: (Int) -> Unit, onEdge: (Int) -> Unit, onShow: () -> Unit) {
-    val previousLabel = stringResource(Res.string.track_previous_segment)
-    val nextLabel = stringResource(Res.string.track_next_segment)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        TextButton({ onSegment(segment - 1) }, enabled = enabled && segment > 0,
-            modifier = Modifier.semantics { contentDescription = previousLabel }) { Text("−") }
-        Text(stringResource(Res.string.track_section, segment + 1, segments), Modifier.padding(top = 14.dp), style = MaterialTheme.typography.bodySmall)
-        TextButton({ onSegment(segment + 1) }, enabled = enabled && segment + 1 < segments,
-            modifier = Modifier.semantics { contentDescription = nextLabel }) { Text("+") }
-    }
-    TrackPositionControls(edge, edges, enabled, onEdge)
-    val sectionDescription = stringResource(Res.string.track_edge, edge + 1, edges)
-    if (edges > 1) Slider(edge.toFloat(), { onEdge(it.toInt()) }, valueRange = 0f..(edges - 1).toFloat(), enabled = enabled,
-        modifier = Modifier.semantics { contentDescription = sectionDescription })
-    TextButton(onShow, enabled = enabled) { Text(stringResource(Res.string.track_show_section)) }
-}
-
-@Composable
-private fun TrackPositionControls(edge: Int, edges: Int, enabled: Boolean, onEdge: (Int) -> Unit) {
-    val previous = stringResource(Res.string.track_previous_position)
-    val next = stringResource(Res.string.track_next_position)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        TextButton({ onEdge(edge - 1) }, enabled = enabled && edge > 0,
-            modifier = Modifier.semantics { contentDescription = previous }) { Text("−") }
-        Text(stringResource(Res.string.track_edge, edge + 1, edges), Modifier.padding(top = 14.dp), style = MaterialTheme.typography.bodySmall)
-        TextButton({ onEdge(edge + 1) }, enabled = enabled && edge + 1 < edges,
-            modifier = Modifier.semantics { contentDescription = next }) { Text("+") }
-    }
-}
-
-@Composable
-private fun TrackActive(metrics: TrackMetrics, state: TrackState, actions: TrackActions) {
-    Text(metrics.name.ifBlank { stringResource(Res.string.track_unnamed) }, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    Text("${stringResource(metrics.status)} · ${metrics.elapsed}", style = MaterialTheme.typography.bodySmall)
-    Text(metrics.primary, style = MaterialTheme.typography.titleLarge)
-    Text(stringResource(Res.string.track_distance, metrics.distance), style = MaterialTheme.typography.bodySmall)
-    metrics.remaining?.let { Text(stringResource(Res.string.track_remaining, it), style = MaterialTheme.typography.bodySmall) }
-    metrics.deviation?.let { Text(stringResource(Res.string.track_deviation, it), style = MaterialTheme.typography.bodySmall) }
-    metrics.controlPoint?.let { Text(stringResource(Res.string.track_next_point, it), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall) }
-    Text(stringResource(metrics.quality), style = MaterialTheme.typography.bodySmall)
-    metrics.navigationQuality?.let { Text(stringResource(it), style = MaterialTheme.typography.bodySmall) }
-    if (metrics.endReached) Text(stringResource(Res.string.track_end_reached), style = MaterialTheme.typography.bodySmall)
-    if (metrics.failed) {
-        Text(stringResource(Res.string.track_storage_error), color = MaterialTheme.colorScheme.error)
-        TextButton(actions.recover, enabled = !state.busy) { Text(stringResource(Res.string.track_recover)) }
-    }
-    Row {
-        if (metrics.recording || metrics.resumable) TextButton(actions.pauseResume, enabled = !state.busy && !metrics.failed) {
-            Text(stringResource(if (metrics.recording) Res.string.track_pause else Res.string.track_resume))
-        }
-        Box {
-            TextButton({ actions.menu(true) }, enabled = !state.busy) { Text(stringResource(Res.string.track_actions)) }
-            TrackOverflow(state.menu, metrics, actions)
+internal fun TrackStartPicker(state: TrackState, onConfirm: () -> Unit, onCancel: () -> Unit,
+    onNext: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(modifier.widthIn(max = 360.dp), shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)) {
+        Column(Modifier.padding(12.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(Res.string.track_pick_hint), style = MaterialTheme.typography.titleSmall)
+            if (state.pickLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            if (state.pickOptions.isNotEmpty()) Text(stringResource(Res.string.track_start_distance, state.startDistance))
+            if (state.pickOptions.size > 1) TextButton(onNext, enabled = !state.pickLoading) {
+                Text(stringResource(Res.string.track_pick_alternative, state.pickOption + 1, state.pickOptions.size))
+            }
+            state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+            Row {
+                TextButton(onCancel) { Text(stringResource(Res.string.layers_cancel)) }
+                TextButton(onConfirm, enabled = !state.pickLoading && state.pickOptions.isNotEmpty()) {
+                    Text(stringResource(Res.string.track_pick_confirm))
+                }
+            }
         }
     }
-    TextButton(if (state.following) actions.inspect else actions.followPosition, enabled = state.position != null) {
-        Text(stringResource(if (state.following) Res.string.track_inspect else Res.string.track_return_position))
-    }
-    if (metrics.finalizing) TextButton(actions.finish, enabled = !state.busy && !metrics.failed) { Text(stringResource(Res.string.viewer_retry)) }
 }
 
 @Composable
-private fun TrackOverflow(expanded: Boolean, metrics: TrackMetrics, actions: TrackActions) {
+internal fun TrackOverflow(expanded: Boolean, metrics: TrackMetrics, actions: TrackActions) {
     DropdownMenu(expanded, { actions.menu(false) }) {
         TrackMenuItem(Res.string.track_finish, enabled = !metrics.failed) { actions.menu(false); actions.confirmFinish(true) }
         if (metrics.recording) TrackMenuItem(Res.string.track_mark_point) { actions.menu(false); actions.mark() }

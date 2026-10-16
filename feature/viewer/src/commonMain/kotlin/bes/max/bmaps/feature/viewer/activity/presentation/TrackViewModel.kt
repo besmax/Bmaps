@@ -13,7 +13,6 @@ import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.TilePyramid
 import bes.max.bmaps.core.mapengine.positionOf
-import bes.max.bmaps.core.sharing.PickedDocument
 import bes.max.bmaps.domain.activity.ActivityAction
 import bes.max.bmaps.domain.activity.ActivityCommand
 import bes.max.bmaps.domain.activity.ActivityDataAvailability
@@ -30,7 +29,6 @@ import bes.max.bmaps.domain.activity.ActivityRepository
 import bes.max.bmaps.domain.activity.ActivityResult
 import bes.max.bmaps.domain.activity.ActivityRoute
 import bes.max.bmaps.domain.activity.ActivityRouteAdapter
-import bes.max.bmaps.domain.activity.ActivityRouteGpx
 import bes.max.bmaps.domain.activity.ActivityRoutePreview
 import bes.max.bmaps.domain.activity.ActivityRouteQuery
 import bes.max.bmaps.domain.activity.ActivityRouteRepository
@@ -40,6 +38,8 @@ import bes.max.bmaps.domain.activity.ActivityStatus
 import bes.max.bmaps.domain.activity.ActivityValidation
 import bes.max.bmaps.domain.activity.ElevationMeasurement
 import bes.max.bmaps.domain.activity.PositionMeasurement
+import bes.max.bmaps.domain.activity.routePackageId
+import bes.max.bmaps.domain.activity.packageRouteId
 import bes.max.bmaps.domain.activity.RouteDirection
 import bes.max.bmaps.domain.activity.RoutePosition
 import bes.max.bmaps.domain.activity.RouteSelection
@@ -68,7 +68,7 @@ class TrackViewModel(
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(TrackState())
     internal val state = mutableState.asStateFlow()
-    private val channel = Channel<TrackEvent>(Channel.RENDEZVOUS)
+    private val channel = Channel<TrackEvent>(Channel.BUFFERED)
     internal val events = channel.receiveAsFlow()
     private var live: ActivityLiveState? = null
     private var selected: ActivityRoute? = null
@@ -78,22 +78,42 @@ class TrackViewModel(
     private var annotationPreviewJob: Job? = null
     private var workJob: Job? = null
     private var nextRoute: String? = null
+    private var sourcePackage: String? = null
+    private var markerCourse: Double? = null
+    private var displayedCourse = "—"
+    fun mapLocation(fix: bes.max.bmaps.core.location.LocationFix?, usable: Boolean) {
+        val course = fix?.courseDegrees?.takeIf { usable && it.isFinite() && it in 0.0..<360.0 &&
+            (fix.speedMetersPerSecond ?: 0.0) >= 1.0 && fix.accuracyMeters <= 35.0 }
+        if (course != null) {
+            val previous = markerCourse
+            markerCourse = if (previous == null) course else previous + ((course - ((previous % 360.0 + 360.0) % 360.0) + 540.0) % 360.0 - 180.0) * 0.35
+        }
+        displayedCourse = course?.let { trackNumber(it, 0) + "°" } ?: "—"
+        mutableState.update { it.copy(markerCourse = markerCourse?.takeIf { usable }?.toFloat(),
+            metrics = it.metrics?.copy(course = displayedCourse)) }
+    }
+    fun context(packageId: String?) { sourcePackage = packageId }
+    fun panel() { mutableState.update { it.copy(panelCollapsed = !it.panelCollapsed) } }
+    private var trackScreenEntered = false
+    fun enterTrackScreen() { trackScreenEntered = true; mutableState.update { it.copy(following = true) } }
 
     init {
         session.initialize()
         viewModelScope.launch {
-            session.live.collect { value ->
+            session.live.collect { snapshot ->
+                val value = snapshot?.takeIf { it.record.status != ActivityStatus.COMPLETED }
                 live = value
                 mutableState.update { current ->
                     current.copy(
-                        metrics = value?.let { trackMetrics(it, navigationRoute) },
+                        metrics = value?.let { trackMetrics(it, navigationRoute).copy(course = displayedCourse) },
+                        packageId = value?.record?.packageId,
                         preparing = current.preparing && value == null,
                         choosing = current.choosing && value == null,
                         position = (value?.position?.measurement as? PositionMeasurement)?.coordinate?.takeIf {
                             value != null && value.record.status == ActivityStatus.RECORDING && value.positionAvailability == ActivityDataAvailability.LIVE && value.failure == null
                         }?.let { TrackCoordinate(it.latitude, it.longitude) },
                         positionId = value?.position?.id,
-                        following = current.following && value != null,
+                        following = current.following && (value != null || trackScreenEntered),
                     )
                 }
             }
@@ -221,9 +241,13 @@ class TrackViewModel(
     }
 
     fun collapse() {
+        pickJob?.cancel()
+        previousStart = null
         mutableState.update {
             it.copy(
                 expanded = false,
+                pickingStart = false,
+                pickLoading = false,
                 menu = false,
                 preparing = false,
                 choosing = false,
@@ -235,6 +259,7 @@ class TrackViewModel(
 
     fun prepareFree() {
         if (live != null || state.value.busy) return
+        if (sourcePackage == null) { mutableState.update { it.copy(expanded = true, error = Res.string.track_needs_map) }; return }
         selected = null
         updateCoverage()
         mutableState.update {
@@ -297,7 +322,17 @@ class TrackViewModel(
     fun selectRoute(id: String) = work {
         when (val result = routes.get(id)) {
             is ActivityResult.Failure -> error(result.reason)
-            is ActivityResult.Success -> prepare(result.value)
+            is ActivityResult.Success -> {
+                val owner = sourcePackage
+                val route = result.value
+                if (owner != null && routePackageId(route.id) == null) {
+                    val copied = route.copy(id = packageRouteId(owner, Uuid.random().toString()), revision = 0)
+                    when (val saved = routes.saveImported(listOf(copied))) {
+                        is ActivityResult.Failure -> error(saved.reason)
+                        is ActivityResult.Success -> prepare(copied)
+                    }
+                } else prepare(route)
+            }
         }
     }
 
@@ -356,6 +391,7 @@ class TrackViewModel(
                 expanded = true,
                 preview = display,
                 reverse = false,
+                startFraction = 0.0,
                 segment = 0,
                 edge = 0,
                 route = TrackRouteDisplay(
@@ -382,6 +418,7 @@ class TrackViewModel(
         mutableState.update {
             it.copy(
                 reverse = value,
+                startFraction = if (value) 1.0 else 0.0,
                 segment = segment,
                 edge = edge,
                 route = it.route?.copy(edges = route.segments[segment].vertices.lastIndex)
@@ -416,29 +453,32 @@ class TrackViewModel(
         val selection = selected?.let {
             RouteSelection(
                 it, if (state.reverse) RouteDirection.REVERSE else RouteDirection.FORWARD,
-                RoutePosition(state.segment, state.edge, if (state.reverse) 1.0 else 0.0)
+                RoutePosition(state.segment, state.edge, state.startFraction)
             )
         }
         val request = ActivityStartRequest(
             Uuid.random().toString(),
             selected?.name.orEmpty(),
             ActivityProfile.entries[state.profile],
-            selection
+            selection, packageId = sourcePackage
         )
         if (ActivityValidation.start(request) != null) {
             error(ActivityFailure.InvalidInput("start")); return@work
         }
         when (val result = session.start(request)) {
             is ActivityResult.Failure -> error(result.reason)
-            is ActivityResult.Success -> mutableState.update {
-                it.copy(
-                    preparing = false,
-                    choosing = false,
-                    expanded = false,
-                    menu = false,
-                    following = true,
-                    error = null
-                )
+            is ActivityResult.Success -> {
+                channel.trySend(TrackEvent.Started(result.value.packageId))
+                mutableState.update {
+                    it.copy(
+                        preparing = false,
+                        choosing = false,
+                        expanded = false,
+                        menu = false,
+                        following = true,
+                        error = null
+                    )
+                }
             }
         }
     }
@@ -505,8 +545,10 @@ class TrackViewModel(
         mutableState.update {
             it.copy(
                 correcting = true,
+                reverse = live?.record?.navigation?.direction == RouteDirection.REVERSE,
                 preparing = false,
                 expanded = true,
+                startFraction = position.fraction,
                 segment = position.segmentIndex,
                 edge = position.edgeIndex,
                 preview = display,
@@ -524,7 +566,7 @@ class TrackViewModel(
 
     fun applyCorrection() {
         val state = state.value
-        val position = RoutePosition(state.segment, state.edge, 0.0)
+        val position = RoutePosition(state.segment, state.edge, state.startFraction)
         if (navigationRoute?.let {
                 ActivityValidation.validRoutePosition(
                     it,
@@ -563,15 +605,19 @@ class TrackViewModel(
         }
     }
 
-    private fun updateSelectedSection() {
+    private fun updateSelectedSection(selectedPick: TrackStartPick? = null) {
         val state = state.value
         val route = if (state.correcting) navigationRoute else selected
         val vertices = route?.segments?.getOrNull(state.segment)?.vertices ?: return
+        val pick = selectedPick ?: routeStartPick(route, state.segment, state.edge, state.startFraction)
         val points = vertices.subList(state.edge, state.edge + 2)
             .map { TrackCoordinate(it.coordinate.latitude, it.coordinate.longitude) }
             .toImmutableList()
         mutableState.update {
             it.copy(
+                startCoordinate = pick.coordinate,
+                startDistance = trackNumber(pick.distance / 1000, 2),
+                startBearing = (pick.bearing + if (state.reverse) 180f else 0f) % 360f,
                 selectedSection = listOf(
                     TrackLine(
                         "selected",
@@ -582,17 +628,55 @@ class TrackViewModel(
         }
     }
 
-    fun selectionCoordinate(): TrackCoordinate? {
+    private var pickJob: kotlinx.coroutines.Job? = null
+    private var previousStart: Triple<Int, Int, Double>? = null
+
+    fun beginStartPick() {
         val state = state.value
-        val route = if (state.correcting) navigationRoute else selected
-        val segment = route?.segments?.getOrNull(state.segment) ?: return null
-        return segment.vertices.getOrNull(state.edge + if (state.reverse && !state.correcting) 1 else 0)?.coordinate?.let {
-            TrackCoordinate(
-                it.latitude,
-                it.longitude
-            )
+        if (state.busy || (!state.preparing && !state.correcting)) return
+        previousStart = Triple(state.segment, state.edge, state.startFraction)
+        mutableState.update { it.copy(pickingStart = true, expanded = false, following = false,
+            pickOptions = kotlinx.collections.immutable.persistentListOf(), error = null) }
+    }
+
+    fun pickStart(point: bes.max.bmaps.core.mapengine.MapPoint, camera: bes.max.bmaps.core.mapengine.MapCameraSnapshot, density: Float) {
+        if (!state.value.pickingStart) return
+        val route = (if (state.value.correcting) navigationRoute else selected) ?: return
+        pickJob?.cancel()
+        pickJob = viewModelScope.launch {
+            mutableState.update { it.copy(pickLoading = true) }
+            val options = withContext(Dispatchers.Default) { pickRouteStart(route, point, camera, 24.0 * density) }
+            mutableState.update { it.copy(pickLoading = false, pickOptions = options.toImmutableList(), pickOption = 0,
+                error = if (options.isEmpty()) Res.string.track_pick_miss else null) }
+            options.firstOrNull()?.let(::setStartPick)
         }
     }
+
+    private fun setStartPick(pick: TrackStartPick) {
+        mutableState.update { it.copy(segment = pick.segment, edge = pick.edge, startFraction = pick.fraction) }
+        updateSelectedSection(pick)
+    }
+
+    fun nextStartPick() {
+        val state = state.value
+        if (state.pickLoading || state.pickOptions.isEmpty()) return
+        val index = (state.pickOption + 1) % state.pickOptions.size
+        mutableState.update { it.copy(pickOption = index) }
+        setStartPick(state.pickOptions[index])
+    }
+
+    fun closeStartPick(confirm: Boolean) {
+        if (confirm && (state.value.pickLoading || state.value.pickOptions.isEmpty())) return
+        pickJob?.cancel()
+        if (!confirm) previousStart?.let { (segment, edge, fraction) ->
+            mutableState.update { it.copy(segment = segment, edge = edge, startFraction = fraction) }
+            updateSelectedSection()
+        }
+        previousStart = null
+        mutableState.update { it.copy(pickingStart = false, pickLoading = false, expanded = true, error = null) }
+    }
+
+    fun selectionCoordinate(): TrackCoordinate? = state.value.startCoordinate
 
     fun followPosition() {
         mutableState.update { it.copy(following = true) }
@@ -604,50 +688,6 @@ class TrackViewModel(
 
     fun details(show: Boolean) {
         mutableState.update { it.copy(details = show) }
-    }
-
-    fun nativeFailure() {
-        mutableState.update { it.copy(error = Res.string.track_file_error) }
-    }
-
-    fun importGpx(document: PickedDocument) {
-        if (state.value.busy || live != null) {
-            document.dispose(); return
-        }
-        work {
-            try {
-                val imported = withContext(Dispatchers.IO) {
-                    document.open().use { ActivityRouteGpx.decode(it) }
-                }
-                if (imported.any { ActivityValidation.route(it) != null }) {
-                    error(ActivityFailure.InvalidInput("route")); return@work
-                }
-                when (val result = routes.saveImported(imported)) {
-                    is ActivityResult.Failure -> error(result.reason)
-                    is ActivityResult.Success -> if (imported.size == 1) prepare(imported.single()) else {
-                        selected = null
-                        nextRoute = null
-                        mutableState.update {
-                            it.copy(expanded = true, choosing = true, preparing = false, menu = false,
-                                route = null, preview = emptyList<TrackLine>().toImmutableList(),
-                                selectedSection = emptyList<TrackLine>().toImmutableList(),
-                                routes = imported.map { route ->
-                                TrackRouteItem(
-                                    route.id,
-                                    route.name,
-                                    route.segments.size,
-                                    route.segments.sumOf { segment -> segment.vertices.size })
-                            }.toImmutableList(), moreRoutes = false)
-                        }
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                nativeFailure()
-            }
-        }
-        workJob?.invokeOnCompletion { document.dispose() }
     }
 
     private fun work(block: suspend () -> Unit) {

@@ -98,7 +98,7 @@ class LocalActivityRepository(private val store: LocalActivityStore) : ActivityR
             cursor?.startedAtEpochMillis ?: 0, cursor?.id ?: "", query.limit + 1)
         val page = rows.take(query.limit)
         ActivityHistoryPage(page.map { ActivitySummary(it.id, it.name, ActivityProfile.valueOf(it.profile), ActivityStatus.valueOf(it.status),
-            it.revision, it.startedAtEpochMillis, it.finishedAtEpochMillis, it.routeId) },
+            it.revision, it.startedAtEpochMillis, it.finishedAtEpochMillis, it.routeId?.let { id -> if (id.startsWith("map:")) id.split(':', limit = 3).last().ifBlank { null } else id }) },
             if (rows.size > query.limit) page.last().let { ActivityHistoryCursor(it.startedAtEpochMillis, it.id) } else null)
     }
 
@@ -212,7 +212,7 @@ class LocalActivityRepository(private val store: LocalActivityStore) : ActivityR
     private fun validateChange(previous: ActivityRecord, value: ActivityCommit) {
         val next = value.record
         if (previous.revision != value.expectedRevision || value.expectedRevision == Long.MAX_VALUE || next.revision != previous.revision + 1) activityFail(ActivityFailure.RevisionConflict)
-        if (next.profile != previous.profile || next.startedAt != previous.startedAt || next.route != previous.route) activityFail(ActivityFailure.InvalidInput("immutableActivity"))
+        if (next.packageId != previous.packageId || next.profile != previous.profile || next.startedAt != previous.startedAt || next.route != previous.route) activityFail(ActivityFailure.InvalidInput("immutableActivity"))
         if (next.updatedAt.continuityId == previous.updatedAt.continuityId &&
             next.updatedAt.monotonicMillis!! < previous.updatedAt.monotonicMillis!!) activityFail(ActivityFailure.InvalidInput("updateTime"))
         val changed = next.status != previous.status

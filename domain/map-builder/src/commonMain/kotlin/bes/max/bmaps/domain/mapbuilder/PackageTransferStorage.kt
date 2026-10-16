@@ -96,6 +96,7 @@ internal suspend fun PackageFiles.readTransfer(source: RawSource, id: PackageId)
             reassign(id.value)
         }
     }
+    if (original.auxiliaryAssets.any { it.relativePath == ROUTES_ASSET }) rebindRoutes(original.id.value, id.value)
     // Identity rebinding changes database bytes; archive digests have already been verified.
     return original.copy(id = id).replaceAssets(assets.map {
         PackageAsset(it.relativePath, assetSize(id.value, true, it.relativePath))

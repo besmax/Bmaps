@@ -185,15 +185,16 @@ class ActivityStorageScenarios(private val database: (String) -> PackageDatabase
     }
 
     suspend fun routeSnapshotsAndImportRollback() = fixture { f ->
-        val source = line("route", "Original")
+        val source = line(packageRouteId("map", "route"), "Original")
         f.routes.save(source, null).success()
         val selected = f.activities.create(record("activity").copy(route = RouteSelection(source, RouteDirection.REVERSE, RoutePosition(0, 0, 1.0))), started()).success()
         f.routes.save(source.copy(revision = 1, name = "Edited"), 0).success()
         assertEquals("Original", f.activities.get(selected.id).success().route?.snapshot?.name)
-        val imported = f.routes.saveImported(listOf(line("new-route", "New"), source))
+        val imported = f.routes.saveImported(listOf(line(packageRouteId("map", "new-route"), "New"), source))
         assertEquals(ActivityFailure.RevisionConflict, assertIs<ActivityResult.Failure>(imported).reason)
-        assertEquals(ActivityFailure.NotFound, assertIs<ActivityResult.Failure>(f.routes.get("new-route")).reason)
+        assertEquals(ActivityFailure.NotFound, assertIs<ActivityResult.Failure>(f.routes.get(packageRouteId("map", "new-route"))).reason)
         f.routes.delete(source.id).success()
+        f.packageRoutes.remove("map")
         f.reopen()
         assertEquals(source, f.activities.get(selected.id).success().route?.snapshot)
     }
@@ -265,11 +266,18 @@ class ActivityStorageScenarios(private val database: (String) -> PackageDatabase
         var db = database(Path(root, "catalog.db").toString())
         lateinit var activities: LocalActivityRepository
         lateinit var routes: LocalActivityRouteRepository
+        val packageRoutes = mutableMapOf<String, String>()
         init { repositories() }
         private fun repositories() {
             val store = LocalActivityStore(ActivityFileStorage(ActivityStorageLocation(root.toString())), ActivityCatalog(db))
             activities = LocalActivityRepository(store)
-            routes = LocalActivityRouteRepository(store)
+            routes = LocalActivityRouteRepository(store, object : bes.max.bmaps.core.storage.PackageRouteStore {
+                override suspend fun read(packageId: String): String? = packageRoutes[packageId]
+                override suspend fun write(packageId: String, expected: String?, payload: String) {
+                    if (packageRoutes[packageId] != expected) throw bes.max.bmaps.core.storage.PackageRouteUnavailable(bes.max.bmaps.core.storage.PackageRouteFailure.CONFLICT)
+                    packageRoutes[packageId] = payload
+                }
+            })
         }
         fun reopen() { db.close(); db = database(Path(root, "catalog.db").toString()); repositories() }
     }

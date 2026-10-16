@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.*
 import kotlinx.io.Buffer
 import kotlinx.io.files.FileNotFoundException
 
@@ -33,12 +34,96 @@ class LocalPackageRepository(
     private val catalog: PackageCatalog,
     private val storage: PackageFileStorage,
     private val demReaders: DemReaderFactory,
-) : PackageRepository, PackageBuildStorage, AnnotationRepository, PackageTransfer {
+    private val packageUse: PackageUseGuard,
+) : PackageRepository, PackageBuildStorage, AnnotationRepository, PackageTransfer, PackageRouteStore {
     private val mutex = Mutex()
     private var reconciled = false
+    private val routeTexts = mutableMapOf<String, String>()
     private val sessions = mutableMapOf<PackageId, MutableList<LocalOpenedPackage>>()
     private val records get() = catalog.records
     private val json get() = PackageManifestCodec.json
+
+    override suspend fun read(packageId: String): String? {
+        val result = operation {
+            val record = records.get(packageId) ?: fail(PackageFailure.NotFound)
+            if (record.state != PackageState.READY.name) fail(PackageFailure.NotReady)
+            storage.access {
+                val manifest = readManifest(PackageId(packageId), false)
+                if (manifest.auxiliaryAssets.none { it.relativePath == ROUTES_ASSET }) null
+                else routeTexts[packageId] ?: read(packageId, false, ROUTES_ASSET, ROUTES_BYTES).decodeToString(throwOnInvalidSequence = true)
+            }
+        }
+        return when (result) {
+            is PackageResult.Success -> result.value
+            is PackageResult.Failure -> throw routeFailure(result.reason)
+        }
+    }
+
+    override suspend fun write(packageId: String, expected: String?, payload: String) {
+        val result = operation {
+            val record = records.get(packageId) ?: fail(PackageFailure.NotFound)
+            if (record.state != PackageState.READY.name) fail(PackageFailure.NotReady)
+            packageRoutes(payload, packageId)
+            storage.access {
+                val manifest = readManifest(PackageId(packageId), false)
+                val present = manifest.auxiliaryAssets.any { it.relativePath == ROUTES_ASSET }
+                val current = if (present) read(packageId, false, ROUTES_ASSET, ROUTES_BYTES).decodeToString(throwOnInvalidSequence = true) else null
+                if (current != expected) fail(PackageFailure.Conflict)
+                val bytes = payload.encodeToByteArray()
+                require(bytes.size <= ROUTES_BYTES)
+                requireCapacity(bytes.size.toLong() * 3 + MANIFEST_RESERVE)
+                currentCoroutineContext().ensureActive()
+                withContext(NonCancellable) {
+                    markNeedsVerification(record)
+                    routeTexts.remove(packageId)
+                    write(packageId, ROUTES_ASSET, Buffer().apply { write(bytes) }, ROUTES_BYTES.toLong(), Long.MAX_VALUE, staged = false)
+                    val updated = synchronizeRoutes(manifest, force = true)
+                    val total = size(packageId, false)
+                    records.putPackage(record.copy(manifestJson = PackageManifestCodec.encode(updated), sizeBytes = total,
+                        updatedAtEpochMillis = updated.updatedAtEpochMillis))
+                }
+            }
+        }
+        if (result is PackageResult.Failure) throw routeFailure(result.reason)
+    }
+
+    private fun routeFailure(failure: PackageFailure) = PackageRouteUnavailable(when (failure) {
+        PackageFailure.NotFound, PackageFailure.NotReady -> PackageRouteFailure.NOT_FOUND
+        PackageFailure.Conflict -> PackageRouteFailure.CONFLICT
+        is PackageFailure.InsufficientStorage, is PackageFailure.SizeLimitExceeded -> PackageRouteFailure.CAPACITY
+        PackageFailure.CorruptData -> PackageRouteFailure.INVALID
+        else -> PackageRouteFailure.UNAVAILABLE
+    })
+
+    private suspend fun PackageFiles.synchronizeRoutes(manifest: PackageManifest, force: Boolean = false): PackageManifest {
+        val id = manifest.id.value
+        val files = relativeFiles(id, false)
+        if (ROUTES_ASSET !in files) {
+            if (manifest.auxiliaryAssets.any { it.relativePath == ROUTES_ASSET }) fail(PackageFailure.CorruptData)
+            return manifest
+        }
+        val currentAsset = manifest.auxiliaryAssets.firstOrNull { it.relativePath == ROUTES_ASSET }
+        if (!force && routeTexts.containsKey(id) && currentAsset?.sizeBytes == assetSize(id, false, ROUTES_ASSET)) return manifest
+        val text = read(id, false, ROUTES_ASSET, ROUTES_BYTES).decodeToString(throwOnInvalidSequence = true)
+        val entries = packageRoutes(text, id)
+        catalog.activityRecords.replacePackageRoutes("package:$id", entries.map { item ->
+            val route = item.jsonObject
+            ActivityRouteCatalogRecord(route.getValue("id").jsonPrimitive.content, route.getValue("name").jsonPrimitive.content,
+                route.getValue("revision").jsonPrimitive.long,
+                route.getValue("segments").jsonArray.sumOf { it.jsonObject.getValue("vertices").jsonArray.size },
+                route.getValue("segments").jsonArray.size, "package:$id")
+        })
+        routeTexts.clear()
+        routeTexts[id] = text
+        val asset = PackageAsset(ROUTES_ASSET, assetSize(id, false, ROUTES_ASSET))
+        val previous = manifest.auxiliaryAssets.firstOrNull { it.relativePath == ROUTES_ASSET }
+        if (asset == previous && !force) return manifest
+        val updated = manifest.copy(auxiliaryAssets = manifest.auxiliaryAssets.filterNot { it.relativePath == ROUTES_ASSET } + asset,
+            updatedAtEpochMillis = Clock.System.now().toEpochMilliseconds())
+        records.get(id)?.let { markNeedsVerification(it) }
+        write(id, "config.json", Buffer().apply { write(PackageManifestCodec.encode(updated).encodeToByteArray()) }, MANIFEST_RESERVE, Long.MAX_VALUE, staged = false)
+        return updated
+    }
 
     override suspend fun exportPackage(id: PackageId, destination: kotlinx.io.RawSink): PackageResult<Unit> = operation {
         val record = records.get(id.value) ?: fail(PackageFailure.NotFound)
@@ -72,6 +157,7 @@ class LocalPackageRepository(
                     promote(id.value)
                     records.putPackage(PackageRecord(id.value, manifest.name, PackageState.READY.name, encoded,
                         size(id.value, false), manifest.updatedAtEpochMillis, manifest.elevation != null, needsVerification = false))
+                    synchronizeRoutes(manifest)
                 }
                 id
             } finally {
@@ -568,11 +654,18 @@ class LocalPackageRepository(
     }
 
     override suspend fun delete(id: PackageId): PackageResult<Unit> = operation {
-        checkComponent(id.value)
-        records.get(id.value)?.let { records.putPackage(it.copy(state = PackageState.DELETING.name)) }
-        closeSessions(id)
-        storage.access { delete(id.value, true); delete(id.value, false); deleteElevationJob(id.value) }
-        records.delete(id.value)
+        val deleted = packageUse.deleting(id.value) {
+            if (catalog.activityRecords.activeForPackage(routePrefix(id.value)) > 0) fail(PackageFailure.ActivityInProgress)
+            checkComponent(id.value)
+            records.get(id.value)?.let { records.putPackage(it.copy(state = PackageState.DELETING.name)) }
+            closeSessions(id)
+            storage.access { delete(id.value, true); delete(id.value, false); deleteElevationJob(id.value) }
+            catalog.activityRecords.deletePackageRoutes("package:${id.value}")
+            records.delete(id.value)
+            routeTexts.remove(id.value)
+            true
+        }
+        if (deleted == null) fail(PackageFailure.ActivityInProgress)
     }
 
     override suspend fun reconcile(): PackageResult<Unit> = operation(initialize = false) {
@@ -588,6 +681,7 @@ class LocalPackageRepository(
                 if (record.state == PackageState.DELETING.name) {
                     closeSessions(id)
                     delete(record.id, true); delete(record.id, false); deleteElevationJob(record.id)
+                    catalog.activityRecords.deletePackageRoutes("package:${record.id}")
                     records.delete(record.id)
                     continue
                 }
@@ -608,11 +702,15 @@ class LocalPackageRepository(
                                 job.copy(state = if (queued) BuildJobState.QUEUED.name else job.state, completedTiles = counts.downloaded,
                                     failedTiles = counts.failed, packageBytes = bytes))
                         }
-                        else -> records.putPackage(record.copy(state = PackageState.MISSING.name, needsVerification = true))
+                        else -> {
+                            catalog.activityRecords.deletePackageRoutes("package:${record.id}")
+                            records.putPackage(record.copy(state = PackageState.MISSING.name, needsVerification = true))
+                        }
                     }
                 } catch (error: Exception) {
                     if (error is CancellationException) throw error
                     ElevationDiagnostics.error("package_reconcile package=${id.value} reason=${failureOf(error)}", error)
+                    catalog.activityRecords.deletePackageRoutes("package:${record.id}")
                     records.putPackage(record.copy(state = PackageState.CORRUPT.name, needsVerification = true))
                 }
             }
@@ -644,6 +742,7 @@ class LocalPackageRepository(
     ): PackageResult<Unit> {
         onProgress(PackageVerificationProgress(PackageVerificationStage.WAITING))
         return operation {
+            routeTexts.remove(id.value)
             val record = records.get(id.value) ?: fail(PackageFailure.NotFound)
             if (record.state !in setOf(PackageState.READY.name, PackageState.CORRUPT.name, PackageState.MISSING.name)) {
                 fail(PackageFailure.NotReady)
@@ -775,7 +874,7 @@ class LocalPackageRepository(
         require(manifest.id == id)
         if (staged) return manifest
         cleanupReliefAssets(manifest)
-        return synchronizeAnnotations(manifest)
+        return synchronizeRoutes(synchronizeAnnotations(manifest))
     }
 
     private suspend fun building(id: PackageId, allowFinalizing: Boolean = false): PackageRecord {

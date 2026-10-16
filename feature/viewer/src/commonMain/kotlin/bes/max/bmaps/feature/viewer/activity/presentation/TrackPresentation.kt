@@ -31,10 +31,17 @@ internal data class TrackMetrics(
     val quality: StringResource, val navigationQuality: StringResource?, val heartRate: String,
     val recordingTime: String, val movingTime: String, val endReached: Boolean,
     val recording: Boolean, val resumable: Boolean, val finalizing: Boolean, val failed: Boolean,
+    val routeProgress: String? = null, val course: String = "—", val speed: String = "— km/h",
     val hasPlan: Boolean, val hasNavigation: Boolean, val returning: Boolean, val alertsEnabled: Boolean,
 )
 @Immutable
 internal data class TrackState(
+    val pickingStart: Boolean = false, val pickLoading: Boolean = false,
+    val startFraction: Double = 0.0, val startDistance: String = "0.0",
+    val startCoordinate: TrackCoordinate? = null, val startBearing: Float? = null,
+    val pickOptions: ImmutableList<TrackStartPick> = persistentListOf(), val pickOption: Int = 0,
+    val markerCourse: Float? = null,
+    val packageId: String? = null, val panelCollapsed: Boolean = false,
     val expanded: Boolean = false, val menu: Boolean = false, val preparing: Boolean = false,
     val choosing: Boolean = false, val correcting: Boolean = false, val finishConfirmation: Boolean = false,
     val details: Boolean = false, val busy: Boolean = false, val following: Boolean = false,
@@ -51,6 +58,7 @@ internal data class TrackState(
     val error: StringResource? = null,
 )
 internal sealed interface TrackEvent {
+    data class Started(val packageId: String?) : TrackEvent
     data class Completed(val activityId: String) : TrackEvent
     data class Message(val text: StringResource, val haptic: Boolean = false) : TrackEvent
 }
@@ -114,6 +122,9 @@ internal fun trackMetrics(live: ActivityLiveState, route: ActivityRoute?): Track
         progress?.endReached == true, running,
         record.status == ActivityStatus.PAUSED || record.status == ActivityStatus.INTERRUPTED,
         record.status == ActivityStatus.FINALIZING, live.failure != null,
+        progress?.plannedDistanceMeters?.let { total ->
+            "${progress.completedRouteMeters?.let { trackNumber(it / 1000) } ?: "—"} / ${trackNumber(total / 1000)} km"
+        }, "—", speed?.let { "${trackNumber(it * 3.6)} km/h" } ?: "— km/h",
         record.route != null, record.navigation != null,
         record.navigation?.mode == ActivityNavigationMode.RECORDED_RETURN,
         record.navigation?.alertsEnabled ?: true)

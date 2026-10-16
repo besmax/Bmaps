@@ -39,6 +39,7 @@ data class ActivityStartRequest(
     val name: String,
     val profile: ActivityProfile,
     val route: RouteSelection? = null,
+    val packageId: String? = null,
 )
 
 @kotlinx.serialization.Serializable
@@ -73,7 +74,7 @@ data class ActivitySummary(
 )
 data class ActivityHistoryPage(val items: List<ActivitySummary>, val next: ActivityHistoryCursor?)
 data class ActivityRouteSummary(val id: String, val name: String, val revision: Long, val vertexCount: Int, val segmentCount: Int)
-data class ActivityRouteQuery(val afterId: String? = null, val limit: Int = 50, val nameContains: String = "")
+data class ActivityRouteQuery(val afterId: String? = null, val limit: Int = 50, val nameContains: String = "", val packageId: String? = null)
 data class ActivityRoutePage(val items: List<ActivityRouteSummary>, val nextId: String?)
 data class TelemetryCursor(val acquiredAtEpochMillis: Long, val sourceId: String, val sampleId: String)
 data class TelemetryQuery(val fromEpochMillis: Long, val toEpochMillis: Long, val after: TelemetryCursor? = null, val limit: Int = 256)

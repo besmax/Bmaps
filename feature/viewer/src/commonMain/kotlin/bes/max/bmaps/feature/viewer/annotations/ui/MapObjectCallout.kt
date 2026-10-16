@@ -203,10 +203,16 @@ internal fun MapObjectCallout(
                         }
                         if (onFollow != null && current != null) {
                             routeLength?.let { Text(stringResource(Res.string.track_route_length, it), style = MaterialTheme.typography.bodySmall) }
-                            TextButton(onFollow, enabled = !busy) { Text(stringResource(Res.string.track_follow)) }
                         }
                         HorizontalDivider()
                         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            if (onFollow != null && current != null) IconButton(onFollow, enabled = !busy) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_track),
+                                    contentDescription = stringResource(Res.string.track_follow)
+                                )
+                            }
+
                             IconButton(onEdit, enabled = current != null && !busy) {
                                 Icon(
                                     painter = painterResource(Res.drawable.ic_edit),

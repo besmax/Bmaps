@@ -46,6 +46,8 @@ import org.jetbrains.compose.resources.StringResource
 import kotlin.uuid.Uuid
 
 @Immutable
+internal data class MapAnnotationItem(val id: String, val name: String, val kind: AnnotationKind)
+@Immutable
 internal data class MapRouteItem(val id: String, val name: String, val segments: Int, val vertices: Int)
 @Immutable
 internal data class MapRouteSelection(val id: String, val name: String, val length: String,
@@ -55,7 +57,8 @@ internal data class MapObjectsState(
     val hasPackage: Boolean = false,
     val routes: ImmutableList<MapRouteItem> = persistentListOf(), val more: Boolean = false,
     val loading: Boolean = false, val routeError: StringResource? = null,
-    val selection: MapRouteSelection? = null, val callout: Boolean = false,
+    val mapLines: ImmutableList<TrackLine> = persistentListOf(),
+    val selection: MapRouteSelection? = null, val fitSelection: Boolean = false, val callout: Boolean = false,
     val importOpen: Boolean = false, val text: String = "", val busy: Boolean = false,
     val routeCount: Int = 0, val objectCount: Int = 0, val pointCount: Int = 0,
     val prepared: Boolean = false, val partial: Boolean = false, val error: StringResource? = null,
@@ -87,30 +90,60 @@ class MapObjectsViewModel(
     private data class Pending(val routes: List<ActivityRoute>, val annotations: List<Annotation>,
         val packageId: PackageId?, var routesSaved: Boolean = false)
 
-    fun context(id: PackageId?) { packageId = id; mutableState.update { it.copy(hasPackage = id != null) } }
+    fun context(id: PackageId?) {
+        if (packageId != id) { catalogJob?.cancel(); selectionJob?.cancel(); nextId = null
+            mutableState.update { it.copy(routes = persistentListOf(), mapLines = persistentListOf(), selection = null, callout = false) }
+        }
+        packageId = id; mutableState.update { it.copy(hasPackage = id != null) }
+    }
 
     fun refresh() = load(false)
     fun more() = load(true)
     private fun load(append: Boolean) {
+        val owner = packageId?.value ?: return
         if (append && (state.value.loading || !state.value.more)) return
         catalogJob?.cancel()
         val generation = ++catalogGeneration
         mutableState.update { it.copy(loading = true, routeError = null) }
         catalogJob = viewModelScope.launch {
             try {
-                when (val result = routes.routes(ActivityRouteQuery(afterId = if (append) nextId else null))) {
+                when (val result = routes.routes(ActivityRouteQuery(afterId = if (append) nextId else null, packageId = owner))) {
                     is ActivityResult.Failure -> mutableState.update { it.copy(routeError = Res.string.objects_routes_error) }
                     is ActivityResult.Success -> {
                         nextId = result.value.nextId
+                        val allRoutes = result.value.items.toMutableList()
+                        if (!append) {
+                            var cursor = result.value.nextId
+                            while (cursor != null) {
+                                currentCoroutineContext().ensureActive()
+                                when (val page = routes.routes(ActivityRouteQuery(afterId = cursor, limit = 500, packageId = owner))) {
+                                    is ActivityResult.Failure -> { mutableState.update { it.copy(routeError = Res.string.objects_routes_error) }; break }
+                                    is ActivityResult.Success -> { allRoutes += page.value.items; cursor = page.value.nextId }
+                                }
+                            }
+                        }
+                        val lines = if (append) emptyList() else allRoutes.flatMap { summary ->
+                            val route = (routes.get(summary.id) as? ActivityResult.Success<ActivityRoute>)?.value ?: return@flatMap emptyList()
+                            withContext(Dispatchers.Default) {
+                                val mandatory = route.segments.size * 2 + route.controlPoints.size * 2
+                                ActivityRoutePreview.create(route, maxOf(1_000, mandatory)).segments.map { segment ->
+                                    TrackLine("${route.id}~${segment.sourceSegmentId}", segment.coordinates.map { TrackCoordinate(it.latitude, it.longitude) }.toImmutableList())
+                                }
+                            }
+                        }
                         val items = result.value.items.map { MapRouteItem(it.id, it.name, it.segmentCount, it.vertexCount) }
-                        mutableState.update { it.copy(routes = (if (append) it.routes + items else items).toImmutableList(), more = nextId != null) }
+                        mutableState.update { it.copy(routes = (if (append) it.routes + items else items).toImmutableList(),
+                            mapLines = (if (append) it.mapLines + lines else lines).toImmutableList(), more = nextId != null) }
                     }
                 }
             } finally { if (generation == catalogGeneration) mutableState.update { it.copy(loading = false) } }
         }
     }
 
-    fun select(id: String) {
+    fun select(id: String) = selectRoute(id, true)
+    fun mapSelect(id: String) = selectRoute(id, false)
+    fun fitted() { mutableState.update { it.copy(fitSelection = false) } }
+    private fun selectRoute(id: String, fit: Boolean) {
         selectionJob?.cancel()
         selectionJob = viewModelScope.launch {
             when (val result = routes.get(id)) {
@@ -123,10 +156,10 @@ class MapObjectsViewModel(
                     val display = withContext(Dispatchers.Default) {
                         val preview = ActivityRoutePreview.create(route)
                         MapRouteSelection(route.id, route.name, trackNumber(trackLength(route) / 1000),
-                            preview.segments.map { segment -> TrackLine(segment.sourceSegmentId,
+                            preview.segments.map { segment -> TrackLine("${route.id}~${segment.sourceSegmentId}",
                                 segment.coordinates.map { TrackCoordinate(it.latitude, it.longitude) }.toImmutableList()) }.toImmutableList())
                     }
-                    mutableState.update { it.copy(selection = display, callout = true, routeError = null) }
+                    mutableState.update { it.copy(selection = display, fitSelection = fit, callout = true, routeError = null) }
                     channel.send(MapObjectsEvent.Selected(id))
                 }
             }
@@ -190,7 +223,7 @@ class MapObjectsViewModel(
                     id = Uuid.random().toString(), kind = AnnotationKind.MARKER,
                     coordinates = listOf(point.coordinate), name = point.name, description = point.description,
                     elevations = point.elevation?.let { listOf(AnnotationElevation(it.meters, it.verticalReference)) }.orEmpty()) }
-                Pending(document.routes, markers, target)
+                Pending(document.routes.map { it.copy(id = target?.value?.let { owner -> packageRouteId(owner, it.id) } ?: it.id) }, markers, target)
             } else {
                 require(bytes.size <= AnnotationGeoJson.MAX_BYTES)
                 Pending(emptyList(), AnnotationImport.decode(text).map { it.copy(id = Uuid.random().toString()) }, target)
@@ -200,7 +233,7 @@ class MapObjectsViewModel(
                 require(imported.annotations.all { AnnotationValidation.error(it) == null })
             }
         }
-        if (value.annotations.isNotEmpty() && target == null) {
+        if (target == null) {
             mutableState.update { it.copy(error = Res.string.objects_import_needs_map) }; return
         }
         pending = value
@@ -212,7 +245,7 @@ class MapObjectsViewModel(
 
     fun confirmImport() = work {
         val value = pending ?: return@work
-        if (value.annotations.isNotEmpty() && value.packageId != packageId) {
+        if (value.packageId != packageId) {
             mutableState.update { it.copy(error = Res.string.objects_import_needs_map) }; return@work
         }
         if (!value.routesSaved && value.routes.isNotEmpty()) {

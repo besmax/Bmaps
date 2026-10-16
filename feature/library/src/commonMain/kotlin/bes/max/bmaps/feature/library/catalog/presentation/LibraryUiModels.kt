@@ -95,6 +95,7 @@ private fun PackageFailure.libraryLabel() = when (this) {
     is PackageFailure.InsufficientStorage -> Res.string.library_storage_full
     is PackageFailure.RateLimited -> Res.string.library_rate_limited
     PackageFailure.TileUnavailable -> Res.string.library_tiles_unavailable
+    PackageFailure.ActivityInProgress -> Res.string.library_map_in_use
     PackageFailure.Conflict -> Res.string.library_source_changed
     else -> Res.string.library_action_failed
 }

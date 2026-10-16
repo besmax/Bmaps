@@ -161,6 +161,8 @@
     <string name="relief_legend">%1$s–%2$s m</string>
     <string name="relief_layer_size">Elevation layer: %1$s MB</string>
     <string name="relief_queued">Waiting to generate elevation layer…</string>
+    <string name="track_start_settings">Start track</string>
+    <string name="track_open_active">Open active track</string>
     <string name="track_title">Track</string>
     <string name="track_record">Record track</string>
     <string name="track_follow_route">Follow route</string>
@@ -232,7 +234,6 @@
     <string name="track_busy">Another activity or operation is active.</string>
     <string name="track_invalid">No usable route or recorded path. Check the selected geometry.</string>
     <string name="track_storage_error">Recording or storage is unavailable. Recover the activity before continuing.</string>
-    <string name="track_file_error">The GPX file could not be imported. Check its format and limits.</string>
     <string name="track_recover">Recover activity</string>
     <string name="track_previous_segment">Previous section</string>
     <string name="track_next_segment">Next section</string>
@@ -305,8 +306,23 @@
     <string name="objects_routes">Routes</string>
     <string name="objects_routes_error">Could not load routes. Try again.</string>
     <string name="objects_import_error">Could not import objects. Check the file, coordinates and import limits, or try again.</string>
-    <string name="objects_import_needs_map">Open a map package to import markers or GeoJSON objects. GPX routes can be imported without a map package.</string>
+    <string name="objects_import_needs_map">Open a map package to import routes and map objects.</string>
     <string name="objects_import_partial">Routes have been saved. Other objects have not been confirmed as saved. Retry to finish, or close and keep the saved routes.</string>
     <string name="objects_import_summary">%1$d routes · %2$d other objects · %3$d points. Confirm to save.</string>
     <string name="objects_prepare_import">Review import</string>
+    <string name="track_expand">Show details</string>
+    <string name="track_actual_distance">Travelled: %1$s km</string>
+    <string name="track_plan_progress">On route: %1$s</string>
+    <string name="track_azimuth">Course: %1$s</string>
+    <string name="track_route_arrived">Route end reached. Recording continues.</string>
+    <string name="track_needs_map">Open a map to start a recording.</string>
+    <string name="history_new_from_map">Open map to record</string>
+    <string name="track_start_distance">From route start: %1$s km</string>
+    <string name="track_pick_on_map">Choose on map</string>
+    <string name="track_start_at_beginning">Start of route in selected direction</string>
+    <string name="track_pick_hint">Tap the route to choose a start position</string>
+    <string name="track_pick_miss">Tap closer to the route</string>
+    <string name="track_pick_alternative">Section %1$d of %2$d · Switch</string>
+    <string name="track_pick_confirm">Confirm position</string>
+    <string name="track_start_position">Selected start position and direction</string>
 </resources>

@@ -137,13 +137,29 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
         else applyPendingLocation()
     }
 
-    fun followActivityLocation(coordinate: GeographicCoordinate) {
-        if (state.value.vectorOnly) { centerLocation(coordinate); return }
-        val layer = state.value.manifest?.layers?.firstOrNull() ?: return
-        val covered = WebMercator.splitBounds(layer.bounds).orEmpty().any { bounds ->
-            coordinate.latitude in bounds.south..bounds.north && coordinate.longitude in bounds.west..bounds.east
+    private var activityMove: kotlinx.coroutines.Job? = null
+    fun followActivityLocation(coordinate: GeographicCoordinate, force: Boolean = false) {
+        val camera = renderer.camera.value ?: return
+        val point = camera.pyramid.positionOf(coordinate) ?: return
+        val window = camera.visibleWindow
+        val width = window.right - window.left
+        val height = window.bottom - window.top
+        if (width <= 0 || height <= 0) return
+        val x = (point.x - window.left) / width
+        val y = (point.y - window.top) / height
+        if (!force && x in 0.3..0.7 && y in 0.25..0.6) return
+        activityMove?.cancel()
+        val start = camera.viewport.center
+        val target = MapPoint(point.x.coerceIn(0.0, 1.0), (point.y + height * 0.08).coerceIn(0.0, 1.0))
+        activityMove = viewModelScope.launch {
+            repeat(12) { index ->
+                val t = (index + 1) / 12.0
+                val eased = t * t * (3 - 2 * t)
+                renderer.controller.moveTo(camera.session, locationRequestId++, camera.viewport.copy(center =
+                    MapPoint(start.x + (target.x - start.x) * eased, start.y + (target.y - start.y) * eased)))
+                kotlinx.coroutines.delay(25)
+            }
         }
-        if (covered) centerLocation(coordinate)
     }
 
     internal fun locationCameraResult(result: CameraMoveResult) {
@@ -152,7 +168,7 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
         }
     }
 
-    fun cancelLocationMove() { pendingLocation = null; pendingLocationZoomScale = null; if (state.value.vectorOnly) vectorFocused = true }
+    fun cancelLocationMove() { activityMove?.cancel(); activityMove = null; pendingLocation = null; pendingLocationZoomScale = null; if (state.value.vectorOnly) vectorFocused = true }
 
     private fun applyPendingLocation() {
         val coordinate = pendingLocation ?: return

@@ -31,7 +31,7 @@ import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(onBack: () -> Unit, onReview: (String) -> Unit, onRecord: () -> Unit, onFollow: (String) -> Unit) {
+fun HistoryScreen(onBack: () -> Unit, onReview: (String) -> Unit, onRecord: () -> Unit, onFollow: (String) -> Unit, onOpenActive: () -> Unit = onRecord) {
     val model = metroViewModel<HistoryViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -48,7 +48,7 @@ fun HistoryScreen(onBack: () -> Unit, onReview: (String) -> Unit, onRecord: () -
     }
     Scaffold(topBar = { TopAppBar(title = { Text(stringResource(Res.string.history_title)) },
         navigationIcon = { TextButton(onBack) { Text(stringResource(Res.string.viewer_back)) } },
-        actions = { TextButton(onRecord) { Text(stringResource(Res.string.track_record)) } }) }, snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+        actions = { TextButton(onRecord) { Text(stringResource(Res.string.history_new_from_map)) } }) }, snackbarHost = { SnackbarHost(snackbar) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
             Row {
                 FilterChip(!state.routesTab, { model.tab(false) }, label = { Text(stringResource(Res.string.history_activities)) }, enabled = !state.busy)
@@ -57,12 +57,12 @@ fun HistoryScreen(onBack: () -> Unit, onReview: (String) -> Unit, onRecord: () -
             }
             OutlinedTextField(state.search, model::search, Modifier.fillMaxWidth(), label = { Text(stringResource(Res.string.history_search)) }, singleLine = true)
             if (!state.routesTab) HistoryFilterList(state.filter, model::filter)
-            state.activeId?.let { TextButton(onRecord) { Text(stringResource(Res.string.history_open_active)) } }
+            state.activeId?.let { TextButton(onOpenActive) { Text(stringResource(Res.string.history_open_active)) } }
             state.error?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (state.routesTab) SavedRouteList(state.routes, state.busy, state.more, model::more, onFollow,
                 model::editRoute, { model.confirmDelete(it, true) }, { model.exportOptions(it, true) }, Modifier.weight(1f))
-            else ActivityHistoryList(state.activities, state.busy, state.more, model::more, onReview, onRecord,
+            else ActivityHistoryList(state.activities, state.busy, state.more, model::more, onReview, onOpenActive,
                 model::editActivity, { model.confirmDelete(it) }, model::derive, { model.exportOptions(it) }, Modifier.weight(1f))
         }
     }

@@ -30,19 +30,28 @@ object ActivityValidation {
     }
 
     fun start(value: ActivityStartRequest): String? {
-        if (!id(value.id) || value.name.length > 120) return "activityProperties"
+        if (!id(value.id) || value.name.length > 120 || value.packageId?.let { !id(it) } == true) return "activityProperties"
+        val owner = value.route?.snapshot?.id?.let(::routePackageId)
+        if (owner != null && value.packageId != null && owner != value.packageId) return "routeOwner"
         return value.route?.let(::selection)
     }
 
     fun selection(value: RouteSelection): String? = route(value.snapshot)
         ?: if (position(value.snapshot, value.start)) null else "startPosition"
 
-    fun record(value: ActivityRecord): String? = recordMetadata(value) ?: value.route?.let(::selection)
-        ?: value.navigation?.takeIf { it.mode == ActivityNavigationMode.PLANNED_ROUTE }?.let {
-            val selection = value.route ?: return@let "navigationRoute"
-            if (it.direction != selection.direction || it.origin != selection.start) "navigationSelection"
-            else navigation(it, selection.snapshot)
+    fun record(value: ActivityRecord): String? {
+        recordMetadata(value)?.let { return it }
+        val selected = value.route
+        if (selected != null) {
+            selection(selected)?.let { return it }
+            val owner = routePackageId(selected.snapshot.id)
+            if (owner != null && value.packageId != null && owner != value.packageId) return "routeOwner"
         }
+        val nav = value.navigation?.takeIf { it.mode == ActivityNavigationMode.PLANNED_ROUTE } ?: return null
+        if (selected == null) return "navigationRoute"
+        if (nav.direction != selected.direction || nav.origin != selected.start) return "navigationSelection"
+        return navigation(nav, selected.snapshot)
+    }
 
     fun validRoutePosition(route: ActivityRoute, value: RoutePosition): Boolean = position(route, value)
 
@@ -68,6 +77,7 @@ object ActivityValidation {
 
     internal fun recordMetadata(value: ActivityRecord): String? {
         if (value.schemaVersion != 1) return "schemaVersion"
+        if (value.packageId?.let { !id(it) } == true) return "packageId"
         if (!id(value.id) || !id(value.sessionGeneration) || value.revision < 0 || value.controlRevision < 0 ||
             value.controlRevision > value.revision || value.name.length > 120) return "activityProperties"
         if (!time(value.startedAt) || !time(value.updatedAt) || value.finishedAt?.let { !time(it) } == true) return "time"

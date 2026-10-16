@@ -8,6 +8,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.domain.activity
 
+import bes.max.bmaps.core.storage.PackageUseGuard
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.location.*
 import bes.max.bmaps.core.mapengine.GeographicCoordinate
@@ -29,6 +30,7 @@ class PhoneActivitySession(
     private val locations: SharedLocationService,
     private val host: ActivityRecordingHost,
     private val clock: ActivityClock,
+    private val packageUse: PackageUseGuard,
 ) : ActivitySession {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mutex = Mutex()
@@ -82,16 +84,22 @@ class PhoneActivitySession(
             if (recovery is ActivityResult.Failure) return@owned recovery
         }
         if (current != null) return@owned ActivityResult.Failure(ActivityFailure.AnotherActivityActive)
+        val sourcePackage = input.packageId ?: input.route?.snapshot?.id?.let(::routePackageId)
+        if (sourcePackage != null) {
+            if (!packageUse.retain(sourcePackage)) return@owned ActivityResult.Failure(ActivityFailure.AnotherActivityActive)
+            val present = routes.routes(ActivityRouteQuery(packageId = sourcePackage, limit = 1))
+            if (present is ActivityResult.Failure) { packageUse.release(); return@owned present }
+        }
         val guidance = input.route?.let { selection ->
             when (val result = makeNavigator(selection.snapshot, ActivityNavigationState(ActivityNavigationMode.PLANNED_ROUTE,
                 selection.snapshot.id, selection.snapshot.revision, selection.direction, selection.start, selection.start), input.profile)) {
-                is ActivityResult.Failure -> return@owned result
+                is ActivityResult.Failure -> { packageUse.release(); return@owned result }
                 is ActivityResult.Success -> result.value
             }
         }
-        host.start(input.profile)?.let { host.stop(); return@owned ActivityResult.Failure(it) }
+        host.start(input.profile)?.let { host.stop(); packageUse.release(); return@owned ActivityResult.Failure(it) }
         val now = clock.now()
-        val record = ActivityRecord(input.id, 0, activityIdentity(), input.name, input.profile, ActivityStatus.RECORDING, now, now, input.route, navigation = guidance?.state).owned()
+        val record = ActivityRecord(input.id, 0, activityIdentity(), input.name, input.profile, ActivityStatus.RECORDING, now, now, input.route, navigation = guidance?.state, packageId = sourcePackage).owned()
         val result = repository.create(record, ActivityEvent(activityIdentity(), 1, ActivityEventKind.STARTED, now))
         if (result is ActivityResult.Success) {
             current = result.value
@@ -103,7 +111,7 @@ class PhoneActivitySession(
             beginLocations(now)
             beginTicker()
             publish(now)
-        } else host.stop()
+        } else { host.stop(); packageUse.release() }
         result
     }
 
@@ -119,6 +127,7 @@ class PhoneActivitySession(
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { return ActivityResult.Failure(ActivityFailure.StorageUnavailable) }
         current = found
+        if (found?.packageId != null) packageUse.retain(found.packageId) else packageUse.release()
         recovered = true
         failure = null
         samples.clear(); events.clear(); pendingNavigationAlerts.clear(); sampleBytes = 0
@@ -359,6 +368,7 @@ class PhoneActivitySession(
             events = listOf(ActivityEvent(activityIdentity(), eventSequence + 1, ActivityEventKind.COMPLETED, now))))
         if (result is ActivityResult.Success) {
             current = null
+            packageUse.release()
             ticker?.cancel(); ticker = null
             mutableActive.value = null
             mutableLive.value = ActivityLiveState(result.value.owned(), result.value.statistics.distanceMeters, result.value.statistics.durations(),

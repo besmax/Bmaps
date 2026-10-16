@@ -292,7 +292,7 @@ class PhoneActivitySessionTest {
         val clock = object : ActivityClock {
             override fun now() = ActivityTime(100_000 + scheduler.currentTime, 100_000 + scheduler.currentTime, "phone-process")
         }
-        val session = PhoneActivitySession(repository, routes, locations, host, clock)
+        val session = PhoneActivitySession(repository, routes, locations, host, clock, bes.max.bmaps.core.storage.PackageUseGuard())
         suspend fun start(route: RouteSelection? = null) { session.start(ActivityStartRequest("activity", "Trip", ActivityProfile.HIKING, route)).success(); scheduler.runCurrent() }
         suspend fun fix(latitude: Double, accuracy: Double = 3.0, conflict: Boolean = false, course: Double? = 90.0) {
             val time = clock.now()

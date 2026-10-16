@@ -84,24 +84,46 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
                     val id = viewerEntry.arguments?.read { getString("packageId") }.orEmpty()
                     ViewerScreen(PackageId(id), onBack = { navigation.popBackStack() },
                         onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
-                        onReview = { activity -> navigation.navigate("viewer/$id/activity/$activity") })
+                        onReview = { activity -> navigation.navigate("viewer/$id/activity/$activity") },
+                        onTrack = { source -> navigation.navigate(source?.let { "viewer/$it/track" } ?: TrackMapRoute) { launchSingleTop = true } })
                 }
                 composable(HistoryRoute) {
                     HistoryScreen(onBack = { navigation.popBackStack() },
                         onReview = { navigation.navigate("activity/$it") },
-                        onRecord = { navigation.navigate(TrackMapRoute) { launchSingleTop = true } },
+                        onRecord = { navigation.openDestination(ShellDestination.LIBRARY) },
+                        onOpenActive = { navigation.navigate(TrackMapRoute) { launchSingleTop = true } },
                         onFollow = { navigation.navigate("track-map/$it") })
                 }
-                composable(TrackMapRoute) {
-                    ViewerScreen(null, onBack = { navigation.popBackStack() },
+                composable(PackageTrackRoute) { trackEntry ->
+                    val map = trackEntry.arguments?.read { getString("packageId") }.orEmpty()
+                    ViewerScreen(PackageId(map), onBack = { navigation.popBackStack() }, trackScreen = true,
                         onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
-                        onReview = { navigation.navigate("activity/$it") })
+                        onReview = { navigation.navigate("viewer/$map/activity/$it") })
+                }
+                composable(TrackMapRoute) {
+                    ViewerScreen(null, trackScreen = true, onBack = { navigation.popBackStack() },
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
+                        onReview = { navigation.navigate("activity/$it") },
+                        onTrack = { source -> navigation.navigate(source?.let { "viewer/$it/track" } ?: TrackMapRoute) { launchSingleTop = true } })
                 }
                 composable(SavedRouteRoute) { routeEntry ->
                     val id = routeEntry.arguments?.read { getString("routeId") }.orEmpty()
-                    ViewerScreen(null, onBack = { navigation.popBackStack() }, initialRouteId = id,
+                    val owner = bes.max.bmaps.domain.activity.routePackageId(id)
+                    if (owner == null) LibraryScreen(onBuildMap = { navigation.openDestination(ShellDestination.CONSTRUCTOR) },
+                        onCredentials = { navigation.navigate("provider-credentials/$it") },
+                        onOpenMap = { navigation.navigate("viewer/${it.value}/route/$id") })
+                    else ViewerScreen(PackageId(owner), onBack = { navigation.popBackStack() }, initialRouteId = id,
                         onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
-                        onReview = { navigation.navigate("activity/$it") })
+                        onReview = { navigation.navigate("activity/$it") },
+                        onTrack = { source -> navigation.navigate(source?.let { "viewer/$it/track" } ?: TrackMapRoute) { launchSingleTop = true } })
+                }
+                composable(PackageSavedRouteRoute) { routeEntry ->
+                    val id = routeEntry.arguments?.read { getString("routeId") }.orEmpty()
+                    val map = routeEntry.arguments?.read { getString("packageId") }.orEmpty()
+                    ViewerScreen(PackageId(map), onBack = { navigation.popBackStack() }, initialRouteId = id,
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
+                        onReview = { navigation.navigate("viewer/$map/activity/$it") },
+                        onTrack = { navigation.navigate("viewer/$map/track") { launchSingleTop = true } })
                 }
                 composable(ActivityReviewRoute) { reviewEntry ->
                     val id = reviewEntry.arguments?.read { getString("activityId") }.orEmpty()
@@ -138,6 +160,8 @@ private const val SettingsRoute = "settings"
 private const val MapRoute = "map/{provider}/{style}"
 private const val MapSettingsRoute = "map-settings"
 
+private const val PackageSavedRouteRoute = "viewer/{packageId}/route/{routeId}"
+private const val PackageTrackRoute = "viewer/{packageId}/track"
 private const val ViewerRoute = "viewer/{packageId}"
 
 private const val HistoryRoute = "activities"
@@ -145,4 +169,4 @@ private const val TrackMapRoute = "track-map"
 private const val SavedRouteRoute = "track-map/{routeId}"
 private const val ActivityReviewRoute = "activity/{activityId}"
 private const val PackageActivityReviewRoute = "viewer/{packageId}/activity/{activityId}"
-private val ViewerRoutes = setOf(ViewerRoute, TrackMapRoute, SavedRouteRoute, ActivityReviewRoute, PackageActivityReviewRoute)
+private val ViewerRoutes = setOf(ViewerRoute, PackageSavedRouteRoute, PackageTrackRoute, TrackMapRoute, SavedRouteRoute, ActivityReviewRoute, PackageActivityReviewRoute)

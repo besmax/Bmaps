@@ -48,6 +48,21 @@ class TrackPresentationTest {
         assertFalse(metrics.hasNavigation)
     }
 
+    @Test fun actualDistanceRouteProgressAndRecordingTimeAreIndependent() {
+        val point = sample("point", "segment", 0.0, 0.0)
+        val record = ActivityRecord("trip", 0, "generation", "Trip", ActivityProfile.ROAD_TRAVEL,
+            ActivityStatus.PAUSED, point.acquiredAt, point.acquiredAt)
+        val live = ActivityLiveState(record, 6_200.0, ActivityDurations(120_000, 60_000, 50_000, 0),
+            progress = RouteProgress(RouteMatchQuality.MATCHED, completedRouteMeters = 5_800.0,
+                remainingRouteMeters = 10_200.0, plannedDistanceMeters = 16_000.0))
+        val metrics = trackMetrics(live, null)
+        assertEquals("6.2", metrics.distance)
+        assertEquals("5.8 / 16.0 km", metrics.routeProgress)
+        assertEquals("0:01:00", metrics.recordingTime)
+        assertEquals("0:02:00", metrics.elapsed)
+        assertEquals("— km/h", metrics.speed)
+    }
+
     @Test fun pathBufferNeverConnectsPauseSegmentsAndPreservesEndpointsWhileThinning() {
         val buffer = TrackPathBuffer()
         repeat(21_000) { index -> buffer.add(sample("p$index", "first", 0.0, index / 100000.0)) }

@@ -84,6 +84,7 @@ data class ActivityRecord(
     val lastCommand: ActivityCommand? = null,
     val navigation: ActivityNavigationState? = null,
     val lastNavigationCommand: ActivityNavigationCommand? = null,
+    val packageId: String? = null,
 )
 
 @Serializable
@@ -143,3 +144,6 @@ data class ActivityStatistics(
 ) {
     fun durations() = ActivityDurations(elapsedMillis, recordingMillis, movingMillis, interruptedMillis, elapsedIsEstimated)
 }
+
+fun routePackageId(id: String): String? = id.takeIf { it.startsWith("map:") }?.removePrefix("map:")?.substringBeforeLast(':')
+fun packageRouteId(packageId: String, routeId: String): String = "map:$packageId:${routeId.substringAfterLast(':').takeLast(36)}"
