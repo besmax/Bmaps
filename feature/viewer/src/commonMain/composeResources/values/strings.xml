@@ -325,4 +325,13 @@
     <string name="track_pick_alternative">Section %1$d of %2$d · Switch</string>
     <string name="track_pick_confirm">Confirm position</string>
     <string name="track_start_position">Selected start position and direction</string>
+    <string name="history_details">Activity details</string>
+    <string name="history_active_recording">Current activity</string>
+    <string name="history_completed_empty">No completed activities match this search.</string>
+    <string name="history_more_activities">Load more activities</string>
+    <string name="history_average_speed">Average speed during recording: %1$s km/h</string>
+    <string name="history_maximum_speed">Maximum measured speed: %1$s km/h</string>
+    <string name="history_telemetry">Telemetry</string>
+    <string name="history_map_legend">Green: recorded path · purple: planned route</string>
+    <string name="history_show_full_path">Fit full path without background map</string>
 </resources>

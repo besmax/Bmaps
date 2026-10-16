@@ -24,6 +24,7 @@ internal data class SavedRouteItem(val id: String, val name: String, val revisio
 internal data class HistoryState(
     val routesTab: Boolean = false, val search: String = "", val filter: Int = 0, val busy: Boolean = false,
     val activities: ImmutableList<HistoryItem> = persistentListOf(), val routes: ImmutableList<SavedRouteItem> = persistentListOf(),
+    val activeItem: HistoryItem? = null,
     val more: Boolean = false, val activeId: String? = null, val error: StringResource? = null,
     val editingId: String? = null, val editingRoute: Boolean = false, val draftName: String = "",
     val deletingId: String? = null, val deletingRoute: Boolean = false,
@@ -40,6 +41,10 @@ internal data class ReviewSeries(val id: String, val metric: StringResource, val
 internal data class ReviewEvent(val id: String, val time: Long, val label: StringResource, val relatedSampleId: String?)
 @Immutable
 internal data class ReviewState(
+    val revision: Long = 0, val date: String = "", val profile: StringResource? = null, val packageId: String? = null,
+    val averageSpeed: String? = null, val maximumSpeed: String? = null,
+    val actionsMenu: Boolean = false, val renaming: Boolean = false, val draftName: String = "", val deleting: Boolean = false, val deleted: Boolean = false,
+    val actionError: StringResource? = null,
     val activityId: String? = null, val name: String = "", val status: StringResource? = null,
     val loading: Boolean = false, val error: StringResource? = null, val busy: Boolean = false,
     val distance: String = "", val elapsed: String = "", val recording: String = "", val moving: String = "",

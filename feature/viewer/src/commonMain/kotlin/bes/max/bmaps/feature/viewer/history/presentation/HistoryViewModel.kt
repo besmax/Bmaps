@@ -48,7 +48,13 @@ class HistoryViewModel(private val activities: ActivityRepository, private val r
     private var mutation = false
     init {
         session.initialize()
-        viewModelScope.launch { session.active.collect { record -> mutableState.update { it.copy(activeId = record?.id) } } }
+        viewModelScope.launch { session.active.collect { record ->
+            val active = record?.takeIf { it.status != ActivityStatus.COMPLETED }
+            mutableState.update { it.copy(activeId = active?.id, activeItem = active?.let { value ->
+                HistoryItem(value.id, value.name, Instant.fromEpochMilliseconds(value.startedAt.epochMillis).toString(),
+                    historyStatus(value.status), historyProfile(value.profile), value.revision, false, true, false)
+            }) }
+        } }
     }
     fun refresh() { if (!state.value.busy) load(false) }
     fun tab(routes: Boolean) { if (state.value.busy) return; mutableState.update { it.copy(routesTab = routes) }; load(false) }

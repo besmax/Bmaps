@@ -58,6 +58,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import org.jetbrains.compose.resources.StringResource
 import kotlin.math.abs
+import kotlin.time.Instant
 
 @Inject
 class ActivityReviewReader(private val activities: ActivityRepository) {
@@ -83,6 +84,7 @@ class ActivityReviewReader(private val activities: ActivityRepository) {
         }.map { it.time.epochMillis }.sorted()
         val series = linkedMapOf<String, ReviewSeriesBuffer>()
         var cursor: TelemetryCursor? = null
+        var maximumSpeed: Double? = null
         var count = 0L
         var fromTime = record.startedAt.epochMillis
         var toTime = record.updatedAt.epochMillis
@@ -94,6 +96,9 @@ class ActivityReviewReader(private val activities: ActivityRepository) {
                 fromTime = minOf(fromTime, sample.acquiredAt.epochMillis)
                 toTime = maxOf(toTime, sample.acquiredAt.epochMillis)
                 if (++count > 2_000_000) throw ReviewFailure(ActivityFailure.CapacityExceeded)
+                (sample.measurement as? SpeedMeasurement)?.metersPerSecond?.let { value ->
+                    maximumSpeed = maxOf(maximumSpeed ?: value, value)
+                }
                 val measurement = when (val value = sample.measurement) {
                     is SpeedMeasurement -> Triple(
                         "speed",
@@ -169,6 +174,12 @@ class ActivityReviewReader(private val activities: ActivityRepository) {
         }.toImmutableList()
         return ReviewState(
             activityId = id,
+            revision = record.revision,
+            date = Instant.fromEpochMilliseconds(record.startedAt.epochMillis).toString(),
+            profile = historyProfile(record.profile),
+            packageId = record.packageId,
+            averageSpeed = if (statistics.recordingMillis > 0) reviewNumber(statistics.distanceMeters * 3600 / statistics.recordingMillis) else null,
+            maximumSpeed = maximumSpeed?.let { reviewNumber(it * 3.6) },
             name = record.name,
             status = historyStatus(record.status),
             distance = trackNumber(statistics.distanceMeters / 1000),

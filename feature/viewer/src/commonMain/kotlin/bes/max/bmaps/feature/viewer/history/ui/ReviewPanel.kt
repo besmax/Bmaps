@@ -50,36 +50,43 @@ internal fun ReviewPanel(state: ReviewState, onExpand: (Boolean) -> Unit, onSeri
             }
             if (!state.loading && state.error == null) {
                 ReviewStatistics(state.distance, state.elapsed, state.recording, state.moving, state.interrupted, state.estimated)
-                ReviewSeriesList(state.series, state.selectedSeries, onSeries)
-                state.series.getOrNull(state.selectedSeries)?.let { series ->
-                    Text("${stringResource(series.metric)} · ${series.unit}", style = MaterialTheme.typography.titleSmall)
-                    Text(series.source, style = MaterialTheme.typography.bodySmall)
-                    Text(stringResource(Res.string.history_sample_statistics, series.minimum, series.mean, series.maximum, series.count.toString()), style = MaterialTheme.typography.bodySmall)
-                    TelemetryChart(series.points, state.fromTime, state.toTime, state.selectedTime, onSelect)
-                    if (series.points.isNotEmpty()) Slider(
-                        value = series.points.indexOfFirst { it.time == state.selectedTime }.coerceAtLeast(0).toFloat(),
-                        onValueChange = { value -> series.points.getOrNull(value.toInt())?.let { onSelect(it.time, it.id) } },
-                        valueRange = 0f..(series.points.size - 1).coerceAtLeast(1).toFloat(),
-                        modifier = Modifier.semantics { contentDescription = "${series.unit}: ${series.source}" })
-                }
-                if (!state.heartRateAvailable) Text(stringResource(Res.string.history_heart_unavailable), style = MaterialTheme.typography.bodySmall)
-                if (state.series.isEmpty()) Text(stringResource(Res.string.history_no_measurements), style = MaterialTheme.typography.bodySmall)
-                state.selectedValue?.let { Text(stringResource(Res.string.history_selected_value, it), style = MaterialTheme.typography.bodyMedium) }
-                state.selectedSource?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                state.selectedTime?.let { Text(stringResource(Res.string.history_selected_time, Instant.fromEpochMilliseconds(it).toString()), style = MaterialTheme.typography.bodySmall) }
-                state.selectedPositionTime?.let { Text(stringResource(Res.string.history_position_time, Instant.fromEpochMilliseconds(it).toString()), style = MaterialTheme.typography.bodySmall) }
-                if (state.selectedTime != null && state.selectedPosition == null) Text(stringResource(Res.string.history_no_position), style = MaterialTheme.typography.bodySmall)
-                Row {
-                    TextButton({ onEvents(true) }) { Text(stringResource(Res.string.history_events)) }
-                    TextButton({ onExport(true) }, enabled = state.exportable && !state.busy) { Text(stringResource(Res.string.history_export)) }
-                }
+                ReviewTelemetry(state, onSeries, onSelect, onEvents, onExport)
             }
         }
     }
 }
 
 @Composable
-private fun ReviewStatistics(distance: String, elapsed: String, recording: String, moving: String, interrupted: String, estimated: Boolean) {
+internal fun ReviewTelemetry(state: ReviewState, onSeries: (Int) -> Unit, onSelect: (Long, String?) -> Unit,
+    onEvents: (Boolean) -> Unit, onExport: (Boolean) -> Unit) {
+    state.actionError?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+    ReviewSeriesList(state.series, state.selectedSeries, onSeries)
+    state.series.getOrNull(state.selectedSeries)?.let { series ->
+        Text("${stringResource(series.metric)} · ${series.unit}", style = MaterialTheme.typography.titleSmall)
+        Text(series.source, style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(Res.string.history_sample_statistics, series.minimum, series.mean, series.maximum, series.count.toString()), style = MaterialTheme.typography.bodySmall)
+        TelemetryChart(series.points, state.fromTime, state.toTime, state.selectedTime, onSelect)
+        if (series.points.isNotEmpty()) Slider(
+            value = series.points.indexOfFirst { it.time == state.selectedTime }.coerceAtLeast(0).toFloat(),
+            onValueChange = { value -> series.points.getOrNull(value.toInt())?.let { onSelect(it.time, it.id) } },
+            valueRange = 0f..(series.points.size - 1).coerceAtLeast(1).toFloat(),
+            modifier = Modifier.semantics { contentDescription = "${series.unit}: ${series.source}" })
+    }
+    if (!state.heartRateAvailable) Text(stringResource(Res.string.history_heart_unavailable), style = MaterialTheme.typography.bodySmall)
+    if (state.series.isEmpty()) Text(stringResource(Res.string.history_no_measurements), style = MaterialTheme.typography.bodySmall)
+    state.selectedValue?.let { Text(stringResource(Res.string.history_selected_value, it), style = MaterialTheme.typography.bodyMedium) }
+    state.selectedSource?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+    state.selectedTime?.let { Text(stringResource(Res.string.history_selected_time, Instant.fromEpochMilliseconds(it).toString()), style = MaterialTheme.typography.bodySmall) }
+    state.selectedPositionTime?.let { Text(stringResource(Res.string.history_position_time, Instant.fromEpochMilliseconds(it).toString()), style = MaterialTheme.typography.bodySmall) }
+    if (state.selectedTime != null && state.selectedPosition == null) Text(stringResource(Res.string.history_no_position), style = MaterialTheme.typography.bodySmall)
+    Row {
+        TextButton({ onEvents(true) }) { Text(stringResource(Res.string.history_events)) }
+        TextButton({ onExport(true) }, enabled = state.exportable && !state.busy) { Text(stringResource(Res.string.history_export)) }
+    }
+}
+
+@Composable
+internal fun ReviewStatistics(distance: String, elapsed: String, recording: String, moving: String, interrupted: String, estimated: Boolean) {
     Column {
         Text(stringResource(Res.string.track_distance, distance))
         Text(stringResource(Res.string.track_elapsed, elapsed), style = MaterialTheme.typography.bodySmall)
@@ -125,7 +132,7 @@ internal fun ReviewDialogs(state: ReviewState, onSelect: (Long, String?) -> Unit
     if (state.eventList) AlertDialog(onDismissRequest = { onEvents(false) }, title = { Text(stringResource(Res.string.history_events)) },
         text = { ReviewEventList(state.events) { time, id -> onSelect(time, id); onEvents(false) } },
         confirmButton = { TextButton({ onEvents(false) }) { Text(stringResource(Res.string.viewer_done)) } })
-    if (state.exporting) ActivityExportDialog(false, state.busy, state.error, onExport, onCloseExport)
+    if (state.exporting) ActivityExportDialog(false, state.busy, state.actionError ?: state.error, onExport, onCloseExport)
 }
 @Composable
 private fun ReviewEventList(events: ImmutableList<ReviewEvent>, onSelect: (Long, String?) -> Unit) {

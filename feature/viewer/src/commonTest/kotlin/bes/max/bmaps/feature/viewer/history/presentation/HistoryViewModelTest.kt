@@ -37,6 +37,17 @@ class HistoryViewModelTest {
             assertEquals(50, repository.queries.last().limit)
         }
     }
+    @Test fun completedActivityListUsesCatalogFilteringAndRetainsItsFilterWhileSearching() = runTest {
+        fixture { model, repository ->
+            model.filter(1); runCurrent()
+            assertEquals(setOf(ActivityStatus.COMPLETED), repository.queries.last().statuses)
+            model.search("Ride"); runCurrent()
+            assertEquals(setOf(ActivityStatus.COMPLETED), repository.queries.last().statuses)
+            assertEquals("Ride", repository.queries.last().nameContains)
+            model.more(); runCurrent()
+            assertEquals(ActivityHistoryCursor(1000, "first"), repository.queries.last().before)
+        }
+    }
     @Test fun invalidRenameStaysVisibleAndValidRenamePreservesTheRecordedTimeline() = runTest {
         fixture { model, repository ->
             model.refresh(); runCurrent()

@@ -31,12 +31,13 @@ import org.jetbrains.compose.resources.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryScreen(onBack: () -> Unit, onReview: (String) -> Unit, onRecord: () -> Unit, onFollow: (String) -> Unit, onOpenActive: () -> Unit = onRecord) {
+fun HistoryScreen(onBack: () -> Unit, onReview: (String) -> Unit, onRecord: () -> Unit, onFollow: (String) -> Unit, onOpenActive: () -> Unit = onRecord, initialRoutesTab: Boolean = false) {
     val model = metroViewModel<HistoryViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val documents = rememberNativeDocuments({ it.dispose() }, model::nativeFailure)
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(model, initialRoutesTab) { if (initialRoutesTab) model.tab(true) }
     LaunchedEffect(model, lifecycle, documents) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             model.refresh()
@@ -46,7 +47,7 @@ fun HistoryScreen(onBack: () -> Unit, onReview: (String) -> Unit, onRecord: () -
             } }
         }
     }
-    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(Res.string.history_title)) },
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(if (state.routesTab) Res.string.history_routes else Res.string.history_title)) },
         navigationIcon = { TextButton(onBack) { Text(stringResource(Res.string.viewer_back)) } },
         actions = { TextButton(onRecord) { Text(stringResource(Res.string.history_new_from_map)) } }) }, snackbarHost = { SnackbarHost(snackbar) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {

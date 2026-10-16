@@ -44,7 +44,7 @@ class ReviewViewModel(private val reader: ActivityReviewReader, private val acti
         if (state.value.activityId == id) return
         load(id)
     }
-    fun retry() { state.value.activityId?.let(::load) }
+    fun retry() { if (!state.value.busy) state.value.activityId?.let(::load) }
     private fun load(id: String) {
         val token = ++generation
         loading?.cancel(); selecting?.cancel()
@@ -56,6 +56,54 @@ class ReviewViewModel(private val reader: ActivityReviewReader, private val acti
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: ReviewFailure) { if (token == generation) mutableState.update { it.copy(loading = false, error = historyFailure(failure.reason)) } }
             catch (_: Exception) { if (token == generation) mutableState.update { it.copy(loading = false, error = Res.string.history_error) } }
+        }
+    }
+    fun actionsMenu(show: Boolean) { mutableState.update { it.copy(actionsMenu = show) } }
+    fun renameDialog(show: Boolean) {
+        if (state.value.busy || show && !state.value.editable) return
+        mutableState.update { it.copy(renaming = show, draftName = it.name, actionError = null) }
+    }
+    fun draftName(value: String) {
+        if (!state.value.busy && value.length <= 120) mutableState.update { it.copy(draftName = value) }
+    }
+    fun deleteDialog(show: Boolean) {
+        if (state.value.busy || show && !state.value.editable) return
+        mutableState.update { it.copy(deleting = show, actionError = null) }
+    }
+    fun rename() = mutate {
+        val state = state.value
+        if (!state.renaming || !state.editable) return@mutate
+        val name = state.draftName.trim()
+        if (name.isEmpty() || name.length > 120) throw ReviewFailure(ActivityFailure.InvalidInput("name"))
+        val record = activities.get(requireNotNull(state.activityId)).valueOrThrow()
+        if (record.revision != state.revision) throw ReviewFailure(ActivityFailure.RevisionConflict)
+        if (record.status != ActivityStatus.COMPLETED) throw ReviewFailure(ActivityFailure.ActivityBusy)
+        val changed = record.copy(name = name, revision = record.revision + 1)
+        if (ActivityValidation.record(changed) != null) throw ReviewFailure(ActivityFailure.InvalidInput("name"))
+        activities.commit(ActivityCommit(record.revision, changed)).valueOrThrow()
+        mutableState.update { it.copy(name = changed.name, revision = changed.revision, renaming = false) }
+    }
+    fun delete() = mutate {
+        val state = state.value
+        if (!state.deleting || !state.editable) return@mutate
+        val id = requireNotNull(state.activityId)
+        val record = activities.get(id).valueOrThrow()
+        if (record.revision != state.revision) throw ReviewFailure(ActivityFailure.RevisionConflict)
+        if (record.status != ActivityStatus.COMPLETED) throw ReviewFailure(ActivityFailure.ActivityBusy)
+        activities.delete(id).valueOrThrow()
+        selecting?.cancel()
+        mutableState.update { it.copy(deleting = false, deleted = true) }
+    }
+    private fun mutate(block: suspend () -> Unit) {
+        if (state.value.busy || state.value.loading) return
+        mutableState.update { it.copy(busy = true, actionError = null) }
+        viewModelScope.launch {
+            try { block() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: ReviewFailure) { mutableState.update { it.copy(actionError =
+                if (failure.reason is ActivityFailure.InvalidInput) Res.string.history_invalid_name else historyFailure(failure.reason)) } }
+            catch (_: Exception) { mutableState.update { it.copy(actionError = Res.string.history_error) } }
+            finally { mutableState.update { it.copy(busy = false) } }
         }
     }
     fun fitted() { mutableState.update { it.copy(fitPending = false) } }
@@ -129,13 +177,13 @@ class ReviewViewModel(private val reader: ActivityReviewReader, private val acti
             exporting?.cancel()
             return
         }
-        if (!state.value.busy) mutableState.update { it.copy(exporting = show) }
+        if (!state.value.busy) mutableState.update { it.copy(exporting = show, actionError = null) }
     }
-    fun nativeFailure() { mutableState.update { it.copy(error = Res.string.history_share_error) } }
+    fun nativeFailure() { mutableState.update { it.copy(actionError = Res.string.history_share_error) } }
     fun export(kind: Int) {
         val id = state.value.activityId ?: return
         if (state.value.busy || kind !in 0..1) return
-        mutableState.update { it.copy(busy = true, error = null) }
+        mutableState.update { it.copy(busy = true, actionError = null) }
         exporting = viewModelScope.launch {
             try {
                 val document = files.create(if (kind == 1) "json" else "gpx", if (kind == 1) "application/json" else "application/gpx+xml") { sink ->
@@ -144,7 +192,7 @@ class ReviewViewModel(private val reader: ActivityReviewReader, private val acti
                 mutableState.update { it.copy(exporting = false) }
                 channel.send(HistoryEvent.Share(document))
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (failure: ActivityExportException) { mutableState.update { it.copy(error = historyFailure(failure.reason)) } }
+            catch (failure: ActivityExportException) { mutableState.update { it.copy(actionError = historyFailure(failure.reason)) } }
             catch (_: Exception) { nativeFailure() }
             finally { mutableState.update { it.copy(busy = false) } }
         }
