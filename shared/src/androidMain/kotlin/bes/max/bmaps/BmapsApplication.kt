@@ -17,14 +17,18 @@ import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.createGraphFactory
 
-class BmapsApplication : Application(), androidx.work.Configuration.Provider {
+class BmapsApplication : Application(), androidx.work.Configuration.Provider, bes.max.bmaps.domain.activity.ActivityRecordingServiceOwner {
     internal val graph: AndroidAppGraph by lazy {
         createGraphFactory<AndroidAppGraph.Factory>().create(applicationContext)
     }
+    override val activityRecordingHost get() = graph.activityRecordingHost
+    override val activitySession get() = graph.activitySession
+
     override val workManagerConfiguration: androidx.work.Configuration
         get() = androidx.work.Configuration.Builder().setWorkerFactory(graph.downloadWorkerFactory).build()
     override fun onCreate() {
         super.onCreate()
+        graph.activitySession.initialize()
         graph.downloadScheduler.initialize()
         graph.elevationGenerationScheduler.initialize()
     }
@@ -32,6 +36,7 @@ class BmapsApplication : Application(), androidx.work.Configuration.Provider {
 
 @DependencyGraph(AppScope::class)
 internal interface AndroidAppGraph : AppGraph {
+    val activityRecordingHost: bes.max.bmaps.domain.activity.AndroidActivityRecordingHost
     val downloadWorkerFactory: bes.max.bmaps.domain.mapbuilder.MapDownloadWorkerFactory
     @DependencyGraph.Factory
     fun interface Factory {

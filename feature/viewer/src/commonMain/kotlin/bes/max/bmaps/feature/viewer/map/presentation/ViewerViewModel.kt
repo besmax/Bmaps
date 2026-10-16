@@ -8,6 +8,8 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.viewer.map.presentation
 
+import kotlinx.collections.immutable.ImmutableList
+import bes.max.bmaps.feature.viewer.activity.presentation.TrackLine
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
@@ -42,6 +44,7 @@ data class ViewerState(
     val attributionVisible: Boolean = false,
     val busy: Boolean = false,
     val annotationPyramid: TilePyramid? = null,
+    val vectorOnly: Boolean = false,
 )
 
 @Inject
@@ -65,11 +68,59 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
     private var pendingLocation: GeographicCoordinate? = null
     private var pendingLocationZoomScale: Double? = null
     private var locationRequestId = Long.MIN_VALUE
+    private var vectorFocused = false
+
+    fun openActivityMap(force: Boolean = false) {
+        if (state.value.vectorOnly && !force) return
+        packageId = null
+        observation?.cancel()
+        val previous = opening
+        previous?.cancel()
+        cancelLocationMove()
+        vectorFocused = false
+        val next = TilePyramid(ZoomRange(0, 18))
+        pyramid = next
+        viewport = MapViewport()
+        generation++
+        mutableState.value = ViewerState(loading = false, annotationPyramid = next, vectorOnly = true)
+        renderer.setContent(generation, RasterMapConfig(next, maxScale = 262_144.0), emptyList())
+        opening = viewModelScope.launch { previous?.join(); renderer.run() }
+    }
+
+    internal fun focusActivityPreview(lines: ImmutableList<TrackLine>) {
+        if (!state.value.vectorOnly || vectorFocused || renderer.camera.value == null) return
+        val coordinates = lines.flatMap { line -> line.points.map { GeographicCoordinate(it.latitude, it.longitude) } }
+        if (coordinates.size == 1) centerLocation(coordinates.single())
+        else if (fitCoordinates(coordinates)) vectorFocused = true
+    }
+
+    fun fitCoordinates(coordinates: List<GeographicCoordinate>): Boolean {
+        val camera = renderer.camera.value ?: return false
+        val points = coordinates.mapNotNull(camera.pyramid::positionOf)
+        if (points.isEmpty()) return false
+        val left = points.minOf { it.x }; val right = points.maxOf { it.x }
+        val top = points.minOf { it.y }; val bottom = points.maxOf { it.y }
+        val visible = camera.visibleWindow
+        val factor = minOf((visible.right - visible.left) / (right - left).coerceAtLeast(1e-6),
+            (visible.bottom - visible.top) / (bottom - top).coerceAtLeast(1e-6)) * 0.8
+        renderer.controller.moveTo(camera.session, locationRequestId++, MapViewport(MapPoint((left + right) / 2, (top + bottom) / 2),
+            (camera.viewport.scale * factor).coerceIn(camera.minScale, camera.maxScale)))
+        return true
+    }
 
     fun toggleImmersive() { mutableState.update { it.copy(immersive = !it.immersive) } }
 
     fun centerLocation(coordinate: GeographicCoordinate) {
         cancelLocationMove()
+        if (state.value.vectorOnly) {
+            if (WebMercator.normalized(coordinate) == null) return
+            pendingLocation = coordinate
+            pendingLocationZoomScale = renderer.camera.value?.let {
+                if (it.viewport.scale <= 1.0) 8192.0 else it.viewport.scale * it.fitScale * 2.0.pow(it.pyramid.levels.max)
+            } ?: 8192.0
+            applyPendingLocation()
+            return
+        }
         val layer = state.value.manifest?.layers?.firstOrNull() ?: return
         val region = WebMercator.splitBounds(layer.bounds).orEmpty().indexOfFirst { bounds ->
             coordinate.latitude in bounds.south..bounds.north && coordinate.longitude in bounds.west..bounds.east
@@ -86,13 +137,38 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
         else applyPendingLocation()
     }
 
+    private var activityMove: kotlinx.coroutines.Job? = null
+    fun followActivityLocation(coordinate: GeographicCoordinate, force: Boolean = false) {
+        val camera = renderer.camera.value ?: return
+        val point = camera.pyramid.positionOf(coordinate) ?: return
+        val window = camera.visibleWindow
+        val width = window.right - window.left
+        val height = window.bottom - window.top
+        if (width <= 0 || height <= 0) return
+        val x = (point.x - window.left) / width
+        val y = (point.y - window.top) / height
+        if (!force && x in 0.3..0.7 && y in 0.25..0.6) return
+        activityMove?.cancel()
+        val start = camera.viewport.center
+        val target = MapPoint(point.x.coerceIn(0.0, 1.0), (point.y + height * 0.08).coerceIn(0.0, 1.0))
+        activityMove = viewModelScope.launch {
+            repeat(12) { index ->
+                val t = (index + 1) / 12.0
+                val eased = t * t * (3 - 2 * t)
+                renderer.controller.moveTo(camera.session, locationRequestId++, camera.viewport.copy(center =
+                    MapPoint(start.x + (target.x - start.x) * eased, start.y + (target.y - start.y) * eased)))
+                kotlinx.coroutines.delay(25)
+            }
+        }
+    }
+
     internal fun locationCameraResult(result: CameraMoveResult) {
         if (result.requestId < 0 && result.outcome == CameraMoveOutcome.REJECTED) {
             channel.trySend(Res.string.location_center_failed)
         }
     }
 
-    fun cancelLocationMove() { pendingLocation = null; pendingLocationZoomScale = null }
+    fun cancelLocationMove() { activityMove?.cancel(); activityMove = null; pendingLocation = null; pendingLocationZoomScale = null; if (state.value.vectorOnly) vectorFocused = true }
 
     private fun applyPendingLocation() {
         val coordinate = pendingLocation ?: return
@@ -143,6 +219,7 @@ class ViewerViewModel(private val packages: PackageRepository) : ViewModel() {
     }
 
     fun retry() {
+        if (state.value.vectorOnly) { openActivityMap(force = true); return }
         val id = packageId ?: return
         val previous = opening
         previous?.cancel()

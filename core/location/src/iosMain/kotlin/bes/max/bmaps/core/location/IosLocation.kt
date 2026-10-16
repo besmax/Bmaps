@@ -22,7 +22,10 @@ import kotlinx.cinterop.useContents
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.isActive
 import platform.CoreLocation.*
+import platform.Foundation.NSProcessInfo
 import platform.Foundation.NSLog
 import platform.Foundation.NSDate
 import platform.Foundation.NSError
@@ -42,19 +45,24 @@ object IosLocationBindings {
 
 private class IosLocationService : LocationService {
     override fun observe(request: LocationRequest): Flow<LocationState> = callbackFlow {
-        val session = IosLocationSession(request) { trySend(it); Unit }
+        val session = IosLocationSession(request) {
+            if (trySend(it).isFailure && isActive) close(LocationDeliveryOverflow())
+        }
         session.start()
         awaitClose { session.stop() }
-    }
+    }.buffer(256)
 }
 
 private class IosLocationSession(
-    request: LocationRequest,
+    private val request: LocationRequest,
     private val onState: (LocationState) -> Unit,
 ) : NSObject(), CLLocationManagerDelegateProtocol {
     private val manager = CLLocationManager().apply {
         desiredAccuracy = kCLLocationAccuracyBest
         distanceFilter = request.minimumDistanceMeters
+        allowsBackgroundLocationUpdates = request.background
+        showsBackgroundLocationIndicator = request.background
+        pausesLocationUpdatesAutomatically = !request.background
     }
 
     fun start() {
@@ -77,6 +85,10 @@ private class IosLocationSession(
                 manager.stopUpdatingLocation()
                 onState(LocationState(LocationStatus.PERMISSION_DENIED))
             }
+            request.background && manager.accuracyAuthorization != CLAccuracyAuthorization.CLAccuracyAuthorizationFullAccuracy -> {
+                manager.stopUpdatingLocation()
+                onState(LocationState(LocationStatus.PRECISE_PERMISSION_REQUIRED))
+            }
             manager.authorizationStatus == kCLAuthorizationStatusAuthorizedWhenInUse || manager.authorizationStatus == kCLAuthorizationStatusAuthorizedAlways -> {
                 onState(LocationState())
                 manager.startUpdatingLocation()
@@ -88,14 +100,20 @@ private class IosLocationSession(
     override fun locationManagerDidChangeAuthorization(manager: CLLocationManager) { updateAuthorization() }
 
     override fun locationManager(manager: CLLocationManager, didUpdateLocations: List<*>) {
-        val location = didUpdateLocations.lastOrNull() as? CLLocation ?: return
-        if (location.horizontalAccuracy < 0) return
-        val coordinate = location.coordinate.useContents { latitude to longitude }
-        onState(LocationState(LocationStatus.ACTIVE, LocationFix(
-            coordinate.first, coordinate.second, location.horizontalAccuracy,
-            (location.timestamp.timeIntervalSince1970 * 1_000).toLong(),
-            location.speed.takeIf { it >= 0 }, location.course.takeIf { it >= 0 },
-        )))
+        for (item in didUpdateLocations) {
+            val location = item as? CLLocation ?: continue
+            if (location.horizontalAccuracy < 0) continue
+            val coordinate = location.coordinate.useContents { latitude to longitude }
+            onState(LocationState(LocationStatus.ACTIVE, LocationFix(
+                coordinate.first, coordinate.second, location.horizontalAccuracy,
+                (location.timestamp.timeIntervalSince1970 * 1_000).toLong(),
+                location.speed.takeIf { it >= 0 }, location.course.takeIf { it >= 0 },
+                ((NSProcessInfo.processInfo.systemUptime - (NSDate().timeIntervalSince1970 - location.timestamp.timeIntervalSince1970)) * 1_000).toLong().coerceAtLeast(0),
+                "core-location", location.altitude.takeIf { location.verticalAccuracy >= 0 },
+                location.verticalAccuracy.takeIf { it >= 0 },
+                location.speedAccuracy.takeIf { it >= 0 },
+            )))
+        }
     }
 
     override fun locationManager(manager: CLLocationManager, didFailWithError: NSError) {
@@ -106,6 +124,8 @@ private class IosLocationSession(
         }
     }
 }
+
+internal actual fun locationMonotonicMillis(): Long = (NSProcessInfo.processInfo.systemUptime * 1_000).toLong()
 
 internal actual fun locationTimeMillis(): Long = (NSDate().timeIntervalSince1970 * 1_000).toLong()
 

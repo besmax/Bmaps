@@ -24,6 +24,9 @@ import bes.max.bmaps.feature.viewer.annotations.ui.icons.MovingMarkerIcon
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerState
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerViewModel
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -40,6 +43,7 @@ import bes.max.bmaps.core.mapengine.CurrentLocationMarker
 import bes.max.bmaps.core.mapengine.MapCameraSnapshot
 import bes.max.bmaps.core.mapengine.MapMarker
 import bes.max.bmaps.core.mapengine.MapPoint
+import bes.max.bmaps.core.mapengine.MapPath
 import bes.max.bmaps.core.mapengine.RasterMap
 import bes.max.bmaps.core.mapengine.positionOf
 
@@ -54,6 +58,18 @@ internal fun ViewerMapContent(
     autoDismiss: Boolean,
     location: CurrentLocationOverlays = CurrentLocationOverlays(),
     onLocationGesture: () -> Unit = {},
+    activityPaths: List<MapPath> = emptyList(),
+    activityMarkers: List<MapMarker> = emptyList(),
+    onActivityClick: ((String, MapPoint) -> Unit)? = null,
+    onObjectRouteClick: (String) -> Unit = {},
+    navigatorMarker: Boolean = false,
+    markerCourse: Float? = null,
+    onMapPan: () -> Unit = {},
+    onStartPick: ((MapPoint) -> Unit)? = null,
+    startBearing: Float? = null,
+    onFollow: ((String) -> Unit)? = null,
+    showCallout: Boolean = true,
+    followLength: String? = null,
 ) {
     val markerGrowth = remember { Animatable(1f) }
     val placementVersion = annotationState.markerPlacementVersion
@@ -74,7 +90,10 @@ internal fun ViewerMapContent(
             it.display.camera?.session == camera?.session
     }?.overlays ?: fallback
     val handleOverlayClick: (String, MapPoint) -> Unit = { id, point ->
-        if (!state.immersive) {
+        if (onStartPick != null) onStartPick(point)
+        else if (!state.immersive) {
+            if (id.startsWith("track:object-route:")) onObjectRouteClick(id.removePrefix("track:object-route:").substringBefore('~'))
+            if (id.startsWith("track:recorded:")) onActivityClick?.invoke(id, point)
             overlays.targets[id]?.let { annotations.clickOverlay(it, point, model.renderer.controller) }
         }
     }
@@ -84,8 +103,8 @@ internal fun ViewerMapContent(
         overlays.markers.filterNot {
             overlays.targets[it.id] is AnnotationHit.Vertex &&
                 (state.immersive || annotationState.draft?.kind == AnnotationKind.MARKER)
-        } + location.markers,
-        overlays.paths + location.paths,
+        } + location.markers + activityMarkers,
+        overlays.paths + location.paths + activityPaths,
         handleOverlayClick,
         onGestureStart = {
             onLocationGesture()
@@ -93,13 +112,17 @@ internal fun ViewerMapContent(
             annotations.cancelExpansion()
             if (autoDismiss && !annotationState.hasMovingObject) annotations.dismissSelection()
         },
+        onPan = onMapPan,
         onLongPress = {
-            if (!state.immersive && state.manifest != null && state.error == null && !annotationState.busy && annotationState.draft == null) {
+            if (onStartPick == null && !navigatorMarker && !state.immersive && (state.manifest != null || state.vectorOnly) && state.error == null && !annotationState.busy && annotationState.draft == null) {
                 annotations.panel(true)
             }
         }
     ) { marker ->
-        if (marker.id == CURRENT_LOCATION_MARKER) CurrentLocationMarker(marker.label)
+        if (marker.id == CURRENT_LOCATION_MARKER) CurrentLocationMarker(marker.label, navigatorMarker, markerCourse)
+        else if (marker.id == "track:start") Box(
+            Modifier.size(44.dp).border(2.dp, Color(0xFFFFB300), CircleShape), contentAlignment = Alignment.Center,
+        ) { CurrentLocationMarker(marker.label, navigator = true, courseDegrees = startBearing) }
         else ViewerMarker(
             marker, overlays.targets[marker.id], annotationState, showSelection = !state.immersive,
             placementProgress = { if (lastPlacementVersion == placementVersion) markerGrowth.value else 0f },
@@ -107,8 +130,8 @@ internal fun ViewerMapContent(
             handleOverlayClick(marker.id, marker.position)
         }
     }
-    if (!state.immersive) {
-        ViewerObjectCallout(model, state, annotations, annotationState, camera, calloutAnimated)
+    if (!state.immersive && showCallout) {
+        ViewerObjectCallout(model, state, annotations, annotationState, camera, calloutAnimated, onFollow, followLength)
     }
 }
 
@@ -161,6 +184,8 @@ private fun ViewerObjectCallout(
     annotationState: AnnotationEditorState,
     camera: MapCameraSnapshot?,
     animated: Boolean,
+    onFollow: ((String) -> Unit)?,
+    followLength: String?,
 ) {
     val activeObject = annotationState.activeObject
     val activeObjectUi = annotationState.activeObjectUi
@@ -197,6 +222,10 @@ private fun ViewerObjectCallout(
         busy = annotationState.busy,
         moving = activeObjectUi?.moving == true,
         error = annotationState.error,
+        routeLength = followLength,
+        onFollow = onFollow?.takeIf { activeObject?.kind == AnnotationKind.LINE }?.let { callback ->
+            { activeObject?.id?.let(callback) }
+        },
         onEdit = { activeObject?.let { annotations.edit(it.id) } },
         onMove = { activeObject?.let { annotations.moveObject(it.id) } },
         onDelete = { activeObject?.let { annotations.confirmDelete(it.id, true) } },

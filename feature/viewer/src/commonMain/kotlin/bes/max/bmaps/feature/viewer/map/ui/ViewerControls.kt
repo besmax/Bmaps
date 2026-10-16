@@ -11,6 +11,8 @@ package bes.max.bmaps.feature.viewer.map.ui
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationEditorState
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationEditorViewModel
 import bes.max.bmaps.feature.viewer.annotations.ui.AnnotationEditorContent
+import bes.max.bmaps.feature.viewer.annotations.ui.MapObjectsActions
+import bes.max.bmaps.feature.viewer.annotations.presentation.MapObjectsState
 import bes.max.bmaps.feature.viewer.position.presentation.MapPositionState
 import bes.max.bmaps.feature.viewer.position.ui.MapPositionOverlay
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerState
@@ -37,6 +39,9 @@ internal fun ViewerBottomContent(
     positionState: MapPositionState,
     modifier: Modifier = Modifier,
     singleLine: Boolean = false,
+    showPosition: Boolean = true,
+    objects: MapObjectsState,
+    objectActions: MapObjectsActions,
 ) {
     Column(
         modifier.fillMaxWidth().safeDrawingPadding().padding(
@@ -46,8 +51,8 @@ internal fun ViewerBottomContent(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AnnotationEditorContent(annotations, annotationState, Modifier)
-        if (state.error == null) MapPositionOverlay(positionState, singleLine = singleLine)
+        AnnotationEditorContent(annotations, annotationState, Modifier, objects, objectActions)
+        if (showPosition && state.error == null) MapPositionOverlay(positionState, singleLine = singleLine)
     }
 }
 
@@ -71,7 +76,7 @@ internal fun BoxScope.ViewerMapControls(
     )
 
     val layers: @Composable () -> Unit = {
-        MapIconButton(
+        if (!state.vectorOnly) MapIconButton(
             onClick = { onInteraction(); model.showLayers() },
             iconResId = MapIcons.layers,
             contentDescription = stringResource(Res.string.layers_title),
@@ -99,7 +104,7 @@ internal fun BoxScope.ViewerMapControls(
                 iconResId = if (locationUnavailable) MapIcons.myLocationOff else MapIcons.myLocation,
                 iconTint = if (locationUnavailable) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 contentDescription = locationDescription ?: stringResource(Res.string.my_location),
-                enabled = state.manifest != null && state.error == null,
+                enabled = (state.vectorOnly || state.manifest != null) && state.error == null,
             )
             if (state.manifest?.layers.orEmpty().any { it.attribution.isNotEmpty() }) {
                 MapIconButton(

@@ -8,10 +8,19 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.core.mapengine
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.SideEffect
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -82,10 +91,27 @@ private fun clipLocationRing(points: List<MapPoint>): List<MapPoint> {
 }
 
 @Composable
-fun CurrentLocationMarker(label: String) {
-    Canvas(Modifier.size(24.dp).semantics { contentDescription = label }) {
-        drawCircle(Color.White, radius = 10.dp.toPx())
-        drawCircle(locationColor, radius = 7.dp.toPx())
+fun CurrentLocationMarker(label: String, navigator: Boolean = false, courseDegrees: Float? = null) {
+    val retained = remember { mutableFloatStateOf(0f) }
+    SideEffect { if (courseDegrees != null) retained.floatValue = courseDegrees }
+    val heading by animateFloatAsState(courseDegrees ?: retained.floatValue, tween(350))
+    Canvas(Modifier.size(if (navigator) 32.dp else 24.dp).semantics { contentDescription = label }) {
+        if (navigator && courseDegrees != null) {
+            rotate(heading) {
+                val arrow = Path().apply {
+                    moveTo(size.width * 0.5f, size.height * 0.08f)
+                    lineTo(size.width * 0.87f, size.height * 0.88f)
+                    lineTo(size.width * 0.5f, size.height * 0.69f)
+                    lineTo(size.width * 0.13f, size.height * 0.88f)
+                    close()
+                }
+                drawPath(arrow, Color.White, style = Stroke(3.dp.toPx()))
+                drawPath(arrow, locationColor)
+            }
+        } else {
+            drawCircle(Color.White, radius = 10.dp.toPx())
+            drawCircle(locationColor, radius = 7.dp.toPx())
+        }
     }
 }
 

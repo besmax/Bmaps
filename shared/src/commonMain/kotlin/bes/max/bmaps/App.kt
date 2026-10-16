@@ -29,6 +29,9 @@ import bes.max.bmaps.feature.shell.navigation.ui.AppShell
 import bes.max.bmaps.feature.shell.settings.ui.SettingsScreen
 import bes.max.bmaps.feature.shell.navigation.ui.ShellDestination
 import bes.max.bmaps.feature.viewer.map.ui.ViewerScreen
+import bes.max.bmaps.feature.viewer.history.ui.HistoryScreen
+import bes.max.bmaps.feature.viewer.history.ui.ActivityListScreen
+import bes.max.bmaps.feature.viewer.history.ui.ActivityDetailsScreen
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 
 @Composable
@@ -43,17 +46,19 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
             entry?.destination?.route
         }
         AppShell(
-            destination = ShellDestination.entries.firstOrNull { it.route == route || (it == ShellDestination.VIEWER && route == ViewerRoute) } ?: ShellDestination.LIBRARY,
-            fullScreen = route == MapRoute || route == MapSettingsRoute || route == ViewerRoute || route == SettingsRoute,
+            destination = ShellDestination.entries.firstOrNull { it.route == route || (it == ShellDestination.VIEWER && route in ViewerRoutes) } ?: ShellDestination.LIBRARY,
+            fullScreen = route == MapRoute || route == MapSettingsRoute || route in ViewerRoutes || route == HistoryRoute || route == SavedHistoryRoute || route == SettingsRoute,
             onBack = { navigation.popBackStack() },
             onNavigate = navigation::openDestination,
+            onActivities = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
             onPreferences = { navigation.navigate(SettingsRoute) { launchSingleTop = true } },
         ) { navigate ->
             NavHost(navController = navigation, startDestination = startDestination.route) {
                 composable(ShellDestination.LIBRARY.route) {
                     LibraryScreen(onBuildMap = { navigate(ShellDestination.CONSTRUCTOR) },
                         onCredentials = { navigation.navigate("provider-credentials/$it") },
-                        onOpenMap = { navigation.navigate("viewer/${it.value}") { launchSingleTop = true } })
+                        onOpenMap = { navigation.navigate("viewer/${it.value}") { launchSingleTop = true } },
+                        onActivities = { navigation.navigate(HistoryRoute) { launchSingleTop = true } })
                 }
                 composable(ShellDestination.CONSTRUCTOR.route) {
                     ConstructorScreen(onOpenLibrary = { navigate(ShellDestination.LIBRARY) },
@@ -80,7 +85,64 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
                 }
                 composable(ViewerRoute) { viewerEntry ->
                     val id = viewerEntry.arguments?.read { getString("packageId") }.orEmpty()
-                    ViewerScreen(PackageId(id), onBack = { navigation.popBackStack() })
+                    ViewerScreen(PackageId(id), onBack = { navigation.popBackStack() },
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
+                        onReview = { activity -> navigation.navigate("viewer/$id/activity/$activity") },
+                        onTrack = { source -> navigation.navigate(source?.let { "viewer/$it/track" } ?: TrackMapRoute) { launchSingleTop = true } })
+                }
+                composable(HistoryRoute) {
+                    ActivityListScreen(onBack = { navigation.popBackStack() },
+                        onDetails = { navigation.navigate("activity/$it") },
+                        onRecord = { navigation.openDestination(ShellDestination.LIBRARY) },
+                        onOpenActive = { navigation.navigate(TrackMapRoute) { launchSingleTop = true } },
+                        onSavedRoutes = { navigation.navigate(SavedHistoryRoute) { launchSingleTop = true } })
+                }
+                composable(SavedHistoryRoute) {
+                    HistoryScreen(initialRoutesTab = true, onBack = { navigation.popBackStack() },
+                        onReview = { navigation.navigate("activity/$it") },
+                        onRecord = { navigation.openDestination(ShellDestination.LIBRARY) },
+                        onOpenActive = { navigation.navigate(TrackMapRoute) { launchSingleTop = true } },
+                        onFollow = { navigation.navigate("track-map/$it") })
+                }
+                composable(PackageTrackRoute) { trackEntry ->
+                    val map = trackEntry.arguments?.read { getString("packageId") }.orEmpty()
+                    ViewerScreen(PackageId(map), onBack = { navigation.popBackStack() }, trackScreen = true,
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
+                        onReview = { navigation.navigate("viewer/$map/activity/$it") })
+                }
+                composable(TrackMapRoute) {
+                    ViewerScreen(null, trackScreen = true, onBack = { navigation.popBackStack() },
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
+                        onReview = { navigation.navigate("activity/$it") },
+                        onTrack = { source -> navigation.navigate(source?.let { "viewer/$it/track" } ?: TrackMapRoute) { launchSingleTop = true } })
+                }
+                composable(SavedRouteRoute) { routeEntry ->
+                    val id = routeEntry.arguments?.read { getString("routeId") }.orEmpty()
+                    val owner = bes.max.bmaps.domain.activity.routePackageId(id)
+                    if (owner == null) LibraryScreen(onBuildMap = { navigation.openDestination(ShellDestination.CONSTRUCTOR) },
+                        onCredentials = { navigation.navigate("provider-credentials/$it") },
+                        onOpenMap = { navigation.navigate("viewer/${it.value}/route/$id") })
+                    else ViewerScreen(PackageId(owner), onBack = { navigation.popBackStack() }, initialRouteId = id,
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
+                        onReview = { navigation.navigate("activity/$it") },
+                        onTrack = { source -> navigation.navigate(source?.let { "viewer/$it/track" } ?: TrackMapRoute) { launchSingleTop = true } })
+                }
+                composable(PackageSavedRouteRoute) { routeEntry ->
+                    val id = routeEntry.arguments?.read { getString("routeId") }.orEmpty()
+                    val map = routeEntry.arguments?.read { getString("packageId") }.orEmpty()
+                    ViewerScreen(PackageId(map), onBack = { navigation.popBackStack() }, initialRouteId = id,
+                        onHistory = { navigation.navigate(HistoryRoute) { launchSingleTop = true } },
+                        onReview = { navigation.navigate("viewer/$map/activity/$it") },
+                        onTrack = { navigation.navigate("viewer/$map/track") { launchSingleTop = true } })
+                }
+                composable(ActivityReviewRoute) { reviewEntry ->
+                    val id = reviewEntry.arguments?.read { getString("activityId") }.orEmpty()
+                    ActivityDetailsScreen(id, onBack = { navigation.popBackStack() })
+                }
+                composable(PackageActivityReviewRoute) { reviewEntry ->
+                    val id = reviewEntry.arguments?.read { getString("activityId") }.orEmpty()
+                    val map = reviewEntry.arguments?.read { getString("packageId") }.orEmpty()
+                    ActivityDetailsScreen(id, onBack = { navigation.popBackStack() }, packageId = PackageId(map))
                 }
                 dialog("provider-credentials/{identifier}") { entry ->
                     val identifier = entry.arguments?.read { getString("identifier") }
@@ -106,4 +168,14 @@ private const val SettingsRoute = "settings"
 private const val MapRoute = "map/{provider}/{style}"
 private const val MapSettingsRoute = "map-settings"
 
+private const val PackageSavedRouteRoute = "viewer/{packageId}/route/{routeId}"
+private const val PackageTrackRoute = "viewer/{packageId}/track"
 private const val ViewerRoute = "viewer/{packageId}"
+
+private const val HistoryRoute = "activities"
+private const val SavedHistoryRoute = "saved-routes"
+private const val TrackMapRoute = "track-map"
+private const val SavedRouteRoute = "track-map/{routeId}"
+private const val ActivityReviewRoute = "activity/{activityId}"
+private const val PackageActivityReviewRoute = "viewer/{packageId}/activity/{activityId}"
+private val ViewerRoutes = setOf(ViewerRoute, PackageSavedRouteRoute, PackageTrackRoute, TrackMapRoute, SavedRouteRoute, ActivityReviewRoute, PackageActivityReviewRoute)

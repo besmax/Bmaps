@@ -70,3 +70,15 @@ Static syntax, resources, and notice checks do not establish compilation or runt
 ```
 
 Native acceptance: change all settings independently; verify live theme, coordinate display, and clustering after Back and relaunch. Rotate while writing, test portrait/landscape and narrow split windows, scroll both landscape columns, check large text/touch targets and system Back, and compare the About version code against the installed APK/IPA metadata. Confirm read/write failure recovery and that all licensing content remains visible offline.
+
+## Track T5 root composition — 2026-10-13
+
+The library action menu exposes Activities through a callback, with no viewer import in the library. The umbrella wires the viewer-owned `activities` history screen, `track-map` live vector viewer, `track-map/{routeId}` preparation, `activity/{activityId}` package-free review and `viewer/{packageId}/activity/{activityId}` package-context review. These destinations retain the existing fullscreen viewer/shell policy. Opening history or a track map does not start recording. Successful foreground finish opens review; Back releases entry-owned presentation while the application session retains recording ownership. Settings and constructor destinations are unchanged. See `22_TRACK_MODE_AND_TELEMETRY.md`; builds, navigation and native acceptance remain unrun.
+
+## Dedicated phone tracking navigation — 2026-10-16
+
+`viewer/{packageId}/track` reuses `ViewerScreen` with tracking presentation enabled. Start preparation emits a viewer event; the umbrella only navigates to the source-map tracking entry. Leaving never stops the phone owner; ordinary maps expose a return indicator. Activities sends new recording to map selection, opens owned routes in their source map, and uses a library map picker plus `viewer/{packageId}/route/{routeId}` to copy a legacy unassigned route before preparation. `track-map` remains an active-owner recovery entry and resolves its persisted source map. Completed review stays independent. These routes are fullscreen. Source/static checks only; native navigation/back-stack/lifecycle acceptance remains with the owner.
+
+## Activity list and details navigation — 2026-10-16
+
+The library top bar has an Activities icon immediately before Settings. AppShell accepts an Activities callback; the umbrella wires it to `activities`, now implemented by `ActivityListScreen`. Existing library/track menu entries use the same destination. The former reusable-route/history UI remains reachable at `saved-routes`. Both activity review routes now render `ActivityDetailsScreen`, including the successful foreground-Finish destination. Details owns a map and scrolling statistics/telemetry content; source-map fallback and mutations stay in viewer presentation/domain code. All three destinations are fullscreen with their own top bars. No recording is started or stopped by these navigation transitions. Source/static validation only; build, native Back/share/lifecycle and visual acceptance remain with the owner. See document 22.

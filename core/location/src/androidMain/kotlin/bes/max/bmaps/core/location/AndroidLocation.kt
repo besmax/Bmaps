@@ -35,6 +35,7 @@ import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -52,12 +53,15 @@ private fun Context.preciseLocationGranted() =
 
 private class AndroidLocationService(private val context: Context) : LocationService {
     override fun observe(request: LocationRequest): Flow<LocationState> = callbackFlow {
+        fun publish(state: LocationState) {
+            if (trySend(state).isFailure && isActive) close(LocationDeliveryOverflow())
+        }
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
         val fine = context.preciseLocationGranted()
         val coarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         locationDiagnostic("Subscription started: precise=$fine, approximate=$coarse, enabled=${manager?.isLocationEnabled}")
         if (!fine) {
-            trySend(LocationState(if (coarse) LocationStatus.PRECISE_PERMISSION_REQUIRED else LocationStatus.PERMISSION_DENIED))
+            publish(LocationState(if (coarse) LocationStatus.PRECISE_PERMISSION_REQUIRED else LocationStatus.PERMISSION_DENIED))
             awaitClose { locationDiagnostic("Subscription stopped: permission missing") }
             return@callbackFlow
         }
@@ -68,7 +72,7 @@ private class AndroidLocationService(private val context: Context) : LocationSer
         }.filter { manager?.allProviders?.contains(it) == true }
         if (manager == null || candidates.isEmpty()) {
             locationDiagnostic("No supported device location provider")
-            trySend(LocationState(LocationStatus.UNAVAILABLE))
+            publish(LocationState(LocationStatus.UNAVAILABLE))
             awaitClose {}
             return@callbackFlow
         }
@@ -87,12 +91,12 @@ private class AndroidLocationService(private val context: Context) : LocationSer
             }
             if (selected != null && selected != published) {
                 published = selected
-                trySend(LocationState(LocationStatus.ACTIVE, selected.fix, selected.sourceConflict))
+                publish(LocationState(LocationStatus.ACTIVE, selected.fix, selected.sourceConflict))
             }
             if (selected == null) {
                 if (published != null && conflictingSources.isNotEmpty()) {
                     locationDiagnostic("Source conflict: no fresh trusted position; waiting for network or source agreement")
-                    trySend(LocationState(LocationStatus.STALE))
+                    publish(LocationState(LocationStatus.STALE))
                 }
                 published = null
             }
@@ -113,6 +117,10 @@ private class AndroidLocationService(private val context: Context) : LocationSer
                 location.latitude, location.longitude, location.accuracy.toDouble(), wallTime - age,
                 location.speed.toDouble().takeIf { location.hasSpeed() && it.isFinite() && it >= 0 },
                 location.bearing.toDouble().takeIf { location.hasBearing() && it.isFinite() && it >= 0 && it < 360 },
+                location.elapsedRealtimeNanos.takeIf { it > 0 }?.div(1_000_000) ?: (SystemClock.elapsedRealtime() - age).coerceAtLeast(0), provider,
+                location.altitude.takeIf { location.hasAltitude() && it.isFinite() },
+                location.verticalAccuracyMeters.toDouble().takeIf { location.hasVerticalAccuracy() && it.isFinite() && it >= 0 },
+                location.speedAccuracyMetersPerSecond.toDouble().takeIf { location.hasSpeedAccuracy() && it.isFinite() && it >= 0 },
             )
             if (!selector.record(provider, fix, wallTime)) {
                 return
@@ -124,7 +132,7 @@ private class AndroidLocationService(private val context: Context) : LocationSer
             val enabled = candidates.filter { manager.isProviderEnabled(it) }
             val fix = if (manager.isLocationEnabled && enabled.isNotEmpty()) publishSelected() else null
             locationDiagnostic("Available providers: $enabled")
-            trySend(when {
+            publish(when {
                 !manager.isLocationEnabled || enabled.isEmpty() -> LocationState(LocationStatus.DISABLED)
                 fix != null -> LocationState(LocationStatus.ACTIVE, fix, published?.sourceConflict == true)
                 else -> LocationState()
@@ -165,7 +173,7 @@ private class AndroidLocationService(private val context: Context) : LocationSer
         }
         fun publishRegistrationFailure() {
             if (registered.isEmpty() && selector.select(locationTimeMillis()) == null) {
-                trySend(LocationState(
+                publish(LocationState(
                     if (permissionFailure) LocationStatus.PERMISSION_DENIED else LocationStatus.UNAVAILABLE,
                 ))
             }
@@ -190,8 +198,10 @@ private class AndroidLocationService(private val context: Context) : LocationSer
             registered.values.forEach { manager.removeUpdates(it) }
             locationDiagnostic("Subscription stopped; released providers: ${registered.keys}")
         }
-    }
+    }.buffer(256)
 }
+
+internal actual fun locationMonotonicMillis(): Long = SystemClock.elapsedRealtime()
 
 internal actual fun locationTimeMillis(): Long = System.currentTimeMillis()
 

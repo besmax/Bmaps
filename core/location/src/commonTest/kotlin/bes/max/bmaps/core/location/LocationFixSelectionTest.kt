@@ -17,6 +17,19 @@ import kotlin.test.assertTrue
 class LocationFixSelectionTest {
     private val base = LocationFix(60.060066, 30.439427, 5.0, 100_000)
 
+    @Test fun nativeMonotonicFixesRemainFreshAndOrderedAfterWallClockRollback() {
+        val monotonic = locationMonotonicMillis()
+        val first = base.copy(monotonicMillis = monotonic)
+        val next = base.copy(timestampMillis = 90_000, monotonicMillis = monotonic + 1)
+        val selector = LocationFixSelector()
+        assertTrue(selector.record("gps", first, 90_000))
+        selector.select(90_000)
+        assertTrue(selector.record("gps", next, 90_000))
+        assertEquals(next, selector.select(90_000)?.fix)
+        assertTrue(next.isFresh(1_000_000))
+        assertTrue(canReplaceLocationFix(first, next))
+    }
+
     @Test fun almostSimultaneousResultsChooseAccuracyRegardlessOfArrivalOrderOrSource() {
         val accurate = base.copy(timestampMillis = 101_000)
         val coarse = base.copy(accuracyMeters = 500.0, timestampMillis = 102_000)

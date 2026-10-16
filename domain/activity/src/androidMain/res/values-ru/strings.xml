@@ -1,0 +1,7 @@
+<resources>
+    <string name="activity_recording_channel">Запись трека</string>
+    <string name="activity_recording_title">Прохождение трека</string>
+    <string name="activity_recording_text">Запись местоположения и телеметрии</string>
+    <string name="activity_recording_paused">Пауза · телеметрия не записывается</string>
+    <string name="activity_recording_finish">Завершить</string>
+</resources>

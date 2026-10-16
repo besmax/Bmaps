@@ -48,6 +48,8 @@ sealed interface PackageFailure {
     data object Io : PackageFailure
     @Serializable
     data object Conflict : PackageFailure
+    @Serializable
+    data object ActivityInProgress : PackageFailure
 }
 
 sealed interface PackageResult<out T> {

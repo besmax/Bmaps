@@ -64,6 +64,7 @@ fun AppShell(
     onNavigate: (ShellDestination) -> Unit,
     onPreferences: () -> Unit,
     onBack: () -> Unit = {},
+    onActivities: () -> Unit = {},
     fullScreen: Boolean = false,
     viewModel: ShellViewModel = metroViewModel(),
     content: @Composable ((ShellDestination) -> Unit) -> Unit,
@@ -95,7 +96,11 @@ fun AppShell(
                     navigationIcon = { if (destination != ShellDestination.LIBRARY) IconButton(onClick = onBack) { Icon(painterResource(Res.drawable.ic_back), stringResource(Res.string.back)) } },
                     title = { Text(stringResource(destination.label), style = MaterialTheme.typography.titleLarge) },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    actions = { IconButton(onClick = viewModel::openPreferences) { Icon(painterResource(Res.drawable.ic_settings), stringResource(Res.string.settings)) } },
+                    actions = {
+                        if (destination == ShellDestination.LIBRARY) IconButton(onClick = onActivities) {
+                            Icon(painterResource(Res.drawable.ic_activities), stringResource(Res.string.activities))
+                        }
+                        IconButton(onClick = viewModel::openPreferences) { Icon(painterResource(Res.drawable.ic_settings), stringResource(Res.string.settings)) } },
                 )
             },
         ) { padding ->

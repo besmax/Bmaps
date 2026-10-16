@@ -1,0 +1,7 @@
+<resources>
+    <string name="activity_recording_channel">Track recording</string>
+    <string name="activity_recording_title">Track activity</string>
+    <string name="activity_recording_text">Recording location and telemetry</string>
+    <string name="activity_recording_paused">Paused · telemetry is not recorded</string>
+    <string name="activity_recording_finish">Finish</string>
+</resources>

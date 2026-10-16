@@ -19,6 +19,7 @@ internal interface IosAppGraph : AppGraph
 private val appGraph: IosAppGraph by lazy { createGraph<IosAppGraph>() }
 
 fun initializeDownloadScheduling() {
+    appGraph.activitySession.initialize()
     appGraph.downloadScheduler.initialize()
     appGraph.elevationGenerationScheduler.initialize()
 }

@@ -18,6 +18,27 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ViewerViewModelTest {
+    @Test fun activityOnlyMapNeedsNoPackageOrRasterSource() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val owner = ViewModelStore()
+        try {
+            val repository = LocalOnlyRepository()
+            val model = ViewerViewModel(repository)
+            owner.put("viewer", model)
+            model.openActivityMap()
+            runCurrent()
+            assertTrue(model.state.value.vectorOnly)
+            assertFalse(model.state.value.loading)
+            assertNull(model.state.value.manifest)
+            assertNotNull(model.state.value.annotationPyramid)
+            assertTrue(repository.operations.isEmpty())
+            assertEquals(0, repository.tileOpens)
+            model.retry()
+            runCurrent()
+            assertTrue(repository.operations.isEmpty())
+        } finally { owner.clear(); runCurrent(); Dispatchers.resetMain() }
+    }
+
     @Test fun recreationReusesSessionAndRetryClosesBeforeOpeningReplacement() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val owner = ViewModelStore()

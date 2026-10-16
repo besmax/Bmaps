@@ -28,7 +28,7 @@ sealed interface LocationEvent {
 @Inject
 @ViewModelKey
 @ContributesIntoMap(AppScope::class)
-class LocationViewModel(private val service: LocationService) : ViewModel() {
+class LocationViewModel(private val service: SharedLocationService) : ViewModel() {
     private val mutableState = MutableStateFlow(LocationState())
     val state = mutableState.asStateFlow()
     private val channel = Channel<LocationEvent>(Channel.BUFFERED)
@@ -39,6 +39,7 @@ class LocationViewModel(private val service: LocationService) : ViewModel() {
 
     fun refresh() {
         locationDiagnostic("Location refresh requested")
+        service.refresh()
         revision.value++
     }
     fun cancelCenter() { centerPending = false; centerVersion++ }

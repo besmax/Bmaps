@@ -18,9 +18,14 @@ data class LocationFix(
     val timestampMillis: Long,
     val speedMetersPerSecond: Double? = null,
     val courseDegrees: Double? = null,
+    val monotonicMillis: Long? = null,
+    val provider: String = "phone",
+    val altitudeMeters: Double? = null,
+    val altitudeAccuracyMeters: Double? = null,
+    val speedAccuracyMetersPerSecond: Double? = null,
 )
 
-data class LocationRequest(val intervalMillis: Long = 1_000, val minimumDistanceMeters: Double = 0.0) {
+data class LocationRequest(val intervalMillis: Long = 1_000, val minimumDistanceMeters: Double = 0.0, val background: Boolean = false) {
     init {
         require(intervalMillis > 0 && minimumDistanceMeters.isFinite() && minimumDistanceMeters >= 0)
     }
@@ -31,6 +36,7 @@ data class LocationState(
     val status: LocationStatus = LocationStatus.WAITING,
     val fix: LocationFix? = null,
     val sourceConflict: Boolean = false,
+    val deliveryGap: Boolean = false,
 )
 
 interface LocationService {
@@ -46,9 +52,13 @@ interface LocationAccess {
 expect fun rememberLocationAccess(onChanged: () -> Unit): LocationAccess
 
 internal expect fun locationTimeMillis(): Long
+internal expect fun locationMonotonicMillis(): Long
 internal expect fun locationDiagnostic(message: String, error: Throwable? = null)
 
-internal fun LocationFix.isFresh(nowMillis: Long) = nowMillis - timestampMillis in -5_000L..30_000L
+internal fun LocationFix.isFresh(nowMillis: Long) =
+    (monotonicMillis?.let { locationMonotonicMillis() - it } ?: (nowMillis - timestampMillis)) in -5_000L..30_000L
+
+internal val LocationFix.orderMillis: Long get() = monotonicMillis ?: timestampMillis
 
 internal fun LocationFix.isValid() =
     latitude.isFinite() && latitude in -90.0..90.0 &&
@@ -63,7 +73,9 @@ internal fun canReplaceLocationFix(
     sourceConflict: Boolean = false,
 ): Boolean {
     if (current == null || sourceConflict) return true
-    return candidate.timestampMillis >= current.timestampMillis ||
-        (current.timestampMillis - candidate.timestampMillis <= LOCATION_ACCURACY_WINDOW_MILLIS &&
+    return candidate.orderMillis >= current.orderMillis ||
+        (current.orderMillis - candidate.orderMillis <= LOCATION_ACCURACY_WINDOW_MILLIS &&
             candidate.accuracyMeters < current.accuracyMeters)
 }
+
+internal class LocationDeliveryOverflow : Exception("Native location delivery buffer exceeded")

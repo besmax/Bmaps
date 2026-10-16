@@ -44,7 +44,7 @@ class RasterMapRenderer {
     private var sessionCounter = 0L
 
     fun setContent(generation: Int, config: RasterMapConfig, layers: List<RasterLayer>) {
-        require(layers.isNotEmpty() && layers.map { it.id }.distinct().size == layers.size)
+        require(layers.map { it.id }.distinct().size == layers.size)
         content.value = Content(generation, config, layers)
         mutableCamera.value = null
         controller.cancelMove()

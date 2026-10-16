@@ -77,6 +77,8 @@ internal fun MapObjectCallout(
     coordinatesLoading: Boolean = false,
     coordinateFormat: CoordinateFormat = CoordinateFormat.DECIMAL_DEGREES,
     elevationMeters: Double? = null,
+    onFollow: (() -> Unit)? = null,
+    routeLength: String? = null,
 ) {
     var size by remember { mutableStateOf(IntSize.Zero) }
     val anchor = if (camera != null && position != null) {
@@ -199,8 +201,18 @@ internal fun MapObjectCallout(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
+                        if (onFollow != null && current != null) {
+                            routeLength?.let { Text(stringResource(Res.string.track_route_length, it), style = MaterialTheme.typography.bodySmall) }
+                        }
                         HorizontalDivider()
                         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            if (onFollow != null && current != null) IconButton(onFollow, enabled = !busy) {
+                                Icon(
+                                    painter = painterResource(Res.drawable.ic_track),
+                                    contentDescription = stringResource(Res.string.track_follow)
+                                )
+                            }
+
                             IconButton(onEdit, enabled = current != null && !busy) {
                                 Icon(
                                     painter = painterResource(Res.drawable.ic_edit),

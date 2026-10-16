@@ -15,6 +15,7 @@ kotlin {
         implementation(project(":core:di"))
         implementation(project(":domain:providers"))
         implementation(project(":domain:map-builder"))
+        implementation(project(":domain:activity"))
         implementation(project(":core:database"))
         implementation(project(":core:storage"))
         implementation(project(":core:sharing"))

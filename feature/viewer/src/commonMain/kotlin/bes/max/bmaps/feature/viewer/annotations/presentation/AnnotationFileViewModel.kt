@@ -12,7 +12,6 @@ import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.sharing.*
 import bes.max.bmaps.domain.mapbuilder.AnnotationGeoJson
-import bes.max.bmaps.domain.mapbuilder.AnnotationImport
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
@@ -25,7 +24,6 @@ import org.jetbrains.compose.resources.StringResource
 
 internal data class AnnotationFileState(val busy: Boolean = false, val error: StringResource? = null)
 internal sealed interface AnnotationFileEvent {
-    data class Loaded(val text: String) : AnnotationFileEvent
     data class Share(val document: SharedDocument) : AnnotationFileEvent
 }
 
@@ -41,29 +39,6 @@ class AnnotationFileViewModel(private val files: SharedDocumentStore) : ViewMode
 
     fun cancel() { work?.cancel() }
     fun nativeFailure() { mutableState.update { it.copy(error = Res.string.annotations_file_error) } }
-
-    fun pick(document: PickedDocument) {
-        if (state.value.busy) { document.dispose(); return }
-        launch { read(document) }
-        work?.invokeOnCompletion { document.dispose() }
-    }
-
-    private suspend fun read(document: PickedDocument) {
-        val text = withContext(Dispatchers.IO) {
-            try { document.open().use { source ->
-                val buffer = Buffer()
-                while (true) {
-                    currentCoroutineContext().ensureActive()
-                    val count = source.readAtMostTo(buffer, 65_536)
-                    if (count == -1L) break
-                    require(count > 0 && buffer.size <= AnnotationGeoJson.MAX_BYTES)
-                }
-                buffer.readByteArray().decodeToString(throwOnInvalidSequence = true)
-            } } finally { document.dispose() }
-        }
-        withContext(Dispatchers.Default) { AnnotationImport.decode(text) }
-        channel.send(AnnotationFileEvent.Loaded(text))
-    }
 
     fun share(text: String) = launch {
         val bytes = text.encodeToByteArray()

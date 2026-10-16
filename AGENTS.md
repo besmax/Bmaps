@@ -14,24 +14,25 @@ Use this guide to select documentation, not as a mandatory reading checklist:
 | Product scope and requirements | `docs/1_VISION_AND_PRODUCT.md` |
 | Architecture, dependencies, module creation or ownership, feature package organization | `docs/2_ARCHITECTURE.md`, `docs/3_MODULES.md` |
 | UI state, ViewModels, events, stable presentation models and composable decomposition (screens, lists and list items) | `docs/4_STATE_AND_UI.md` |
-| Phase work, current status and acceptance criteria | `docs/5_IMPLEMENTATION_PLAN.md` |
-| Domain contracts and package format | `docs/6_CONTRACTS_AND_PACKAGE_FORMAT.md` |
+| Phase work, current status and acceptance criteria | `docs/5_IMPLEMENTATION_PLAN.md`; track-mode feature phases and status: `docs/22_TRACK_MODE_AND_TELEMETRY.md` |
+| Domain contracts and package format | `docs/6_CONTRACTS_AND_PACKAGE_FORMAT.md`; activity/route/telemetry and wearable contracts: `docs/22_TRACK_MODE_AND_TELEMETRY.md` |
 | Feature shell, navigation and application composition | `docs/7_FEATURE_SHELL.md` |
 | Providers, networking and credentials | `docs/8_PROVIDER_NETWORKING_AND_CREDENTIALS.md` |
 | Map rendering, camera control and coordinate transformations | `docs/9_MAP_ENGINE.md` |
 | Visual design and styling | `docs/10_BMAPS_DESIGN.md` |
-| Package storage, MBTiles, disk-size accounting, cached verification, dirty-state recovery and reconciliation | `docs/11_PACKAGE_STORAGE.md` |
+| Package storage, map-owned route assets and active-map deletion protection, MBTiles, disk-size accounting, cached verification, dirty-state recovery and reconciliation | `docs/11_PACKAGE_STORAGE.md` |
 | Download execution, scheduling, progress and restore | `docs/12_DOWNLOAD_PIPELINE.md` |
 | Library adaptive layouts, package opening/deletion, manual full verification and cancellation, offline viewer, adaptive control layout, immersive gestures and viewport retention | `docs/13_LIBRARY_AND_OFFLINE_VIEWER.md` |
 | Raster layer alignment, ordering, visibility, opacity and composition | `docs/14_RASTER_LAYER_COMPOSITION.md` |
-| Map annotations, marker icons, geometry editing, persisted vertex heights, callout coordinate-system display, GeoJSON and GPX import | `docs/15_ANNOTATIONS_AND_GEOJSON.md` |
+| Map objects, unified manual/imported route presentation and confirmed mixed GPX/GeoJSON import, marker icons, geometry editing, persisted vertex heights and callout coordinate-system display | `docs/15_ANNOTATIONS_AND_GEOJSON.md` |
 | Map object clustering, cluster interaction and expansion | `docs/15_ANNOTATIONS_AND_GEOJSON.md`, `docs/plans/MAP_OBJECT_CLUSTERING.md` (design proposal; verify current implementation in source) |
 | Elevation/DEM download selection, tile-envelope request bounds/margins, area/size estimates, footprint verification, provider credentials and persistence | `docs/16_ELEVATION_DOWNLOADS.md` |
 | Elevation/DEM reading, TIFF/native integration, bounded grid/block caches, sampling, center lookup cancellation, compact viewer center readout, annotation callout height and pre-save vertex height sampling | `docs/17_ELEVATION_READER.md` |
 | Generated elevation color layers, palette/range settings, background generation, performance pipeline/range cache, regeneration and disk-size accounting | `docs/21_ELEVATION_COLOR_LAYERS.md` |
 | Licensing, provenance, source headers, packaged notices and release signing | `docs/18_LICENSING_AND_PROVENANCE.md`, `CONTRIBUTING.md` |
 | Package import/export, `.bmaps` transfer format, standalone MBTiles and native document access/sharing | `docs/19_PACKAGE_TRANSFER.md` |
-| Current location/GPS, permissions, native and Google Fused Location Provider sources, severe source disagreements, lifecycle, accuracy overlays, initial focus and navigator preparation | `docs/20_CURRENT_LOCATION.md` |
+| Current location/GPS, shared map/recorder location distribution, native acquisition uptime/provenance/altitude, permissions, native and Google Fused Location Provider sources, severe source disagreements, lifecycle, accuracy overlays, initial focus and navigator preparation | `docs/20_CURRENT_LOCATION.md` |
+| Track mode, dedicated tracking screen/navigation arrow/free-area camera, start-settings dialog, map-tap start-position selection and lower-left map icon/controls, segmented activity overlays, follow/free camera state, foreground alerts, indexed complex-route matching/progress/gaps, navigation commands/alerts, frozen recorded-return snapshots, route-free recording, background activity lifecycle, telemetry, activity/route spatial storage and catalog recovery, detailed GPX route import, Apple Watch, library top-bar Activities entry, completed-activity list and dedicated activity details, paginated activity/route history, synchronized telemetry charts/map/timeline review, package-free vector viewing, reusable recorded routes and GPX/JSON activity exports | `docs/22_TRACK_MODE_AND_TELEMETRY.md` |
 
 For tasks spanning multiple areas, read the relevant sections from each affected area. Discover additional documents with targeted filename or text searches when needed. Reuse context already read in the conversation unless it has changed or needs verification. Update affected documentation when behavior, contracts, or implementation status changes.
 
@@ -64,7 +65,7 @@ Documents under `docs/plans/` describe proposals and implementation approaches; 
     * `core` modules are isolated infrastructure. Cross-imports within `core` should be strictly minimized.
 
 ## 4. Tech Stack Constraints
-* **UI:** Compose Multiplatform for all UI rendering.
+* **UI:** Compose Multiplatform for all UI rendering, with one exception approved by the project owner on 2026-10-12: SwiftUI is permitted only for the Apple Watch companion's watchOS UI. This exception does not extend to phone UI.
 * **Map Engine:** MapComposeMP for tile rendering.
 * **Network:** Ktor Client with platform-specific engines, specifically OkHttp for Android and Darwin for iOS.
 * **Storage:** Room KMP for primary application metadata; custom SQLite driver for `.mbtiles` read/write operations.

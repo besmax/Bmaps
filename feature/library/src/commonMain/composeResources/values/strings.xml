@@ -86,4 +86,6 @@
     <string name="verification_not_ready">Finish or restore this download before verifying the map.</string>
     <string name="library_add_map">Add map</string>
     <string name="library_close_actions">Close map actions</string>
+    <string name="library_activities">Activities</string>
+    <string name="library_map_in_use">Finish the active track before deleting its map.</string>
 </resources>

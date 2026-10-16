@@ -45,6 +45,7 @@ fun RasterMap(
     onOverlayClick: (String, MapPoint) -> Unit = { _, _ -> },
     onGestureStart: () -> Unit = {},
     onLongPress: () -> Unit = {},
+    onPan: () -> Unit = {},
     markerContent: @Composable (MapMarker) -> Unit = {},
 ) {
     val state by renderer.state.collectAsStateWithLifecycle()
@@ -53,6 +54,7 @@ fun RasterMap(
     val markerItems by rememberUpdatedState(markers.associateBy(MapMarker::id))
     val gesture by rememberUpdatedState(onGestureStart)
     val longPress by rememberUpdatedState(onLongPress)
+    val pan by rememberUpdatedState(onPan)
     val engine = state.engine
     val scope = rememberCoroutineScope()
     var mapOrigin by remember { mutableStateOf(Offset.Zero) }
@@ -108,6 +110,15 @@ fun RasterMap(
             }
             renderer.controller.cancelMove()
             gesture()
+            var panned = false
+            fun movement(event: androidx.compose.ui.input.pointer.PointerEvent): Boolean {
+                val change = event.changes.firstOrNull { it.id == down.id } ?: return false
+                val delta = change.position - down.position
+                val moved = event.changes.count { it.pressed } > 1 ||
+                    delta.x * delta.x + delta.y * delta.y > viewConfiguration.touchSlop * viewConfiguration.touchSlop
+                if (moved && !panned) { panned = true; pan() }
+                return moved
+            }
             val recognizedLongPress = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                 var cancelled = false
                 while (!cancelled) {
@@ -116,15 +127,14 @@ fun RasterMap(
                     if (change == null || !change.pressed) {
                         cancelled = true
                     } else {
-                        val delta = change.position - down.position
-                        cancelled = delta.x * delta.x + delta.y * delta.y > viewConfiguration.touchSlop * viewConfiguration.touchSlop
+                        cancelled = movement(event)
                     }
                 }
                 !cancelled
             } ?: true
             if (recognizedLongPress) longPress()
             while (currentEvent.changes.any { it.pressed }) {
-                awaitPointerEvent(PointerEventPass.Initial)
+                movement(awaitPointerEvent(PointerEventPass.Initial))
             }
         }
     }) {
