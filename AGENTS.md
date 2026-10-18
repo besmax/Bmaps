@@ -38,6 +38,8 @@ For tasks spanning multiple areas, read the relevant sections from each affected
 
 Keep this task-to-document guide current as part of the same change that adds, renames, moves, splits, or removes project documentation. Also update the affected rows when a document gains a new responsibility or a task area gets its own implementation document. Before completing documentation work, check that each new or changed task area has an accurate entry here and that referenced paths still exist. Do not leave new documents discoverable only through searches or links in other documents.
 
+Maintain one authoritative description of each contract and update it in place when behavior changes. Architecture documents describe boundaries; the module registry describes ownership/dependencies; feature documents describe detailed behavior and limits. Use section links instead of copying feature update paragraphs across documents. Application phase status belongs in `docs/5_IMPLEMENTATION_PLAN.md`; track-mode status and evidence belong in `docs/22_TRACK_MODE_AND_TELEMETRY.md` section 9. Do not append activity change history or retain superseded activity designs; preserve current constraints, pending work and truthful verification evidence.
+
 Documents under `docs/plans/` describe proposals and implementation approaches; they do not establish completion or override the current architecture and contracts. Use the relevant implementation document, `docs/5_IMPLEMENTATION_PLAN.md`, and source code to establish current behavior. Distinguish source implementation, automated verification, and user-reported device acceptance when updating status; do not mark unperformed builds or tests as passed.
 
 # Bmaps: AI Agent Core Conventions

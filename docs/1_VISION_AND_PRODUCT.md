@@ -29,9 +29,12 @@ Maps are stored entirely locally to maintain offline capabilities. Each download
   * `map_data.mbtiles`: The core SQLite database containing the raster tiles.
   * `layers/{layer_id}.mbtiles`: Additional raster layers with identical geographic bounds, listed in rendering order in the versioned manifest.
   * `annotations.db`: A localized SQLite database storing user markers, routes, and polygons. The schema is specifically designed to map directly to GeoJSON geometries and properties. This ensures high-performance spatial queries (viewport bounding box filtering) while allowing frictionless serialization to standard `.geojson` files during package export.
+  * `routes.json`: Optional registered auxiliary asset for full imported/recording-derived user routes; travels with the map and is removed on map deletion.
   * `config.json`: Master configuration file defining map boundaries, zoom levels, layers, and metadata.
   * `elevation.geotiff` (or `.tiff`): The DEM matrix for altitude parsing.
   * `*.*`: Any additional required auxiliary files.
+
+Activity recordings, telemetry and frozen route snapshots remain application-owned and readable after source-map deletion. An active activity protects its source map from deletion. Detailed ownership and feature status belong to [document 22](22_TRACK_MODE_AND_TELEMETRY.md#2-product-entities-and-ownership).
 
 The Phase 1 contracts and package lifecycle rules are specified in `6_CONTRACTS_AND_PACKAGE_FORMAT.md`. This defines the format; actual IO and size-limit enforcement are implemented in later phases.
 

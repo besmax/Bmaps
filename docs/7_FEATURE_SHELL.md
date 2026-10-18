@@ -28,7 +28,7 @@ The DataStore artifact is an API dependency of `core:datastore` because its type
 
 The shell top bar displays the current destination label: **Your maps** for Library and **Build a map** for the constructor. These screens do not repeat their titles in the content below the bar. Settings owns its existing **Settings** top bar; full-screen maps retain their floating controls. Source/static verification only; builds and device/emulator acceptance remain with the user.
 
-The root starts at Library. Its FAB opens the constructor, and ready package rows open a viewer entry carrying the package ID. There is no bottom navigation or saved tab stack. The top-bar gear opens **Settings** at route `settings`. It is a normal composable destination with its own top app bar and Back button; the outer shell hides its chrome and insets for this destination. Back returns to the previous entry. Feature callbacks become Channel-backed `ShellEvent` values; the shell consumes them while RESUMED and the umbrella performs navigation.
+The root starts at Library. Its FAB action menu opens the constructor, native package import or Activities; ready package rows open a viewer carrying the package ID. There is no bottom navigation or saved tab stack. The top-bar Activities icon uses a root callback; the gear opens Settings at route `settings`. Settings is a navigation-scoped screen with immediate persistence, as described below.
 
 `SettingsScreen` observes one immutable preference state. Portrait/narrow windows show a centered, scrollable stack of Appearance, map settings, and About cards. Landscape windows at least 600 dp wide use two independent scrolling columns: Appearance and About on the left, map settings on the right. Insets and a fixed top bar remain outside the scrolling content. Recreating or rotating the activity retains the navigation entry and ViewModel.
 
@@ -71,14 +71,19 @@ Static syntax, resources, and notice checks do not establish compilation or runt
 
 Native acceptance: change all settings independently; verify live theme, coordinate display, and clustering after Back and relaunch. Rotate while writing, test portrait/landscape and narrow split windows, scroll both landscape columns, check large text/touch targets and system Back, and compare the About version code against the installed APK/IPA metadata. Confirm read/write failure recovery and that all licensing content remains visible offline.
 
-## Track T5 root composition — 2026-10-13
+## Activity navigation
 
-The library action menu exposes Activities through a callback, with no viewer import in the library. The umbrella wires the viewer-owned `activities` history screen, `track-map` live vector viewer, `track-map/{routeId}` preparation, `activity/{activityId}` package-free review and `viewer/{packageId}/activity/{activityId}` package-context review. These destinations retain the existing fullscreen viewer/shell policy. Opening history or a track map does not start recording. Successful foreground finish opens review; Back releases entry-owned presentation while the application session retains recording ownership. Settings and constructor destinations are unchanged. See `22_TRACK_MODE_AND_TELEMETRY.md`; builds, navigation and native acceptance remain unrun.
+The library top-bar Activities icon, library action menu and track menu use callbacks wired by the umbrella to viewer-owned destinations. No feature imports another feature. Activity screens are fullscreen with their own controls/top bars. Navigation entries own presentation only; opening/closing lists, maps or details never starts or stops recording.
 
-## Dedicated phone tracking navigation — 2026-10-16
+| Destination | Entry point / responsibility |
+| --- | --- |
+| `activities` | ActivityListScreen: completed pages and a separate current-owner card; new recording returns to map selection |
+| `saved-routes` | HistoryScreen route management; selecting a map-owned route opens its source map, while an unassigned route requires a target map |
+| `viewer/{packageId}/track` | ViewerScreen with dedicated tracking presentation after successful Start; ordinary map Track icons return to the active source map |
+| `track-map` | Active-owner recovery entry, resolving persisted source-map context |
+| `track-map/{routeId}` | Opens the owned route's map or library map picker for copying an unassigned route |
+| `viewer/{packageId}/route/{routeId}` | Copies an unassigned route into the chosen map before preparation, or opens the map-owned route |
+| `activity/{activityId}` | ActivityDetailsScreen with source-map lookup/vector fallback |
+| `viewer/{packageId}/activity/{activityId}` | ActivityDetailsScreen with supplied package context; successful foreground Finish opens the same details UI |
 
-`viewer/{packageId}/track` reuses `ViewerScreen` with tracking presentation enabled. Start preparation emits a viewer event; the umbrella only navigates to the source-map tracking entry. Leaving never stops the phone owner; ordinary maps expose a return indicator. Activities sends new recording to map selection, opens owned routes in their source map, and uses a library map picker plus `viewer/{packageId}/route/{routeId}` to copy a legacy unassigned route before preparation. `track-map` remains an active-owner recovery entry and resolves its persisted source map. Completed review stays independent. These routes are fullscreen. Source/static checks only; native navigation/back-stack/lifecycle acceptance remains with the owner.
-
-## Activity list and details navigation — 2026-10-16
-
-The library top bar has an Activities icon immediately before Settings. AppShell accepts an Activities callback; the umbrella wires it to `activities`, now implemented by `ActivityListScreen`. Existing library/track menu entries use the same destination. The former reusable-route/history UI remains reachable at `saved-routes`. Both activity review routes now render `ActivityDetailsScreen`, including the successful foreground-Finish destination. Details owns a map and scrolling statistics/telemetry content; source-map fallback and mutations stay in viewer presentation/domain code. All three destinations are fullscreen with their own top bars. No recording is started or stopped by these navigation transitions. Source/static validation only; build, native Back/share/lifecycle and visual acceptance remain with the owner. See document 22.
+Activity policy, rendering fallback and mutation/export behavior stay in viewer/domain code. [Document 22](22_TRACK_MODE_AND_TELEMETRY.md#810-map-preparation-and-tracking-ui) owns the detailed workflow; its [status section](22_TRACK_MODE_AND_TELEMETRY.md#9-current-state-and-evidence) owns build/test/native acceptance state.
