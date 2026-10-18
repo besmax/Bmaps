@@ -58,7 +58,7 @@ The selectable **About Bmaps · Licensing** card retains the copyright, canonica
 
 Updated tests cover individual setting writes, independent pending writes, duplicate-submit prevention, failed-field rollback and retry, load failure, unknown-CRS preservation, persistence after leaving Settings, and continuous observation after reopening. The DataStore reopening test now exercises concurrent clustering and coordinate-format edits. The Android navigation scenario checks immediate theme changes, recreation, background/foreground, Back/reopen, and the absence of Save/Cancel.
 
-Static syntax, resources, and notice checks do not establish compilation or runtime behavior. Builds, automated test execution, and visual/device acceptance remain assigned to the project owner.
+Static syntax, resources, and notice checks do not establish compilation or runtime behavior. Follow the [verification policy](../AGENTS.md#verification-policy): agents select focused host tests; project builds and all device/emulator/simulator runs belong to the owner. The commands below include both host tests and owner-run build/native tasks; they are not a single agent checklist. Historical unrun results remain unverified.
 
 ```sh
 ./gradlew :core:datastore:testAndroidHostTest :feature:shell:testAndroidHostTest

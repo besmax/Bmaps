@@ -6,9 +6,48 @@ purpose: "Define track navigation, route-free recording, telemetry, Apple Watch 
 
 # Track mode and telemetry
 
-Updated: 2026-10-18. This document owns track-mode behavior, contracts, limits and feature-local implementation status. [Current state and evidence](#9-current-state-and-evidence) separates source implementation, automated verification and device acceptance. Builds, automated test execution and device/emulator/simulator acceptance remain with the project owner.
+Updated: 2026-10-18. This document owns track-mode behavior, contracts, limits and feature-local implementation status. [Current state and evidence](#9-current-state-and-evidence) separates source implementation, automated verification and device acceptance. Under the [verification policy](../AGENTS.md#verification-policy), agents run focused tests without devices; the owner retains project builds and every device/emulator/simulator run. Ask before running the full test suite.
 
 Sections 1–7 define product behavior; section 8 defines current contracts and implementation limits; section 9 owns the T0–T7 status and verification handoff. Section 10 retains acceptance targets and remaining work until full feature acceptance. Keep current behavior in place rather than appending activity change history or superseded designs. Once the complete feature is accepted, remove section 10 after retaining enduring constraints and verification evidence in sections 1–9.
+
+## Contents
+
+- [1. Scope](#1-scope)
+- [2. Product entities and ownership](#2-product-entities-and-ownership)
+- [3. Map entry points and layout](#3-map-entry-points-and-layout)
+  - [Start with a route](#start-with-a-route)
+  - [Start without a route](#start-without-a-route)
+  - [During an activity](#during-an-activity)
+- [4. Route navigation behavior](#4-route-navigation-behavior)
+- [5. Recording, telemetry, and lifecycle](#5-recording-telemetry-and-lifecycle)
+- [6. Apple Watch](#6-apple-watch)
+- [7. Completion, review, and reusable routes](#7-completion-review-and-reusable-routes)
+- [8. Architecture constraints](#8-architecture-constraints)
+  - [8.1 Implemented domain contracts](#81-implemented-domain-contracts)
+  - [8.2 Selected storage and consistency design](#82-selected-storage-and-consistency-design)
+  - [8.3 Start, clocks, lifecycle, and recovery](#83-start-clocks-lifecycle-and-recovery)
+  - [8.4 Wearable protocol and retention](#84-wearable-protocol-and-retention)
+  - [8.5 Platform feasibility assessment and source probe](#85-platform-feasibility-assessment-and-source-probe)
+  - [8.6 Presentation ownership](#86-presentation-ownership)
+  - [8.7 Persistence and detailed GPX import](#87-persistence-and-detailed-gpx-import)
+  - [8.8 Phone recording and recovery](#88-phone-recording-and-recovery)
+  - [8.9 Route matching, progress and recorded return](#89-route-matching-progress-and-recorded-return)
+  - [8.10 Map preparation and tracking UI](#810-map-preparation-and-tracking-ui)
+  - [8.11 Activity browsing, review and sharing](#811-activity-browsing-review-and-sharing)
+  - [8.12 Map-owned route storage](#812-map-owned-route-storage)
+- [9. Current state and evidence](#9-current-state-and-evidence)
+  - [Authored verification coverage](#authored-verification-coverage)
+  - [Verification handoff](#verification-handoff)
+- [10. Temporary implementation plan](#10-temporary-implementation-plan)
+  - [T0 — Contracts and platform feasibility](#t0--contracts-and-platform-feasibility)
+  - [T1 — Durable data and detailed routes](#t1--durable-data-and-detailed-routes)
+  - [T2 — Recording and lifecycle](#t2--recording-and-lifecycle)
+  - [T3 — Complex-track navigation](#t3--complex-track-navigation)
+  - [T4 — Map interface](#t4--map-interface)
+  - [T5 — History and reusable routes](#t5--history-and-reusable-routes)
+  - [T6 — Phone acceptance and performance](#t6--phone-acceptance-and-performance)
+  - [T7 — Apple Watch integration and final closure](#t7--apple-watch-integration-and-final-closure)
+  - [Remaining decisions and calibration](#remaining-decisions-and-calibration)
 
 ## 1. Scope
 
@@ -435,7 +474,7 @@ The active record persists its source package ID with a version-1 default. A sha
 
 ## 9. Current state and evidence
 
-This section is the source of truth for track-mode implementation and verification status. Checked deliverables in section 10 mean source present, not passed acceptance. Keep a current evidence summary here; do not append activity implementation/change history. Update behavior and contracts in place. The project owner retains builds, automated test execution and all device/emulator/simulator runs.
+This section is the source of truth for track-mode implementation and verification status. Checked deliverables in section 10 mean source present, not passed acceptance. Keep a current evidence summary here; do not append activity implementation/change history. Update behavior and contracts in place. Agents select focused host tests; the owner retains project builds and all device/emulator/simulator runs under the verification policy. Historical unrun results below remain unverified; the new allocation of work is not execution evidence.
 
 | Phase / area | Source implementation | Automated verification / evidence | Device acceptance / next step |
 | --- | --- | --- | --- |
@@ -464,10 +503,17 @@ These sources contain regression scenarios; their presence does not imply execut
 | `MapObjectsViewModelTest`, `PackageUseGuardTest`, native package transfer scenarios | Confirmed mixed imports/retry, package-required writes, asset CAS, active-map retention, package ID rebinding and preserved source metadata |
 | `HistoryViewModelTest`, `ActivityDetailsTest`, `ReviewBuffersTest`, `ViewerViewModelTest`, `ActivityExportWriterTest` | Paging/search, protected rename/delete, timeline preservation, statistics/chart reduction/gaps, vector fallback, GPX/JSON streaming and caller-owned sinks |
 
-### Owner verification handoff
+### Verification handoff
+
+Agents choose the relevant host suites for the change; do not run every feature suite for unrelated work:
 
 ```sh
 ./gradlew :core:location:testAndroidHostTest :domain:activity:testAndroidHostTest :feature:viewer:testAndroidHostTest
+```
+
+The owner runs project builds and all device/emulator/simulator tests, including:
+
+```sh
 ./gradlew :domain:activity:iosSimulatorArm64Test :feature:viewer:iosSimulatorArm64Test
 ./gradlew :domain:activity:connectedAndroidDeviceTest
 ```
@@ -543,7 +589,7 @@ Acceptance: route-free completion produces one valid reusable route in the sourc
 
 ### T6 — Phone acceptance and performance
 
-- [ ] Complete focused phone algorithm/persistence checks and user-run builds/tests with recorded results.
+- [ ] Complete agent-run focused host algorithm/persistence checks and owner-run builds/device/emulator/simulator tests with recorded results.
 - [ ] Obtain device acceptance for routed and route-free hike/ride scenarios, locked-screen/background lifecycle, camera/panels, GPS loss, full telemetry pauses, and recovery.
 - [ ] Measure detailed-route matching/rendering, long-recording memory/storage, and battery behavior on representative Android/iPhone devices.
 - [ ] Update implementation descriptions and remaining phone limitations before watch integration begins.

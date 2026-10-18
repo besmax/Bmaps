@@ -8,6 +8,13 @@ purpose: "Maintain a live index of all project modules, their strict responsibil
 
 This document serves as the single source of truth for the project's module topography. Before creating a new module or adding a dependency, agents must consult this registry to ensure architectural compliance. Current application phase status belongs to [document 5](5_IMPLEMENTATION_PLAN.md#current-implementation-status); activity implementation and verification status belongs to [document 22](22_TRACK_MODE_AND_TELEMETRY.md#9-current-state-and-evidence). This registry records ownership and dependencies, not parallel phase histories.
 
+## Native application hosts
+
+* **`:androidApp`**
+    * **Responsibility:** Native Android application host, application lifecycle entry points and platform packaging; delegates shared UI and DI graph assembly to `:shared`.
+
+`iosApp` is the native Xcode host, not a registered Gradle module. The module entries below enumerate Gradle projects declared by settings.gradle.kts.
+
 ## 1. Umbrella Layer
 * **`:shared`**
     * **Responsibility:** The root aggregator. Assembles the Metro DI graph, connects interfaces to implementations, and exposes the root UI targets.

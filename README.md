@@ -29,6 +29,8 @@ Read [AGENTS.md](AGENTS.md) and the [documentation](docs/5_IMPLEMENTATION_PLAN.m
 
 ## Build and run
 
+Project builds and all device/emulator/simulator runs belong to the user. Agents run focused tests without devices and ask before a full test run; see the [verification policy](AGENTS.md#verification-policy). Documentation changes use the [local documentation checks](CONTRIBUTING.md#documentation-maintenance), also run in CI.
+
 Use Android Studio with the configured JDK/Android SDK to run `androidApp`, or build its APK:
 
 ```sh

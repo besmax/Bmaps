@@ -2,9 +2,35 @@
 
 Planning baseline: 2026-09-08. Last updated: 2026-10-18. The table below owns current application phase status. Feature-local T0–T7 status and evidence are maintained only in [document 22](22_TRACK_MODE_AND_TELEMETRY.md#9-current-state-and-evidence).
 
+## Contents
+
+- [Current implementation status](#current-implementation-status)
+- [1. Original inspection baseline (2026-09-08)](#1-original-inspection-baseline-2026-09-08)
+- [2. Scope and delivery milestones](#2-scope-and-delivery-milestones)
+- [3. Decisions to settle before dependent implementation](#3-decisions-to-settle-before-dependent-implementation)
+- [4. Detailed implementation sequence](#4-detailed-implementation-sequence)
+  - [Phase 0 — Correct and verify the build foundation](#phase-0--correct-and-verify-the-build-foundation)
+  - [Phase 1 — Define package and application contracts](#phase-1--define-package-and-application-contracts)
+  - [Phase 2 — Build the feature shell and DI composition](#phase-2--build-the-feature-shell-and-di-composition)
+  - [Phase 3 — Render the first online map](#phase-3--render-the-first-online-map)
+    - [Phase 3A — Provider registry and tile networking](#phase-3a--provider-registry-and-tile-networking)
+    - [Phase 3B — Coordinates and renderer integration](#phase-3b--coordinates-and-renderer-integration)
+    - [Phase 3C — Online constructor map (provider catalog and first UI slice implemented)](#phase-3c--online-constructor-map-provider-catalog-and-first-ui-slice-implemented)
+    - [Phase 3D — Cross-platform acceptance](#phase-3d--cross-platform-acceptance)
+  - [Phase 4 — Implement package storage and local tile access](#phase-4--implement-package-storage-and-local-tile-access)
+  - [Phase 5 — Build the offline constructor and durable download pipeline](#phase-5--build-the-offline-constructor-and-durable-download-pipeline)
+  - [Phase 6 — Deliver the library and offline viewer](#phase-6--deliver-the-library-and-offline-viewer)
+  - [Phase 7 — Add raster layer composition](#phase-7--add-raster-layer-composition)
+  - [Phase 8 — Implement annotations and GeoJSON](#phase-8--implement-annotations-and-geojson)
+  - [Phase 9 — Implement coordinate-system and elevation support](#phase-9--implement-coordinate-system-and-elevation-support)
+  - [Phase 10 — Implement import, export, and native sharing](#phase-10--implement-import-export-and-native-sharing)
+  - [Phase 11 — Harden and prepare a release candidate](#phase-11--harden-and-prepare-a-release-candidate)
+- [5. Dependency and implementation rules](#5-dependency-and-implementation-rules)
+- [6. Verification strategy and completion tracking](#6-verification-strategy-and-completion-tracking)
+
 ## Current implementation status
 
-Source implementation, automated verification and device acceptance are distinct. Earlier passing checks apply only to the recorded slice; they do not verify all later source changes. Mobile builds, automated test execution and device/emulator/simulator runs remain assigned to the project owner.
+Source implementation, automated verification and device acceptance are distinct. Earlier passing checks apply only to the recorded slice; they do not verify all later source changes. Under the [verification policy](../AGENTS.md#verification-policy), agents run focused tests without devices; the user owns project builds and every device/emulator/simulator run. Ask before running the full test suite.
 
 | Area | Source implementation | Automated verification / evidence | Device acceptance / next step |
 | --- | --- | --- | --- |
@@ -342,6 +368,8 @@ Apply these constraints to every work item:
 | Performance | Representative large packages, DEMs, annotation sets, and measured device baselines |
 
 Split each phase into reviewable changes around coherent behavior. Each implementation change records its affected modules, user-visible outcome, verification performed, and remaining limitations. Do not add tests that merely mirror boilerplate or reversible documentation edits.
+
+Focused tests follow the [verification policy](../AGENTS.md#verification-policy). The dated handoffs below retain their actual historical results and prior allocation of work; statements assigning automated tests to the user do not override the current policy. Unexecuted checks remain unverified until a real result is recorded.
 
 Normally, a phase is complete only when its deliverables and acceptance criteria pass and the documentation reflects the result. Explicit exception (2026-09-29): the project owner closed Phase 9 with implementation complete and transferred outstanding verification to Phase 11; release acceptance still requires these checks. Track deviations with rationale rather than silently narrowing the MVP. Remaining Phase 0 foundation work is still open and must be completed before foundation or downstream integration acceptance is claimed; later feature source does not establish that these checks passed.
 
