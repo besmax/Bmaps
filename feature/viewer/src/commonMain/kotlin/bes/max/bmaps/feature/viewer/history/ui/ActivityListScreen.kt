@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,16 +71,20 @@ fun ActivityListScreen(
                     enabled = !state.busy
                 ) { Text(stringResource(Res.string.viewer_retry)) }
             }
-            if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            RecordedActivityList(
-                state.activities,
-                state.busy,
-                state.more,
-                model::more,
-                onDetails,
-                onRecord,
-                Modifier.weight(1f)
-            )
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                RecordedActivityList(
+                    state.activities,
+                    state.busy,
+                    state.more,
+                    model::more,
+                    onDetails,
+                    onRecord,
+                    Modifier.fillMaxSize()
+                )
+                if (state.loadingVisible) {
+                    LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
+                }
+            }
         }
     }
 }

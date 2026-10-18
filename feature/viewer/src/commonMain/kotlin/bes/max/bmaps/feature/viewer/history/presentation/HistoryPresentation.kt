@@ -23,6 +23,7 @@ internal data class SavedRouteItem(val id: String, val name: String, val revisio
 @Immutable
 internal data class HistoryState(
     val routesTab: Boolean = false, val search: String = "", val filter: Int = 0, val busy: Boolean = false,
+    val loadingVisible: Boolean = false,
     val activities: ImmutableList<HistoryItem> = persistentListOf(), val routes: ImmutableList<SavedRouteItem> = persistentListOf(),
     val activeItem: HistoryItem? = null,
     val more: Boolean = false, val activeId: String? = null, val error: StringResource? = null,

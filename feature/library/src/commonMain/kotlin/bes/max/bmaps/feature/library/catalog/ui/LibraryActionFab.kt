@@ -58,7 +58,6 @@ internal fun LibraryActionFab(
     onExpandedChange: (Boolean) -> Unit,
     onBuild: () -> Unit,
     onImport: () -> Unit,
-    onActivities: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val visibility = remember { MutableTransitionState(false) }
@@ -105,7 +104,7 @@ internal fun LibraryActionFab(
                 properties = PopupProperties(focusable = true),
             ) {
                 Box(
-                    Modifier.width(240.dp).height(312.dp)
+                    Modifier.width(240.dp).height(240.dp)
                         .clickable(onClickLabel = dismissLabel) { onExpandedChange(false) },
                 ) {
                     LibraryTreeBackground(progress = { progress.value })
@@ -122,13 +121,6 @@ internal fun LibraryActionFab(
                         importLabel, Res.drawable.ic_import_map, expanded && importEnabled, onImport,
                         Modifier.align(Alignment.TopStart).width(200.dp).graphicsLayer {
                             translationY = 88.dp.toPx()
-                            alpha = contentAlpha.value
-                        },
-                    )
-                    LibraryFabAction(
-                        stringResource(Res.string.library_activities), Res.drawable.avatar_map, expanded, onActivities,
-                        Modifier.align(Alignment.TopStart).width(200.dp).graphicsLayer {
-                            translationY = 160.dp.toPx()
                             alpha = contentAlpha.value
                         },
                     )
@@ -188,7 +180,7 @@ private fun LibraryTreeBackground(progress: () -> Float) {
         val root = Offset(size.width - radius, size.height - radius)
         val tipX = size.width - 68.dp.toPx()
         clipRect(bottom = size.height - radius * 2) {
-            repeat(3) { index ->
+            repeat(2) { index ->
                 val tip = Offset(tipX, (44.dp + 72.dp * index).toPx())
                 val delay = if (index == 0) 0.1f else 0f
                 val growth = ((amount - delay) / 0.65f).coerceIn(0f, 1f)

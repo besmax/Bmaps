@@ -48,6 +48,7 @@ class HistoryViewModel(private val activities: ActivityRepository, private val r
     private var mutation = false
     init {
         session.initialize()
+        observeLoadingIndicator()
         viewModelScope.launch { session.active.collect { record ->
             val active = record?.takeIf { it.status != ActivityStatus.COMPLETED }
             mutableState.update { it.copy(activeId = active?.id, activeItem = active?.let { value ->
@@ -55,6 +56,28 @@ class HistoryViewModel(private val activities: ActivityRepository, private val r
                     historyStatus(value.status), historyProfile(value.profile), value.revision, false, true, false)
             }) }
         } }
+    }
+    private fun observeLoadingIndicator() {
+        viewModelScope.launch {
+            var indicator: Job? = null
+            state.map { it.busy }.distinctUntilChanged().collect { busy ->
+                if (busy) {
+                    if (!state.value.loadingVisible) {
+                        indicator?.cancel()
+                        indicator = launch {
+                            delay(250)
+                            mutableState.update { it.copy(loadingVisible = true) }
+                            delay(350)
+                            if (!state.value.busy) mutableState.update { it.copy(loadingVisible = false) }
+                        }
+                    }
+                } else if (!state.value.loadingVisible) {
+                    indicator?.cancel()
+                } else if (indicator?.isActive != true) {
+                    mutableState.update { it.copy(loadingVisible = false) }
+                }
+            }
+        }
     }
     fun refresh() { if (!state.value.busy) load(false) }
     fun tab(routes: Boolean) { if (state.value.busy) return; mutableState.update { it.copy(routesTab = routes) }; load(false) }

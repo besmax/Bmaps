@@ -53,7 +53,6 @@ fun LibraryScreen(
     onBuildMap: () -> Unit,
     onOpenMap: (PackageId) -> Unit,
     onCredentials: (String) -> Unit,
-    onActivities: () -> Unit = {},
 ) {
     val model = metroViewModel<LibraryViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
@@ -107,7 +106,6 @@ fun LibraryScreen(
             onExpandedChange = model::actionsExpanded,
             onBuild = { model.actionsExpanded(false); onBuildMap() },
             onImport = { model.actionsExpanded(false); documents.pick() },
-            onActivities = { model.actionsExpanded(false); onActivities() },
             modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
         )
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp))

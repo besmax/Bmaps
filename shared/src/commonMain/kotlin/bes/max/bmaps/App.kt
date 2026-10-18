@@ -57,8 +57,7 @@ internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolea
                 composable(ShellDestination.LIBRARY.route) {
                     LibraryScreen(onBuildMap = { navigate(ShellDestination.CONSTRUCTOR) },
                         onCredentials = { navigation.navigate("provider-credentials/$it") },
-                        onOpenMap = { navigation.navigate("viewer/${it.value}") { launchSingleTop = true } },
-                        onActivities = { navigation.navigate(HistoryRoute) { launchSingleTop = true } })
+                        onOpenMap = { navigation.navigate("viewer/${it.value}") { launchSingleTop = true } })
                 }
                 composable(ShellDestination.CONSTRUCTOR.route) {
                     ConstructorScreen(onOpenLibrary = { navigate(ShellDestination.LIBRARY) },

@@ -14,6 +14,7 @@ import bes.max.bmaps.core.sharing.SharingLocation
 import bes.max.bmaps.domain.activity.*
 import bmaps.feature.viewer.generated.resources.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.*
@@ -21,6 +22,100 @@ import kotlin.test.*
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class HistoryViewModelTest {
+    @Test fun fastInitialLoadAndRefreshNeverShowLoadingIndicator() = runTest {
+        fixture { model, repository ->
+            repository.historyDelayMillis = 100
+            repeat(2) {
+                model.refresh(); runCurrent()
+                assertTrue(model.state.value.busy)
+                assertFalse(model.state.value.loadingVisible)
+                advanceTimeBy(100); runCurrent()
+                assertFalse(model.state.value.busy)
+                assertFalse(model.state.value.loadingVisible)
+                assertEquals(listOf("first"), model.state.value.activities.map { it.id })
+                advanceTimeBy(500); runCurrent()
+                assertFalse(model.state.value.loadingVisible)
+            }
+        }
+    }
+    @Test fun slowLoadShowsIndicatorAfterDelayAndKeepsItVisibleWithoutDelayingResults() = runTest {
+        fixture { model, repository ->
+            repository.historyDelayMillis = 300
+            model.refresh(); runCurrent()
+            advanceTimeBy(249); runCurrent()
+            assertFalse(model.state.value.loadingVisible)
+            advanceTimeBy(1); runCurrent()
+            assertTrue(model.state.value.loadingVisible)
+            advanceTimeBy(50); runCurrent()
+            assertFalse(model.state.value.busy)
+            assertEquals(listOf("first"), model.state.value.activities.map { it.id })
+            assertTrue(model.state.value.loadingVisible)
+            advanceTimeBy(299); runCurrent()
+            assertTrue(model.state.value.loadingVisible)
+            advanceTimeBy(1); runCurrent()
+            assertFalse(model.state.value.loadingVisible)
+        }
+    }
+    @Test fun longLoadHidesIndicatorAsSoonAsItFinishesAfterMinimumVisibility() = runTest {
+        fixture { model, repository ->
+            repository.historyDelayMillis = 1000
+            model.refresh(); runCurrent()
+            advanceTimeBy(999); runCurrent()
+            assertTrue(model.state.value.loadingVisible)
+            assertTrue(model.state.value.busy)
+            advanceTimeBy(1); runCurrent()
+            assertFalse(model.state.value.loadingVisible)
+            assertFalse(model.state.value.busy)
+        }
+    }
+    @Test fun replacementSearchKeepsVisibleIndicatorAndCancelsStaleLoad() = runTest {
+        fixture { model, repository ->
+            repository.historyDelayMillis = 1000
+            model.refresh(); runCurrent()
+            advanceTimeBy(250); runCurrent()
+            assertTrue(model.state.value.loadingVisible)
+            repository.historyDelayMillis = 100
+            model.search("Ride"); runCurrent()
+            assertTrue(model.state.value.loadingVisible)
+            advanceTimeBy(100); runCurrent()
+            assertFalse(model.state.value.busy)
+            assertTrue(model.state.value.loadingVisible)
+            assertEquals("Ride", repository.queries.last().nameContains)
+            advanceTimeBy(250); runCurrent()
+            assertFalse(model.state.value.loadingVisible)
+            advanceTimeBy(1000); runCurrent()
+            assertFalse(model.state.value.loadingVisible)
+        }
+    }
+    @Test fun fastReplacementSearchCancelsPendingIndicator() = runTest {
+        fixture { model, repository ->
+            repository.historyDelayMillis = 1000
+            model.refresh(); runCurrent()
+            advanceTimeBy(100); runCurrent()
+            repository.historyDelayMillis = 100
+            model.search("Ride"); runCurrent()
+            advanceTimeBy(100); runCurrent()
+            assertFalse(model.state.value.busy)
+            assertFalse(model.state.value.loadingVisible)
+            advanceTimeBy(1000); runCurrent()
+            assertFalse(model.state.value.loadingVisible)
+            assertEquals("Ride", repository.queries.last().nameContains)
+        }
+    }
+    @Test fun failedLoadKeepsItsErrorWhileIndicatorFinishesItsMinimumVisibility() = runTest {
+        fixture { model, repository ->
+            repository.historyDelayMillis = 300
+            repository.failHistory = true
+            model.refresh(); runCurrent()
+            advanceTimeBy(300); runCurrent()
+            assertFalse(model.state.value.busy)
+            assertTrue(model.state.value.loadingVisible)
+            assertEquals(Res.string.history_error, model.state.value.error)
+            advanceTimeBy(300); runCurrent()
+            assertFalse(model.state.value.loadingVisible)
+            assertEquals(Res.string.history_error, model.state.value.error)
+        }
+    }
     @Test fun historyPagingAndFiltersAreSentToTheRepository() = runTest {
         fixture { model, repository ->
             model.refresh(); runCurrent()
@@ -80,6 +175,8 @@ class HistoryViewModelTest {
     }
 }
 private class HistoryTestRepository : ActivityRepository {
+    var historyDelayMillis = 0L
+    var failHistory = false
     private val time = ActivityTime(1000, 1000, "clock")
     var record = ActivityRecord("first", 0, "generation", "Hike", ActivityProfile.HIKING, ActivityStatus.COMPLETED,
         time, time, finishedAt = time, statistics = ActivityStatistics(distanceMeters = 10.0))
@@ -87,6 +184,8 @@ private class HistoryTestRepository : ActivityRepository {
     val commits = mutableListOf<ActivityCommit>()
     override suspend fun history(query: ActivityHistoryQuery): ActivityResult<ActivityHistoryPage> {
         queries += query
+        delay(historyDelayMillis)
+        if (failHistory) error("History unavailable")
         val item = ActivitySummary(if (query.before == null) "first" else "second", record.name, record.profile, record.status,
             record.revision, 1000, 1000, null)
         return ActivityResult.Success(ActivityHistoryPage(listOf(item), if (query.before == null) ActivityHistoryCursor(1000, "first") else null))

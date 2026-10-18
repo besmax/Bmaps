@@ -28,7 +28,7 @@ The DataStore artifact is an API dependency of `core:datastore` because its type
 
 The shell top bar displays the current destination label: **Your maps** for Library and **Build a map** for the constructor. These screens do not repeat their titles in the content below the bar. Settings owns its existing **Settings** top bar; full-screen maps retain their floating controls. Source/static verification only; builds and device/emulator acceptance remain with the user.
 
-The root starts at Library. Its FAB action menu opens the constructor, native package import or Activities; ready package rows open a viewer carrying the package ID. There is no bottom navigation or saved tab stack. The top-bar Activities icon uses a root callback; the gear opens Settings at route `settings`. Settings is a navigation-scoped screen with immediate persistence, as described below.
+The root starts at Library. Its FAB action menu opens the constructor or native package import; ready package rows open a viewer carrying the package ID. There is no bottom navigation or saved tab stack. The top-bar Activities icon uses a root callback; the gear opens Settings at route `settings`. Settings is a navigation-scoped screen with immediate persistence, as described below.
 
 `SettingsScreen` observes one immutable preference state. Portrait/narrow windows show a centered, scrollable stack of Appearance, map settings, and About cards. Landscape windows at least 600 dp wide use two independent scrolling columns: Appearance and About on the left, map settings on the right. Insets and a fixed top bar remain outside the scrolling content. Recreating or rotating the activity retains the navigation entry and ViewModel.
 
@@ -60,6 +60,8 @@ Updated tests cover individual setting writes, independent pending writes, dupli
 
 Static syntax, resources, and notice checks do not establish compilation or runtime behavior. Follow the [verification policy](../AGENTS.md#verification-policy): agents select focused host tests; project builds and all device/emulator/simulator runs belong to the owner. The commands below include both host tests and owner-run build/native tasks; they are not a single agent checklist. Historical unrun results remain unverified.
 
+Current focused host result: `./gradlew :androidApp:testDebugUnitTest --tests '*ShellNavigationHostTest'` compiles library/shared/application sources as test prerequisites, but the navigation scenario fails during activity-session initialization with `UnsatisfiedLinkError: no sqliteJni in java.library.path`. The host SQLite setup must be resolved before this scenario establishes navigation or FAB acceptance; no device/emulator/simulator result is implied.
+
 ```sh
 ./gradlew :core:datastore:testAndroidHostTest :feature:shell:testAndroidHostTest
 ./gradlew :androidApp:testDebugUnitTest --tests '*ShellNavigationHostTest'
@@ -73,7 +75,7 @@ Native acceptance: change all settings independently; verify live theme, coordin
 
 ## Activity navigation
 
-The library top-bar Activities icon, library action menu and track menu use callbacks wired by the umbrella to viewer-owned destinations. No feature imports another feature. Activity screens are fullscreen with their own controls/top bars. Navigation entries own presentation only; opening/closing lists, maps or details never starts or stops recording.
+The library top-bar Activities icon and track menu use callbacks wired by the umbrella to viewer-owned destinations. No feature imports another feature. Activity screens are fullscreen with their own controls/top bars. Navigation entries own presentation only; opening/closing lists, maps or details never starts or stops recording.
 
 | Destination | Entry point / responsibility |
 | --- | --- |
