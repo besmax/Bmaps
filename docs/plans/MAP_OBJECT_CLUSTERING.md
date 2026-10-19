@@ -1,6 +1,8 @@
 # Map object clustering: implementation proposal and Luna handoff
 
-Status: implementation started and Android host-verified on 2026-09-20. Device and simulator verification remains with the user. Preserve all existing workspace changes, including polygon encoding/recovery fixes and the user's editor formatting changes.
+Current clustering behavior is defined in [Compact map object clustering](../15_ANNOTATIONS_AND_GEOJSON.md#compact-map-object-clustering). The original transitive-grouping and viewport-clamping proposal below has been superseded by the compact hierarchy and fixed map anchors. This plan is not completion evidence.
+
+Historical status: implementation started and Android host-verified on 2026-09-20. Device and simulator verification remains with the user. Preserve all existing workspace changes, including polygon encoding/recovery fixes and the user's editor formatting changes.
 
 ## 1. Product decisions
 
@@ -113,21 +115,9 @@ Cache projected geometry and bounds per `(catalogRevision, pyramid)`, not per pa
 - Shape size: projected bounding-box diagonal using the distance formula at the candidate scale. Only shapes of size `<= 64 dp` wholly inside the active local region `[0,1] x [0,1]` are clustering candidates. Other intersecting shapes stay as original paths.
 - Invalid candidate projection never suppresses an otherwise renderable original path.
 
-### Grouping
+### Grouping, badge placement and culling
 
-Use an undirected proximity graph. Connect two eligible anchors when their distance is **at most 64 dp**. Clusters are connected components with at least two members. Singleton components remain individual objects. A chain A-B-C may form one cluster even when A-C exceeds 64 dp; this transitive grouping is deliberate and must have a test. Do not silently replace this rule with a grid-cell grouping or greedy nearest-center algorithm.
-
-Implement components with union-find and a spatial hash whose cell side is 64 dp. Check all nine neighboring cells, and use the exact squared-distance comparison before unioning. Sort inputs and output member IDs lexicographically for deterministic results. Cell coordinates use `floor`, not integer truncation, and sufficiently wide integer keys. Handle nonfinite or out-of-range cell indices by a correct bounded pairwise fallback, not overflow. At most 1,000 candidates means at most 499,500 pair comparisons even in the dense fallback. Do not create all graph edges in memory.
-
-For each component retain its members, original geometry bounds, and arithmetic-mean anchor in projected coordinates. Clustering considers the whole active-region snapshot, not only on-screen candidates. Consequently zooming can only remove edges or remove shapes from eligibility; it cannot join previously separate components when the input snapshot stays fixed. This monotonic property is required by expansion search.
-
-### Badge placement and culling
-
-Keep grouping independent of pan. For display, determine component members whose projected geometry bounds intersect the actual visible window expanded by 32 dp on each side. A marker has zero-size bounds. If none intersect, do not render its circle.
-
-Place a visible circle at the arithmetic mean of these visible member anchors, clamped into the intersection of the viewport and local map region with a 32 dp inset. If that intersection is narrower than 64 dp on an axis, use its midpoint on that axis. If there is no viewport/region intersection, draw no circle. This prevents a long connected component's off-screen global centroid from making all of its on-screen members disappear. Membership and count still include the whole component; placement alone changes with pan.
-
-Draw original paths/markers only for objects not represented by any cluster. Do not render a hidden member merely because its cluster circle is currently culled. Selected objects remain exempt and visible normally.
+See the authoritative [compact clustering contract](../15_ANNOTATIONS_AND_GEOJSON.md#compact-map-object-clustering) for the spatial hierarchy, extent limit, fixed anchors and renderer clipping. The original proximity-graph and viewport-clamping design is superseded.
 
 ## 7. Exact cluster-click behavior
 
@@ -144,7 +134,7 @@ Treat nonclustered objects, including shapes that become too large, as singleton
 1. If zoom is disabled, `sMax <= s0 * (1 + 1e-6)`, or `split(sMax)` is false, open the member list without moving the camera.
 2. Otherwise binary-search `[s0, sMax]` for the first splitting scale, using 24 iterations and cancellation checks. Maintain a false lower bound and true upper bound. Use the upper bound as the answer. Revalidate that it actually splits; floating-point tolerance must never be used to claim a split that the algorithm does not produce.
 3. Choose `target = min(sMax, max(s0 * 1.5, splittingScale * 1.05))`. Re-evaluate `split(target)` before sending the command. The margin avoids landing exactly on a grouping threshold; it never exceeds the real maximum.
-4. Center on the clicked badge's local map position, clamped to `[0,1]`; this is the visible part of a possibly long cluster. There is no requirement to fit all members simultaneously. Animate to the absolute target scale in approximately 300 ms through the controller described below.
+4. Focus an actual member near the clicked badge, using the current feature contract. There is no requirement to fit all members simultaneously. Animate to the absolute target scale in approximately 300 ms through the controller described below.
 5. Recompute presentation from actual camera snapshots throughout the move. On completion, recompute once immediately and verify against the actual resulting scale. If the camera did not reach a splitting scale despite a valid request, show the member list. Clear pending state on completion/cancellation/stale session.
 6. If the user pans/pinches, presses another camera control, changes region/level/package, starts editing, or changes object visibility during expansion, cancel the pending automatic expansion and its verification. Do not fight the user with a corrective second zoom or open an obsolete list.
 
@@ -227,13 +217,13 @@ Do not invoke an OpenAI-specific skill merely because the implementation agent i
 ### Pure clustering tests in viewer commonTest
 
 1. Empty input and one object produce no clusters; two markers at 63 dp cluster; two at 65 dp do not; exactly 64 dp clusters.
-2. Cross-cell neighbors cluster correctly. Input reordering produces identical membership and stable keys. Hash-colliding annotation IDs remain distinct.
-3. A-B=50 dp, B-C=50 dp, A-C=100 dp produces one three-member component. Every eligible ID occurs exactly once across singleton and cluster outputs.
+2. Spatial hierarchy partitioning is deterministic. Input reordering produces identical membership and stable keys. Hash-colliding annotation IDs remain distinct.
+3. A-B=50 dp, B-C=50 dp, A-C=100 dp cannot produce one three-member cluster. Every eligible ID occurs exactly once across singleton and cluster outputs.
 4. Density 1 and density 3 produce identical membership for the same dp layout and camera. Rectangular maps use independent X/Y factors; relative fit scale is converted correctly.
 5. Hidden kinds and selected objects are excluded. Draft mode emits no clusters and retains vertex handles.
 6. Small lines/polygons can cluster with markers. Shapes with diagonals 64 dp qualify, 65 dp do not. Region-crossing shapes stay drawn. A singleton polygon stays a filled polygon.
-7. Increasing scale only separates components for unchanged inputs; shapes becoming large reappear as original paths. Panning changes badge placement/culling but never member sets/counts.
-8. A long connected component with off-screen centroid still has a visible badge when a member intersects the viewport. Fully off-screen clusters are culled. Tiny viewport intersections produce finite in-bounds anchors.
+7. Increasing scale only separates components for unchanged inputs; shapes becoming large reappear as original paths. Panning changes neither map anchors nor member sets/counts.
+8. Long chains split into compact groups. Circle anchors remain fixed across all viewport edges; native rendering owns clipping.
 9. Date-line regions do not cluster together; unsupported coordinates/projection levels never crash or corrupt geometry.
 10. Expansion returns a strictly larger permitted scale at which the original component splits. Cover a split requiring much more than 2x, a shape exiting eligibility, threshold equality, and a maximum scale below the needed split.
 11. Coincident markers return the member-list outcome; mixed coincident and distinct anchors may split into a smaller remaining cluster. No division by zero or infinite scale.

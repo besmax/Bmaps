@@ -125,7 +125,7 @@ class AnnotationEditorViewModel(
                                 groups = prepared!!.groups(camera, view.density) { context.ensureActive() }
                                 groupKey = nextGroupKey
                             }
-                            prepared!!.render(groups, camera, view.density)
+                            prepared!!.render(groups)
                         } else {
                             annotationOverlays(AnnotationEditorState(items = data.values,
                                 layers = AnnotationKind.entries.map { AnnotationLayerState(it, it in data.visible) },

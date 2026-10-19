@@ -11,7 +11,6 @@ import androidx.compose.ui.graphics.Color
 import bes.max.bmaps.core.mapengine.*
 import bes.max.bmaps.domain.mapbuilder.Annotation
 import bes.max.bmaps.domain.mapbuilder.AnnotationKind
-import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
@@ -74,67 +73,63 @@ internal class AnnotationClusterer(
     private val projected = values.filter { it.kind in visibleKinds }.sortedBy { it.id }
         .mapNotNull { projectAnnotation(it, pyramid, it.id == selectedId) }
 
-    fun groups(camera: MapCameraSnapshot, density: Float, checkActive: () -> Unit = {}): List<AnnotationGroup> {
-        val pixels = pixels(camera) ?: return projected.map { AnnotationGroup(listOf(it)) }
-        if (!density.isFinite() || density <= 0) return projected.map { AnnotationGroup(listOf(it)) }
-        val threshold = CLUSTER_DISTANCE_DP * density
-        val eligible = projected.filter {
-            it.value.id != selectedId && (it.value.kind == AnnotationKind.MARKER ||
-                (it.bounds.left >= 0 && it.bounds.top >= 0 && it.bounds.right <= 1 && it.bounds.bottom <= 1 &&
-                    hypot((it.bounds.right - it.bounds.left) * pixels.x, (it.bounds.bottom - it.bounds.top) * pixels.y) <= threshold))
+    private class Node(val members: List<ProjectedAnnotation>, width: Double, height: Double) {
+        val bounds = MapWindow(members.minOf { it.bounds.left }, members.minOf { it.bounds.top },
+            members.maxOf { it.bounds.right }, members.maxOf { it.bounds.bottom })
+        val children: List<Node> = if (members.size == 1) emptyList() else {
+            val horizontal = (members.maxOf { it.anchor.x } - members.minOf { it.anchor.x }) * width >=
+                (members.maxOf { it.anchor.y } - members.minOf { it.anchor.y }) * height
+            val ordered = members.sortedWith(compareBy<ProjectedAnnotation> {
+                if (horizontal) it.anchor.x else it.anchor.y
+            }.thenBy { it.value.id })
+            val middle = ordered.size / 2
+            val split = (1 until ordered.size).filter { index ->
+                if (horizontal) ordered[index - 1].anchor.x != ordered[index].anchor.x
+                else ordered[index - 1].anchor.y != ordered[index].anchor.y
+            }.minByOrNull { kotlin.math.abs(it - middle) } ?: middle
+            listOf(Node(ordered.take(split), width, height), Node(ordered.drop(split), width, height))
         }
-        val parent = IntArray(eligible.size) { it }
-        fun root(index: Int): Int {
-            var current = index
-            while (parent[current] != current) { parent[current] = parent[parent[current]]; current = parent[current] }
-            return current
-        }
-        fun connect(a: Int, b: Int) {
-            val left = eligible[a].anchor; val right = eligible[b].anchor
-            if (hypot((left.x - right.x) * pixels.x, (left.y - right.y) * pixels.y) <= threshold) parent[root(a)] = root(b)
-        }
-        val cells = eligible.map { floor(it.anchor.x * pixels.x / threshold) to floor(it.anchor.y * pixels.y / threshold) }
-        if (cells.any { !it.first.isFinite() || !it.second.isFinite() || it.first < 0 || it.second < 0 ||
-                it.first > Long.MAX_VALUE.toDouble() / 2 || it.second > Long.MAX_VALUE.toDouble() / 2 }) {
-            for (a in eligible.indices) { checkActive(); for (b in 0 until a) connect(a, b) }
-        } else {
-            val grid = mutableMapOf<Pair<Long, Long>, MutableList<Int>>()
-            for (a in eligible.indices) {
-                checkActive()
-                val x = cells[a].first.toLong(); val y = cells[a].second.toLong()
-                for (dx in -1L..1L) for (dy in -1L..1L) grid[x + dx to y + dy]?.forEach { connect(a, it) }
-                grid.getOrPut(x to y) { mutableListOf() }.add(a)
-            }
-        }
-        val eligibleIds = eligible.map { it.value.id }.toSet()
-        return (eligible.indices.groupBy(::root).values.map { indexes -> AnnotationGroup(indexes.map { eligible[it] }) } +
-            projected.filter { it.value.id !in eligibleIds }.map { AnnotationGroup(listOf(it)) }).sortedBy { it.ids.first() }
     }
 
-    fun render(groups: List<AnnotationGroup>, camera: MapCameraSnapshot, density: Float): AnnotationOverlays {
+    private val candidates = projected.filter { it.value.id != selectedId &&
+        it.bounds.left >= 0 && it.bounds.top >= 0 && it.bounds.right <= 1 && it.bounds.bottom <= 1 }
+    private val candidateIds = candidates.map { it.value.id }.toSet()
+    private val ungrouped = projected.filter { it.value.id !in candidateIds }
+    private val tree = pyramid.engineSize()?.let { (width, height) ->
+        candidates.takeIf { it.isNotEmpty() }?.let { Node(it, width.toDouble(), height.toDouble()) }
+    }
+
+    fun groups(camera: MapCameraSnapshot, density: Float, checkActive: () -> Unit = {}): List<AnnotationGroup> {
+        val pixels = pixels(camera) ?: return projected.map { AnnotationGroup(listOf(it)) }
+        if (!density.isFinite() || density <= 0 || tree == null) return projected.map { AnnotationGroup(listOf(it)) }
+        val threshold = CLUSTER_DISTANCE_DP * density
+        val result = ungrouped.mapTo(mutableListOf()) { AnnotationGroup(listOf(it)) }
+        fun collect(node: Node) {
+            checkActive()
+            val diagonal = hypot((node.bounds.right - node.bounds.left) * pixels.x,
+                (node.bounds.bottom - node.bounds.top) * pixels.y)
+            if (node.children.isEmpty() || diagonal <= threshold) {
+                result += AnnotationGroup(node.members.sortedBy { it.value.id })
+            } else {
+                node.children.forEach(::collect)
+            }
+        }
+        collect(tree)
+        return result.sortedBy { it.ids.first() }
+    }
+
+    fun render(groups: List<AnnotationGroup>): AnnotationOverlays {
         val markers = mutableListOf<MapMarker>(); val paths = mutableListOf<MapPath>()
         val targets = mutableMapOf<String, AnnotationHit>()
-        val pixels = pixels(camera)
         for (group in groups) {
-            if (group.members.size == 1 || pixels == null) {
+            if (group.members.size == 1) {
                 group.members.forEach { item ->
                     item.marker?.let(markers::add); item.path?.let(paths::add)
                     targets[objectOverlayId(item.value.id)] = AnnotationHit.Object(item.value.id)
                 }
                 continue
             }
-            val paddingX = 32 * density / pixels.x; val paddingY = 32 * density / pixels.y
-            val window = camera.visibleWindow
-            val padded = MapWindow(window.left - paddingX, window.top - paddingY, window.right + paddingX, window.bottom + paddingY)
-            val visible = group.members.filter { it.bounds.intersects(padded) }
-            if (visible.isEmpty()) continue
-            val left = max(0.0, window.left); val right = min(1.0, window.right)
-            val top = max(0.0, window.top); val bottom = min(1.0, window.bottom)
-            if (right < left || bottom < top) continue
-            fun inset(value: Double, low: Double, high: Double, padding: Double) =
-                if (high - low <= 2 * padding) (low + high) / 2 else value.coerceIn(low + padding, high - padding)
-            val anchor = MapPoint(inset(visible.map { it.anchor.x }.average(), left, right, paddingX),
-                inset(visible.map { it.anchor.y }.average(), top, bottom, paddingY))
+            val anchor = MapPoint(group.members.map { it.anchor.x }.average(), group.members.map { it.anchor.y }.average())
             val id = clusterOverlayId(group.ids)
             markers += MapMarker(id, anchor, "", Color.Unspecified, group.ids.size.toString(), MapMarkerAnchor.CENTER, 1f)
             targets[id] = AnnotationHit.Cluster(group.ids)
