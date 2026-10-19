@@ -9,6 +9,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.map.ui
 
 import bes.max.bmaps.feature.viewer.annotations.presentation.CalloutLocationViewModel
+import bes.max.bmaps.feature.viewer.annotations.presentation.MapRouteSelection
 import bes.max.bmaps.domain.mapbuilder.AnnotationKind
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,6 +47,7 @@ import bes.max.bmaps.core.mapengine.MapPoint
 import bes.max.bmaps.core.mapengine.MapPath
 import bes.max.bmaps.core.mapengine.RasterMap
 import bes.max.bmaps.core.mapengine.positionOf
+import bes.max.bmaps.core.mapengine.GeographicCoordinate
 
 @Composable
 internal fun ViewerMapContent(
@@ -61,7 +63,7 @@ internal fun ViewerMapContent(
     activityPaths: List<MapPath> = emptyList(),
     activityMarkers: List<MapMarker> = emptyList(),
     onActivityClick: ((String, MapPoint) -> Unit)? = null,
-    onObjectRouteClick: (String) -> Unit = {},
+    onObjectRouteClick: (String, MapPoint) -> Unit = { _, _ -> },
     navigatorMarker: Boolean = false,
     markerCourse: Float? = null,
     onMapPan: () -> Unit = {},
@@ -70,6 +72,11 @@ internal fun ViewerMapContent(
     onFollow: ((String) -> Unit)? = null,
     showCallout: Boolean = true,
     followLength: String? = null,
+    routeSelection: MapRouteSelection? = null,
+    routeBusy: Boolean = false,
+    onRouteFollow: ((String) -> Unit)? = null,
+    onRouteEdit: () -> Unit = {},
+    onRouteDelete: () -> Unit = {},
 ) {
     val markerGrowth = remember { Animatable(1f) }
     val placementVersion = annotationState.markerPlacementVersion
@@ -92,7 +99,7 @@ internal fun ViewerMapContent(
     val handleOverlayClick: (String, MapPoint) -> Unit = { id, point ->
         if (onStartPick != null) onStartPick(point)
         else if (!state.immersive) {
-            if (id.startsWith("track:object-route:")) onObjectRouteClick(id.removePrefix("track:object-route:").substringBefore('~'))
+            if (id.startsWith("track:object-route:")) onObjectRouteClick(id.removePrefix("track:object-route:").substringBefore('~'), point)
             if (id.startsWith("track:recorded:")) onActivityClick?.invoke(id, point)
             overlays.targets[id]?.let { annotations.clickOverlay(it, point, model.renderer.controller) }
         }
@@ -131,7 +138,8 @@ internal fun ViewerMapContent(
         }
     }
     if (!state.immersive && showCallout) {
-        ViewerObjectCallout(model, state, annotations, annotationState, camera, calloutAnimated, onFollow, followLength)
+        ViewerObjectCallout(model, state, annotations, annotationState, camera, calloutAnimated, onFollow, followLength,
+            routeSelection, routeBusy, onRouteFollow, onRouteEdit, onRouteDelete)
     }
 }
 
@@ -186,15 +194,21 @@ private fun ViewerObjectCallout(
     animated: Boolean,
     onFollow: ((String) -> Unit)?,
     followLength: String?,
+    routeSelection: MapRouteSelection?,
+    routeBusy: Boolean,
+    onRouteFollow: ((String) -> Unit)?,
+    onRouteEdit: () -> Unit,
+    onRouteDelete: () -> Unit,
 ) {
     val activeObject = annotationState.activeObject
     val activeObjectUi = annotationState.activeObjectUi
     val locationModel = metroViewModel<CalloutLocationViewModel>()
     val locationState by locationModel.state.collectAsStateWithLifecycle()
-    val coordinate = if (activeObject?.kind == AnnotationKind.MARKER)
+    val coordinate = if (routeSelection != null) GeographicCoordinate(routeSelection.coordinate.latitude, routeSelection.coordinate.longitude)
+    else if (activeObject?.kind == AnnotationKind.MARKER)
         activeObject.coordinates.firstOrNull() else activeObjectUi?.calloutCoordinate
     val manifest = state.manifest
-    val storedElevation = activeObject?.let { value ->
+    val storedElevation = if (routeSelection != null) routeSelection.elevationMeters else activeObject?.let { value ->
         val index = if (value.kind == AnnotationKind.MARKER) 0 else coordinate?.let(value.coordinates::indexOf) ?: -1
         value.elevations.getOrNull(index)?.meters
     }
@@ -207,8 +221,8 @@ private fun ViewerObjectCallout(
     val locationMatches = locationState.packageId == manifest?.id && locationState.coordinate == coordinate
     MapObjectCallout(
         renderer = model.renderer,
-        annotation = activeObject,
-        position = activeObjectUi?.calloutCoordinate?.let { state.annotationPyramid?.positionOf(it) },
+        display = routeSelection?.display ?: annotationState.calloutDisplay,
+        position = coordinate?.let { state.annotationPyramid?.positionOf(it) },
         camera = camera,
         displayCoordinate = locationState.displayCoordinate.takeIf { locationMatches },
         coordinateError = locationState.coordinateError.takeIf { locationMatches },
@@ -219,15 +233,16 @@ private fun ViewerObjectCallout(
             locationMatches
         },
         animated = animated,
-        busy = annotationState.busy,
-        moving = activeObjectUi?.moving == true,
-        error = annotationState.error,
-        routeLength = followLength,
-        onFollow = onFollow?.takeIf { activeObject?.kind == AnnotationKind.LINE }?.let { callback ->
+        busy = if (routeSelection != null) routeBusy else annotationState.busy,
+        moving = routeSelection == null && activeObjectUi?.moving == true,
+        error = annotationState.error.takeIf { routeSelection == null },
+        routeLength = routeSelection?.length ?: followLength,
+        onFollow = if (routeSelection != null) onRouteFollow?.let { callback -> { callback(routeSelection.id) } }
+        else onFollow?.takeIf { activeObject?.kind == AnnotationKind.LINE }?.let { callback ->
             { activeObject?.id?.let(callback) }
         },
-        onEdit = { activeObject?.let { annotations.edit(it.id) } },
+        onEdit = { if (routeSelection != null) onRouteEdit() else activeObject?.let { annotations.edit(it.id) } },
         onMove = { activeObject?.let { annotations.moveObject(it.id) } },
-        onDelete = { activeObject?.let { annotations.confirmDelete(it.id, true) } },
+        onDelete = { if (routeSelection != null) onRouteDelete() else activeObject?.let { annotations.confirmDelete(it.id, true) } },
     )
 }

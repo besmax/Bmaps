@@ -63,6 +63,7 @@ internal data class AnnotationEditorState(
         layer.objectStates.entries.firstOrNull { it.value.calloutOpen }?.key
     }
     val activeObject: Annotation? get() = activeObjectId?.let { id -> source.firstOrNull { it.id == id } }
+    val calloutDisplay: MapObjectCalloutDisplay? get() = activeObject?.calloutDisplay()
     val activeObjectUi: AnnotationObjectUiState? get() = activeObjectId?.let(::objectUi)
     val hasMovingObject: Boolean get() = activeObject != null && activeObjectUi?.moving == true
     fun objectUi(id: String): AnnotationObjectUiState? = layers.firstNotNullOfOrNull { it.objectStates[id] }

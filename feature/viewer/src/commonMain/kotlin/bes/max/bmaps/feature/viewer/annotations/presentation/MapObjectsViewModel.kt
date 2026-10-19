@@ -14,6 +14,7 @@ import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
+import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import bes.max.bmaps.core.sharing.PickedDocument
 import bes.max.bmaps.domain.activity.*
 import bes.max.bmaps.domain.mapbuilder.Annotation
@@ -51,7 +52,8 @@ internal data class MapAnnotationItem(val id: String, val name: String, val kind
 internal data class MapRouteItem(val id: String, val name: String, val segments: Int, val vertices: Int)
 @Immutable
 internal data class MapRouteSelection(val id: String, val name: String, val length: String,
-    val lines: ImmutableList<TrackLine>)
+    val lines: ImmutableList<TrackLine>, val display: MapObjectCalloutDisplay,
+    val coordinate: TrackCoordinate, val elevationMeters: Double?, val revision: Long)
 @Immutable
 internal data class MapObjectsState(
     val hasPackage: Boolean = false,
@@ -62,6 +64,8 @@ internal data class MapObjectsState(
     val importOpen: Boolean = false, val text: String = "", val busy: Boolean = false,
     val routeCount: Int = 0, val objectCount: Int = 0, val pointCount: Int = 0,
     val prepared: Boolean = false, val partial: Boolean = false, val error: StringResource? = null,
+    val editingRoute: Boolean = false, val deletingRoute: Boolean = false,
+    val routeName: String = "", val routeDescription: String = "", val routeActionError: StringResource? = null,
 )
 internal sealed interface MapObjectsEvent {
     data object Imported : MapObjectsEvent
@@ -87,12 +91,15 @@ class MapObjectsViewModel(
     private var selectionJob: Job? = null
     private var importJob: Job? = null
     private var pending: Pending? = null
+    private var selectedRoute: ActivityRoute? = null
     private data class Pending(val routes: List<ActivityRoute>, val annotations: List<Annotation>,
         val packageId: PackageId?, var routesSaved: Boolean = false)
 
     fun context(id: PackageId?) {
         if (packageId != id) { catalogJob?.cancel(); selectionJob?.cancel(); nextId = null
-            mutableState.update { it.copy(routes = persistentListOf(), mapLines = persistentListOf(), selection = null, callout = false) }
+            selectedRoute = null
+            mutableState.update { it.copy(routes = persistentListOf(), mapLines = persistentListOf(), selection = null, callout = false,
+                editingRoute = false, deletingRoute = false, routeActionError = null) }
         }
         packageId = id; mutableState.update { it.copy(hasPackage = id != null) }
     }
@@ -140,11 +147,12 @@ class MapObjectsViewModel(
         }
     }
 
-    fun select(id: String) = selectRoute(id, true)
-    fun mapSelect(id: String) = selectRoute(id, false)
+    fun select(id: String) { if (!state.value.busy) selectRoute(id, true) }
+    fun mapSelect(id: String, coordinate: GeographicCoordinate? = null) { if (!state.value.busy) selectRoute(id, false, coordinate) }
     fun fitted() { mutableState.update { it.copy(fitSelection = false) } }
-    private fun selectRoute(id: String, fit: Boolean) {
+    private fun selectRoute(id: String, fit: Boolean, coordinate: GeographicCoordinate? = null) {
         selectionJob?.cancel()
+        val owner = packageId
         selectionJob = viewModelScope.launch {
             when (val result = routes.get(id)) {
                 is ActivityResult.Failure -> mutableState.update { it.copy(routeError = Res.string.objects_routes_error) }
@@ -155,18 +163,87 @@ class MapObjectsViewModel(
                     }
                     val display = withContext(Dispatchers.Default) {
                         val preview = ActivityRoutePreview.create(route)
+                        val anchor = coordinate ?: route.segments.first().vertices.first().coordinate
+                        val elevation = route.segments.asSequence().flatMap { it.vertices.asSequence() }
+                            .firstOrNull { it.coordinate == anchor }?.elevation?.meters
                         MapRouteSelection(route.id, route.name, trackNumber(trackLength(route) / 1000),
                             preview.segments.map { segment -> TrackLine("${route.id}~${segment.sourceSegmentId}",
-                                segment.coordinates.map { TrackCoordinate(it.latitude, it.longitude) }.toImmutableList()) }.toImmutableList())
+                                segment.coordinates.map { TrackCoordinate(it.latitude, it.longitude) }.toImmutableList()) }.toImmutableList(),
+                            MapObjectCalloutDisplay(route.id, route.name, route.description, Res.string.annotations_lines),
+                            TrackCoordinate(anchor.latitude, anchor.longitude), elevation, route.revision)
                     }
-                    mutableState.update { it.copy(selection = display, fitSelection = fit, callout = true, routeError = null) }
+                    currentCoroutineContext().ensureActive()
+                    if (owner != packageId) return@launch
+                    selectedRoute = route
+                    mutableState.update { it.copy(selection = display, fitSelection = fit, callout = true, routeError = null,
+                        editingRoute = false, deletingRoute = false, routeActionError = null) }
                     channel.send(MapObjectsEvent.Selected(id))
                 }
             }
         }
     }
     fun callout(show: Boolean) { mutableState.update { it.copy(callout = show && it.selection != null) } }
-    fun clearSelection() { selectionJob?.cancel(); mutableState.update { it.copy(selection = null, callout = false) } }
+    fun clearSelection() {
+        selectionJob?.cancel(); selectedRoute = null
+        mutableState.update { it.copy(selection = null, callout = false, editingRoute = false, deletingRoute = false, routeActionError = null) }
+    }
+
+    fun editRoute() {
+        val route = selectedRoute ?: return
+        if (!state.value.busy) mutableState.update { it.copy(editingRoute = true, deletingRoute = false,
+            routeName = route.name, routeDescription = route.description, routeActionError = null) }
+    }
+    fun routeName(value: String) { if (!state.value.busy && value.length <= 120) mutableState.update { it.copy(routeName = value) } }
+    fun routeDescription(value: String) { if (!state.value.busy && value.length <= 4000) mutableState.update { it.copy(routeDescription = value) } }
+    fun dismissRouteAction() {
+        if (!state.value.busy) mutableState.update { it.copy(editingRoute = false, deletingRoute = false, routeActionError = null) }
+    }
+    fun confirmRouteDelete() {
+        if (!state.value.busy && selectedRoute != null) mutableState.update { it.copy(deletingRoute = true, editingRoute = false, routeActionError = null) }
+    }
+    fun saveRoute() = routeWork { route ->
+        if (!state.value.editingRoute || route.revision == Long.MAX_VALUE) return@routeWork
+        val updated = route.copy(revision = route.revision + 1, name = state.value.routeName.trim(), description = state.value.routeDescription)
+        if (withContext(Dispatchers.Default) { ActivityValidation.route(updated) } != null) {
+            mutableState.update { it.copy(routeActionError = Res.string.annotations_invalid) }; return@routeWork
+        }
+        when (val result = routes.save(updated, route.revision)) {
+            is ActivityResult.Failure -> mutableState.update { it.copy(routeActionError = Res.string.annotations_save_error) }
+            is ActivityResult.Success -> {
+                if (selectedRoute?.id != route.id) return@routeWork
+                selectedRoute = result.value
+                mutableState.update { it.copy(editingRoute = false, selection = it.selection?.copy(name = updated.name,
+                    display = it.selection.display.copy(name = updated.name, description = updated.description), revision = updated.revision),
+                    routes = it.routes.map { item -> if (item.id == route.id) item.copy(name = updated.name) else item }.toImmutableList()) }
+            }
+        }
+    }
+    fun deleteRoute() = routeWork { route ->
+        if (!state.value.deletingRoute) return@routeWork
+        when (routes.delete(route.id)) {
+            is ActivityResult.Failure -> mutableState.update { it.copy(routeActionError = Res.string.annotations_save_error) }
+            is ActivityResult.Success -> {
+                if (selectedRoute?.id != route.id) return@routeWork
+                clearSelection()
+                mutableState.update { it.copy(routes = it.routes.filterNot { item -> item.id == route.id }.toImmutableList(),
+                    mapLines = it.mapLines.filterNot { line -> line.id.substringBefore('~') == route.id }.toImmutableList()) }
+                refresh()
+            }
+        }
+    }
+    private fun routeWork(block: suspend (ActivityRoute) -> Unit) {
+        val route = selectedRoute ?: return
+        if (state.value.busy) return
+        catalogJob?.cancel()
+        catalogGeneration++
+        mutableState.update { it.copy(busy = true, loading = false, routeActionError = null) }
+        viewModelScope.launch {
+            try { block(route) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { mutableState.update { it.copy(routeActionError = Res.string.annotations_save_error) } }
+            finally { mutableState.update { it.copy(busy = false) } }
+        }
+    }
 
     fun beginImport() {
         if (state.value.busy || state.value.partial) return
@@ -267,7 +344,7 @@ class MapObjectsViewModel(
         mutableState.update { it.copy(importOpen = false, text = "", prepared = false, partial = false, error = null) }
         channel.send(MapObjectsEvent.Imported)
         refresh()
-        if (value.routes.size == 1) select(value.routes.single().id)
+        if (value.routes.size == 1) selectRoute(value.routes.single().id, true)
     }
 
     private fun work(block: suspend () -> Unit) {

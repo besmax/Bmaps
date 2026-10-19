@@ -27,8 +27,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import bes.max.bmaps.domain.mapbuilder.Annotation
-import bes.max.bmaps.domain.mapbuilder.AnnotationKind
+import bes.max.bmaps.feature.viewer.annotations.presentation.MapObjectCalloutDisplay
 import bes.max.bmaps.core.mapengine.ProjectedCoordinate
 import bes.max.bmaps.core.mapengine.CoordinateSystemId
 import bes.max.bmaps.core.datastore.CoordinateFormat
@@ -46,7 +45,7 @@ import org.jetbrains.compose.resources.painterResource
 import kotlin.math.roundToInt
 
 private data class CalloutContent(
-    val annotation: Annotation,
+    val display: MapObjectCalloutDisplay,
     val position: MapPoint,
     val anchor: Offset,
     val layout: IntSize,
@@ -57,12 +56,13 @@ private data class CalloutContent(
     val coordinateError: StringResource?,
     val coordinatesLoading: Boolean,
     val elevationMeters: Double?,
+    val routeLength: String?,
 )
 
 @Composable
 internal fun MapObjectCallout(
     renderer: RasterMapRenderer,
-    annotation: Annotation?,
+    display: MapObjectCalloutDisplay?,
     position: MapPoint?,
     camera: MapCameraSnapshot?,
     animated: Boolean,
@@ -91,8 +91,8 @@ internal fun MapObjectCallout(
         ) else null
     } else null
     val coordinateAxes = displayCoordinate?.let { formatCoordinateAxes(it, coordinateFormat) }
-    val current = if (annotation != null && position != null && anchor != null && camera != null) CalloutContent(
-        annotation,
+    val current = if (display != null && position != null && anchor != null && camera != null) CalloutContent(
+        display,
         position,
         anchor,
         camera.layout,
@@ -105,16 +105,17 @@ internal fun MapObjectCallout(
         },
         coordinatesLoading,
         elevationMeters,
+        routeLength,
     ) else null
     var retained by remember(camera?.session) { mutableStateOf<CalloutContent?>(null) }
     SideEffect { if (current != null) retained = current }
     val content = current ?: retained
-    var expanded by remember(content?.annotation?.id) { mutableStateOf(false) }
+    var expanded by remember(content?.display?.id) { mutableStateOf(false) }
     val density = LocalDensity.current
     val visibility = remember(camera?.session) { MutableTransitionState(false) }
     LaunchedEffect(current != null, visibility) { visibility.targetState = current != null }
-    val title = content?.annotation?.name?.takeIf { it.isNotBlank() }
-        ?: content?.annotation?.let { stringResource(it.kind.label()) }.orEmpty()
+    val title = content?.display?.name?.takeIf { it.isNotBlank() }
+        ?: content?.display?.let { stringResource(it.fallbackTitle) }.orEmpty()
     if (content != null && (!visibility.isIdle || visibility.currentState || visibility.targetState)) {
         val point = content.anchor
         val maxWidthPx = content.layout.width
@@ -130,7 +131,7 @@ internal fun MapObjectCallout(
         val y = desiredY.coerceIn(0f, (maxHeightPx - size.height).coerceAtLeast(0).toFloat())
         RasterMapCallout(
             renderer = renderer,
-            id = "annotation-callout:${content.annotation.id}",
+            id = "annotation-callout:${content.display.id}",
             position = content.position,
             modifier = Modifier.offset { IntOffset((x - point.x).roundToInt(), (y - point.y).roundToInt()) },
         ) {
@@ -160,7 +161,7 @@ internal fun MapObjectCallout(
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis
                         )
-                        content.annotation.description.takeIf { it.isNotBlank() }?.let { description ->
+                        content.display.description.takeIf { it.isNotBlank() }?.let { description ->
                             Text(
                                 description,
                                 style = MaterialTheme.typography.bodyMedium,
@@ -201,9 +202,7 @@ internal fun MapObjectCallout(
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
-                        if (onFollow != null && current != null) {
-                            routeLength?.let { Text(stringResource(Res.string.track_route_length, it), style = MaterialTheme.typography.bodySmall) }
-                        }
+                        content.routeLength?.let { Text(stringResource(Res.string.track_route_length, it), style = MaterialTheme.typography.bodySmall) }
                         HorizontalDivider()
                         Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                             if (onFollow != null && current != null) IconButton(onFollow, enabled = !busy) {
@@ -220,7 +219,7 @@ internal fun MapObjectCallout(
                                 )
                             }
 
-                            if (content.annotation.kind == AnnotationKind.MARKER) IconButton(onMove, enabled = current != null && !busy && !moving) {
+                            if (content.display.marker) IconButton(onMove, enabled = current != null && !busy && !moving) {
                                 Icon(
                                     painter = painterResource(Res.drawable.ic_cursor_move),
                                     contentDescription = stringResource(Res.string.annotations_move)

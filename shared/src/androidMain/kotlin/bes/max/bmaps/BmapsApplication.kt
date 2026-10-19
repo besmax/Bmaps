@@ -10,6 +10,7 @@ package bes.max.bmaps
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import bes.max.bmaps.core.di.AppScope
@@ -45,7 +46,9 @@ internal interface AndroidAppGraph : AppGraph {
 }
 
 @Composable
-fun App(fixtureMap: Boolean = false) {
+fun App(fixtureMap: Boolean = false, openActiveActivity: Boolean = false, onActiveActivityOpened: () -> Unit = {}) {
     val application = LocalContext.current.applicationContext as BmapsApplication
-    App(application.graph, fixtureMap = fixtureMap)
+    App(application.graph, fixtureMap = fixtureMap, openActiveActivity = openActiveActivity, onActiveActivityOpened = onActiveActivityOpened)
 }
+
+fun Intent?.opensActiveActivity(): Boolean = this?.action == bes.max.bmaps.domain.activity.ACTIVITY_RECORDING_OPEN_ACTION

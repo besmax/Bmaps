@@ -30,6 +30,32 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ActivityStorageScenarios(private val database: (String) -> PackageDatabase) {
+    suspend fun followingRecordedRoutePreservesBothActivitiesAfterReopen() = fixture { f ->
+        var first = f.activities.create(record("first").copy(name = "", packageId = "map"), started()).success()
+        first = f.activities.commit(ActivityCommit(0, first.copy(revision = 1, updatedAt = time(1200)),
+            listOf(position("p1", 1100, "path", 50.0), position("p2", 1200, "path", 50.01)))).success()
+        first = transition(f, first, ActivityStatus.FINALIZING, ActivityEventKind.FINISH_REQUESTED, 2000)
+        val route = assertNotNull(f.routes.derive(first.id, "recorded-first").success())
+        first = transition(f, first.copy(derivedRouteId = route.id), ActivityStatus.COMPLETED, ActivityEventKind.COMPLETED, 2100)
+        f.reopen()
+        assertEquals(listOf(first.id), f.activities.history(ActivityHistoryQuery(statuses = setOf(ActivityStatus.COMPLETED))).success().items.map { it.id })
+
+        val selection = RouteSelection(f.routes.get(route.id).success(), RouteDirection.FORWARD, RoutePosition(0, 0, 0.0))
+        var second = f.activities.create(record("second").copy(name = route.name, packageId = "map", route = selection,
+            startedAt = time(3000), updatedAt = time(3000)), started().copy(time = time(3000))).success()
+        assertEquals(first, f.activities.get(first.id).success())
+        assertEquals(listOf(first.id), f.activities.history(ActivityHistoryQuery(statuses = setOf(ActivityStatus.COMPLETED))).success().items.map { it.id })
+        second = transition(f, second, ActivityStatus.FINALIZING, ActivityEventKind.FINISH_REQUESTED, 4000)
+        second = transition(f, second, ActivityStatus.COMPLETED, ActivityEventKind.COMPLETED, 4100)
+        f.reopen()
+        val history = f.activities.history(ActivityHistoryQuery(statuses = setOf(ActivityStatus.COMPLETED))).success()
+        assertEquals(listOf(second.id, first.id), history.items.map { it.id })
+        assertEquals(first, f.activities.get(first.id).success())
+        assertEquals(second, f.activities.get(second.id).success())
+        assertEquals(2, f.activities.positions(first.id, ActivityPositionQuery()).success().items.size)
+        assertEquals(route, f.routes.get(route.id).success())
+    }
+
     suspend fun ownerStatisticsAndCommandPayloadSurviveReopen() = fixture { f ->
         val initial = f.activities.create(record("statistics"), started()).success()
         val command = ActivityCommand("pause-owner", initial.id, initial.sessionGeneration, 0, ActivityAction.PAUSE)

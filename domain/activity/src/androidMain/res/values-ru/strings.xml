@@ -1,7 +1,23 @@
 <resources>
     <string name="activity_recording_channel">Запись трека</string>
-    <string name="activity_recording_title">Прохождение трека</string>
-    <string name="activity_recording_text">Запись местоположения и телеметрии</string>
-    <string name="activity_recording_paused">Пауза · телеметрия не записывается</string>
+    <string name="activity_recording_title">Текущая активность</string>
+    <string name="activity_recording_text">Подготовка записи</string>
+    <string name="activity_recording_paused">Запись приостановлена</string>
     <string name="activity_recording_finish">Завершить</string>
+    <string name="activity_recording_running">Запись</string>
+    <string name="activity_recording_pause">Пауза</string>
+    <string name="activity_recording_resume">Продолжить</string>
+    <string name="activity_recording_navigation_paused">Пауза</string>
+    <string name="activity_recording_hiking">Пешком</string>
+    <string name="activity_recording_motorcycle">Мотоцикл</string>
+    <string name="activity_recording_road">Автомобиль</string>
+    <string name="activity_recording_free">Без маршрута</string>
+    <string name="activity_recording_on_route">По маршруту</string>
+    <string name="activity_recording_off_route">Отклонение от маршрута</string>
+    <string name="activity_recording_no_gps">Нет GPS</string>
+    <string name="activity_recording_uncertain">Уточнение положения на маршруте</string>
+    <string name="activity_recording_gap">Разрыв маршрута</string>
+    <string name="activity_recording_distance">%1$s км</string>
+    <string name="activity_recording_remaining">До финиша %1$s км</string>
+    <string name="activity_recording_speed">Скорость %1$s км/ч</string>
 </resources>

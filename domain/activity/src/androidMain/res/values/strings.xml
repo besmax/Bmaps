@@ -2,6 +2,22 @@
     <string name="activity_recording_channel">Track recording</string>
     <string name="activity_recording_title">Track activity</string>
     <string name="activity_recording_text">Recording location and telemetry</string>
-    <string name="activity_recording_paused">Paused · telemetry is not recorded</string>
+    <string name="activity_recording_paused">Recording paused</string>
     <string name="activity_recording_finish">Finish</string>
+    <string name="activity_recording_running">Recording</string>
+    <string name="activity_recording_pause">Pause</string>
+    <string name="activity_recording_resume">Resume</string>
+    <string name="activity_recording_navigation_paused">Paused</string>
+    <string name="activity_recording_hiking">Hiking</string>
+    <string name="activity_recording_motorcycle">Motorcycle</string>
+    <string name="activity_recording_road">Driving</string>
+    <string name="activity_recording_free">Free recording</string>
+    <string name="activity_recording_on_route">On route</string>
+    <string name="activity_recording_off_route">Off route</string>
+    <string name="activity_recording_no_gps">No GPS</string>
+    <string name="activity_recording_uncertain">Locating on route</string>
+    <string name="activity_recording_gap">Route gap</string>
+    <string name="activity_recording_distance">%1$s km</string>
+    <string name="activity_recording_remaining">To finish %1$s km</string>
+    <string name="activity_recording_speed">Speed %1$s km/h</string>
 </resources>

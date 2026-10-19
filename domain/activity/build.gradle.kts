@@ -33,6 +33,9 @@ kotlin {
     sourceSets.androidMain.dependencies {
         implementation(libs.androidx.core.ktx)
     }
+    sourceSets.getByName("androidHostTest").dependencies {
+        implementation(libs.robolectric)
+    }
     sourceSets.getByName("androidDeviceTest").dependencies {
         implementation(libs.androidx.testExt.junit)
     }

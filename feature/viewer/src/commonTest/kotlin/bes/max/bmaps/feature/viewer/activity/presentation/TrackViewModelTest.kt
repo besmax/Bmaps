@@ -21,6 +21,32 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TrackViewModelTest {
+    @Test fun followingRouteAfterFreeRecordingCreatesAnotherActivityIdentity() = runTest {
+        fixture { model, session ->
+            model.prepareFree()
+            model.start()
+            runCurrent()
+            model.await { it.metrics != null && !it.busy }
+            val first = assertNotNull(session.live.value)
+            assertNull(session.starts.single().route)
+            session.live.value = first.copy(record = first.record.copy(status = ActivityStatus.COMPLETED,
+                finishedAt = first.record.updatedAt))
+            runCurrent()
+            model.await { it.metrics == null }
+            model.selectRoute("map:map:recorded-first")
+            runCurrent()
+            model.await { it.preparing && !it.busy }
+            model.start()
+            runCurrent()
+            model.await { it.metrics != null && !it.busy }
+            assertEquals(2, session.starts.size)
+            val second = session.starts.last()
+            assertNotEquals(first.record.id, second.id)
+            assertEquals("map:map:recorded-first", second.route?.snapshot?.id)
+            assertTrue(session.commands.isEmpty())
+        }
+    }
+
     @Test fun routePreparationKeepsReverseIntermediateStartAndDoesNotStartUntilRequested() = runTest {
         fixture { model, session ->
             model.mapCoverage(TilePyramid(ZoomRange(2, 2), 0, 0, 1, 1))

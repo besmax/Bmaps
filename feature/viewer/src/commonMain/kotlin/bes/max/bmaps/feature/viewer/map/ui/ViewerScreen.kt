@@ -13,7 +13,7 @@ import bes.max.bmaps.feature.viewer.annotations.presentation.MapObjectsViewModel
 import bes.max.bmaps.feature.viewer.annotations.presentation.MapObjectsEvent
 import bes.max.bmaps.feature.viewer.annotations.ui.MapObjectsActions
 import bes.max.bmaps.feature.viewer.annotations.ui.MapObjectsImportDialog
-import bes.max.bmaps.feature.viewer.annotations.ui.MapRouteCard
+import bes.max.bmaps.feature.viewer.annotations.ui.MapRouteActionDialogs
 import bes.max.bmaps.feature.viewer.elevation.presentation.ElevationProgressViewModel
 import bes.max.bmaps.feature.viewer.location.ui.locationMessage
 import bes.max.bmaps.feature.viewer.position.presentation.MapPositionViewModel
@@ -51,6 +51,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import bes.max.bmaps.core.mapengine.positionOf
+import bes.max.bmaps.core.mapengine.coordinateAt
 import bmaps.feature.viewer.generated.resources.*
 import org.jetbrains.compose.resources.stringResource
 import dev.zacsweers.metrox.viewmodel.metroViewModel
@@ -272,7 +273,7 @@ fun ViewerScreen(
             activityMarkers = if (activityId == null) startMarkers else reviewMarkers,
             onStartPick = pickPoint.takeIf { trackState.pickingStart }, startBearing = trackState.startBearing,
             onActivityClick = { id, point -> review.selectMap(id, point, state.annotationPyramid) },
-            onObjectRouteClick = { id -> objects.mapSelect(id); annotations.dismissSelection() },
+            onObjectRouteClick = { id, point -> objects.mapSelect(id, state.annotationPyramid?.coordinateAt(point)); annotations.dismissSelection() },
             navigatorMarker = trackScreen, markerCourse = trackState.markerCourse,
             onMapPan = { track.inspect(); model.cancelLocationMove() },
             onFollow = if (activityId == null && trackState.metrics == null && annotationState.draft == null) { id ->
@@ -283,14 +284,16 @@ fun ViewerScreen(
             } else null,
             showCallout = activityId == null && !trackState.expanded && !trackState.pickingStart,
             followLength = trackState.selectedAnnotationLength.takeIf { trackState.selectedAnnotationId == annotationState.activeObjectId },
+            routeSelection = objectState.selection.takeIf { objectState.callout && objectRoutesVisible && annotationState.draft == null },
+            routeBusy = objectState.busy,
+            onRouteFollow = objectActions.follow,
+            onRouteEdit = objects::editRoute,
+            onRouteDelete = objects::confirmRouteDelete,
         )
         MapObjectsImportDialog(objectState, objectActions)
+        MapRouteActionDialogs(objectState, objects::routeName, objects::routeDescription, objects::saveRoute,
+            objects::deleteRoute, objects::dismissRouteAction)
         if (!state.immersive) {
-            if (activityId == null && objectState.callout && objectRoutesVisible && !trackState.expanded && !trackState.pickingStart && annotationState.draft == null) {
-                objectState.selection?.let { selection -> MapRouteCard(selection, { objects.callout(false) },
-                    objectActions.follow?.let { follow -> { follow(selection.id) } },
-                    Modifier.align(Alignment.TopStart).safeDrawingPadding().padding(start = 16.dp, top = 80.dp, end = 80.dp)) }
-            }
             if (state.vectorOnly) Text(stringResource(Res.string.history_neutral_map),
                 Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(start = 80.dp, end = 80.dp, top = 16.dp),
                 style = MaterialTheme.typography.bodySmall, maxLines = 2)

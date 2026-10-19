@@ -97,18 +97,39 @@ internal fun MapObjectsImportDialog(state: MapObjectsState, actions: MapObjectsA
 }
 
 @Composable
-internal fun MapRouteCard(selection: MapRouteSelection, onClose: () -> Unit, onFollow: (() -> Unit)?,
-    modifier: Modifier = Modifier) {
-    Surface(modifier.widthIn(max = 260.dp), shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f), shadowElevation = 2.dp) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-            Text(selection.name.ifBlank { stringResource(Res.string.track_unnamed) }, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleSmall)
-            Text(stringResource(Res.string.track_route_length, selection.length), style = MaterialTheme.typography.bodySmall)
-            Row {
-                if (onFollow != null) TextButton(onFollow) { Text(stringResource(Res.string.track_start)) }
-                TextButton(onClose) { Text(stringResource(Res.string.viewer_done)) }
-            }
-        }
+internal fun MapRouteActionDialogs(state: MapObjectsState, onName: (String) -> Unit,
+    onDescription: (String) -> Unit, onSave: () -> Unit, onDelete: () -> Unit, onDismiss: () -> Unit) {
+    if (state.editingRoute) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(Res.string.annotations_lines)) },
+            text = {
+                Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(state.routeName, onName, enabled = !state.busy, singleLine = true,
+                        label = { Text(stringResource(Res.string.annotations_name)) })
+                    OutlinedTextField(state.routeDescription, onDescription, enabled = !state.busy,
+                        label = { Text(stringResource(Res.string.annotations_description)) })
+                    state.routeActionError?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = { TextButton(onSave, enabled = !state.busy) { Text(stringResource(Res.string.layers_save)) } },
+            dismissButton = { TextButton(onDismiss, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) } },
+        )
+    }
+    if (state.deletingRoute) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(Res.string.annotations_delete)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(Res.string.annotations_delete_confirm,
+                        state.selection?.name?.ifBlank { stringResource(Res.string.annotations_lines) }.orEmpty()))
+                    state.routeActionError?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = { TextButton(onDelete, enabled = !state.busy) { Text(stringResource(Res.string.annotations_delete)) } },
+            dismissButton = { TextButton(onDismiss, enabled = !state.busy) { Text(stringResource(Res.string.layers_cancel)) } },
+        )
     }
 }

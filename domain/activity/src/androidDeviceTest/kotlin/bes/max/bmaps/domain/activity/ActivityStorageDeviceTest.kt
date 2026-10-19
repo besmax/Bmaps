@@ -22,6 +22,7 @@ class ActivityStorageDeviceTest {
     private val scenarios = ActivityStorageScenarios { path ->
         packageDatabase(Room.databaseBuilder<PackageDatabase>(InstrumentationRegistry.getInstrumentation().targetContext, path))
     }
+    @Test fun followingRecordedRoutePreservesBothActivitiesAfterReopen() = runBlocking { scenarios.followingRecordedRoutePreservesBothActivitiesAfterReopen() }
     @Test fun ownerStatisticsAndCommandPayloadSurviveReopen() = runBlocking { scenarios.ownerStatisticsAndCommandPayloadSurviveReopen() }
     @Test fun navigationSnapshotAndOrderedPositionsSurviveReopen() = runBlocking { scenarios.navigationSnapshotAndOrderedPositionsSurviveReopen() }
     @Test fun singleOwnerAndRestart() = runBlocking { scenarios.singleOwnerAndRestart() }

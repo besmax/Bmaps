@@ -15,7 +15,6 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.LocationManager
 import android.os.*
-import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import bes.max.bmaps.core.di.AppScope
@@ -27,6 +26,8 @@ import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.util.UUID
+
+const val ACTIVITY_RECORDING_OPEN_ACTION = "bes.max.bmaps.activity.OPEN"
 
 interface ActivityRecordingServiceOwner {
     val activityRecordingHost: AndroidActivityRecordingHost
@@ -99,37 +100,23 @@ class ActivityRecordingService : Service() {
         super.onCreate()
         try {
             val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(NotificationChannel(CHANNEL, getString(R.string.activity_recording_channel), NotificationManager.IMPORTANCE_LOW))
-            val open = packageManager.getLaunchIntentForPackage(packageName)?.let {
-                PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            }
-            val finish = PendingIntent.getService(this, 1, Intent(this, ActivityRecordingService::class.java).setAction(FINISH), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-            val notification = NotificationCompat.Builder(this, CHANNEL)
-                .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-                .setContentTitle(getString(R.string.activity_recording_title))
-                .setContentText(getString(R.string.activity_recording_text))
-                .setContentIntent(open).setOngoing(true).setSilent(true)
-                .addAction(0, getString(R.string.activity_recording_finish), finish).build()
-            ServiceCompat.startForeground(this, 7401, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+            manager.createNotificationChannel(NotificationChannel(ActivityRecordingNotification.CHANNEL, getString(R.string.activity_recording_channel), NotificationManager.IMPORTANCE_LOW))
+            val notifications = ActivityRecordingNotification(this)
+            ServiceCompat.startForeground(this, 7401, notifications.create(null), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
             owner.activityRecordingHost.attached(this)
             scope.launch {
-                owner.activitySession.active.map { record -> record?.let { it.name to it.status } }.distinctUntilChanged().collect { display ->
-                    if (display != null) {
-                        val text = if (display.second == ActivityStatus.PAUSED) R.string.activity_recording_paused else R.string.activity_recording_text
-                        manager.notify(7401, NotificationCompat.Builder(this@ActivityRecordingService, CHANNEL)
-                            .setSmallIcon(android.R.drawable.ic_menu_mylocation).setContentTitle(display.first.ifBlank { getString(R.string.activity_recording_title) })
-                            .setContentText(getString(text)).setContentIntent(open).setOngoing(true).setSilent(true)
-                            .addAction(0, getString(R.string.activity_recording_finish), finish).build())
-                    }
+                owner.activitySession.live.map { it?.notificationState() }.distinctUntilChanged().collect { state ->
+                    if (state != null) manager.notify(7401, notifications.create(state))
                 }
             }
         } catch (_: Exception) { owner.activityRecordingHost.failed(); stopSelf() }
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == FINISH) scope.launch {
-            val record = owner.activitySession.active.first()
-            if (record == null) { owner.activityRecordingHost.stop(); return@launch }
-            owner.activitySession.apply(ActivityCommand(activityIdentity(), record.id, record.sessionGeneration, record.controlRevision, ActivityAction.FINISH))
+        ActivityRecordingNotification.command(intent)?.let { command ->
+            scope.launch {
+                if (owner.activitySession.active.first() == null) owner.activityRecordingHost.stop()
+                else owner.activitySession.apply(command)
+            }
         }
         return START_NOT_STICKY
     }
@@ -139,10 +126,6 @@ class ActivityRecordingService : Service() {
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         scope.cancel()
         super.onDestroy()
-    }
-    private companion object {
-        const val CHANNEL = "activity-recording"
-        const val FINISH = "bes.max.bmaps.activity.FINISH"
     }
 }
 

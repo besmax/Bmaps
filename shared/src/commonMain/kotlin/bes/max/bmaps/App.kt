@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import bes.max.bmaps.domain.mapbuilder.PackageId
 import androidx.navigation.NavHostController
 import androidx.savedstate.read
@@ -35,9 +36,16 @@ import bes.max.bmaps.feature.viewer.history.ui.ActivityDetailsScreen
 import dev.zacsweers.metrox.viewmodel.LocalMetroViewModelFactory
 
 @Composable
-internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolean = false, fixtureMap: Boolean = false) {
+internal fun App(graph: AppGraph, previewMap: Boolean = false, onlineMap: Boolean = false, fixtureMap: Boolean = false,
+    openActiveActivity: Boolean = false, onActiveActivityOpened: () -> Unit = {}) {
     CompositionLocalProvider(LocalMetroViewModelFactory provides graph.metroViewModelFactory) {
         val navigation = rememberNavController()
+        LaunchedEffect(openActiveActivity) {
+            if (openActiveActivity) {
+                navigation.navigate(TrackMapRoute) { launchSingleTop = true }
+                onActiveActivityOpened()
+            }
+        }
         val startDestination = if (previewMap || onlineMap) ShellDestination.CONSTRUCTOR else ShellDestination.LIBRARY
         val entry by navigation.currentBackStackEntryAsState()
         val route = if (entry?.destination?.route == "provider-credentials/{identifier}") {
