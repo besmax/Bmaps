@@ -95,6 +95,71 @@ class PhoneActivitySessionTest {
     }
 
     @Test
+    fun sameTimeConflictUpdatesTrustOnceWithoutRecordingAndRecoveryStartsANewSegment() = runTest {
+        fixture { f ->
+            f.start()
+            f.fix(55.0)
+            val firstTime = f.clock.now()
+            f.fix(55.1, conflict = true)
+            f.fix(55.1, conflict = true)
+            f.fix(55.1)
+            assertEquals(ActivityDataAvailability.SOURCE_CONFLICT, f.session.live.value?.positionAvailability)
+            advanceTimeBy(1_000); runCurrent()
+            val firstSamples = f.repository.samples.toList()
+            assertEquals(1, firstSamples.count { it.measurement is PositionMeasurement })
+            assertEquals(1, f.repository.eventLog.count { it.kind == ActivityEventKind.SOURCE_CONFLICT })
+            assertEquals(1, f.repository.eventLog.count { it.kind == ActivityEventKind.POSITION_LOST })
+            assertEquals(0.0, f.session.live.value!!.distanceMeters)
+            f.fix(55.1)
+            advanceTimeBy(1_000); runCurrent()
+            val points = f.repository.samples.filter { it.measurement is PositionMeasurement }
+            assertEquals(2, points.size)
+            assertEquals(firstTime, points.first().acquiredAt)
+            assertEquals(firstSamples, f.repository.samples.take(firstSamples.size))
+            assertNotEquals(points.first().pathSegmentId, points.last().pathSegmentId)
+            assertEquals(ActivityDataAvailability.LIVE, f.session.live.value?.positionAvailability)
+            assertEquals(0.0, f.session.live.value!!.distanceMeters)
+        }
+    }
+
+    @Test
+    fun staleAndFutureConflictsCannotBypassTheQualityBarrier() = runTest {
+        fixture { f ->
+            f.start()
+            advanceTimeBy(6_000); runCurrent()
+            f.fix(55.0, accuracy = 500.0)
+            val now = f.clock.now()
+            f.fix(55.0, conflict = true, acquiredAt = now.copy(
+                epochMillis = now.epochMillis - 6_000, monotonicMillis = now.monotonicMillis!! - 6_000))
+            f.fix(55.0, conflict = true, acquiredAt = now.copy(
+                epochMillis = now.epochMillis + 1_000, monotonicMillis = now.monotonicMillis!! + 1_000))
+            assertNotEquals(ActivityDataAvailability.SOURCE_CONFLICT, f.session.live.value?.positionAvailability)
+            advanceTimeBy(1_000); runCurrent()
+            assertTrue(f.repository.samples.isEmpty())
+            assertTrue(f.repository.eventLog.none { it.kind == ActivityEventKind.SOURCE_CONFLICT })
+        }
+    }
+
+    @Test
+    fun preResumeConflictCannotChangeTheNewRecordingInterval() = runTest {
+        fixture { f ->
+            f.start()
+            f.fix(55.0)
+            val oldTime = f.clock.now()
+            advanceTimeBy(1_000); runCurrent()
+            f.session.apply(f.command(ActivityAction.PAUSE)).success()
+            advanceTimeBy(1_000); runCurrent()
+            f.session.apply(f.command(ActivityAction.RESUME)).success()
+            runCurrent()
+            f.fix(55.1, conflict = true, acquiredAt = oldTime)
+            assertNotEquals(ActivityDataAvailability.SOURCE_CONFLICT, f.session.live.value?.positionAvailability)
+            advanceTimeBy(1_000); runCurrent()
+            assertEquals(1, f.repository.samples.count { it.measurement is PositionMeasurement })
+            assertTrue(f.repository.eventLog.none { it.kind == ActivityEventKind.SOURCE_CONFLICT })
+        }
+    }
+
+    @Test
     fun sharedMapSubscriptionSurvivesRecordingPauseAndReleasesAfterMapExit() = runTest {
         fixture { f ->
             val map = launch { f.locations.observe().collect() }
@@ -294,8 +359,8 @@ class PhoneActivitySessionTest {
         }
         val session = PhoneActivitySession(repository, routes, locations, host, clock, bes.max.bmaps.core.storage.PackageUseGuard())
         suspend fun start(route: RouteSelection? = null) { session.start(ActivityStartRequest("activity", "Trip", ActivityProfile.HIKING, route)).success(); scheduler.runCurrent() }
-        suspend fun fix(latitude: Double, accuracy: Double = 3.0, conflict: Boolean = false, course: Double? = 90.0) {
-            val time = clock.now()
+        suspend fun fix(latitude: Double, accuracy: Double = 3.0, conflict: Boolean = false, course: Double? = 90.0, acquiredAt: ActivityTime = clock.now()) {
+            val time = acquiredAt
             native.states.emit(LocationState(LocationStatus.ACTIVE, LocationFix(latitude, 37.0, accuracy, time.epochMillis,
                 speedMetersPerSecond = 2.0, courseDegrees = course, monotonicMillis = time.monotonicMillis,
                 provider = "gps", altitudeMeters = -5.0, altitudeAccuracyMeters = 2.0), conflict))

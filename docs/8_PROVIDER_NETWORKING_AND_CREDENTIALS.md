@@ -72,7 +72,7 @@ Opening Build loads OSM; the default Library destination does not request map ti
 
 | Source | Current availability | Remaining requirements |
 | --- | --- | --- |
-| OSM / WorldStreetMap | Enabled; source levels 0–19, visible linked attribution, identifying User-Agent, persistent native HTTP cache | Public OSM bulk/offline package downloads remain prohibited. |
+| OSM / WorldStreetMap | Enabled; source levels 0–19, visible linked attribution, identifying User-Agent, persistent native HTTP cache | The current development configuration temporarily sets offline download permission to ALLOWED by owner decision. Restore the required production restriction before release; the provider-policy test still expects PROHIBITED. |
 | Thunderforest / Atlas | Configured at `api.thunderforest.com`; levels 0–22; linked Thunderforest and OSM attribution; masked key entry | User account/key required. Authenticated native rendering has not been verified. Offline entitlement must be verified separately. |
 | OsmAnd / OsmAndHd | Configured and selectable; no embedded credential | Establish permission for third-party use of the endpoint. OSM's standard-tile policy does not cover it. |
 | ArcGIS / World Imagery | Configured and selectable; JPEG source levels 0–23 and service attribution | Verify licensed access, effective coverage, and regional rendering beyond the current global engine limits. |
@@ -96,6 +96,8 @@ The Android native-cache host test uses a local server to verify fresh responses
 Debug smoke entry points: iOS `--online-map` starts on Build; `--preview-map` retains the offline fixture. Android's debug-only `fixture-map` intent extra selects the fixture for deterministic UI tests without contacting providers. Release entry points ignore these debug switches.
 
 ## Verification
+
+`./gradlew :feature:constructor:testAndroidHostTest --tests 'bes.max.bmaps.feature.constructor.map.presentation.OnlineMapViewModelTest'` passed both host tests with no failures or skips. The retry test retains the viewport, ignores retired-generation events and reports missing credentials. Its test-owned ViewModelStore is cleared and pending cancellation work drained before resetting Dispatchers.Main, fixing the previous teardown failure. These assertions do not establish native rendering, real provider access or background recovery; those remain owner checks.
 
 ```sh
 ./gradlew :core:network:testAndroidHostTest :domain:providers:testAndroidHostTest :core:datastore:testAndroidHostTest

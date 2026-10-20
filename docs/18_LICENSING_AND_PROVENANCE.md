@@ -18,6 +18,10 @@ Settings includes a selectable About Bmaps/licensing card, including the install
 
 ## Signed release procedure
 
+Android packaging uses the catalog-pinned NDK through `app.android.application`, matching `app.proj.android` and `app.tiff.android`. The selected NDK must be installed so AGP can use its strip tool during final APK packaging. Keep native debug information outside the distributed APK; stripping does not remove the embedded PROJ database or change the supported ABIs.
+
+After changing the packaging NDK, the owner must rebuild the signed release APK and inspect the build output for `Unable to strip` warnings. Inspect the packaged `lib/*/*.so` files for `.debug_*` sections, rather than relying on the strip task's successful completion. The existing 280,519,788-byte APK contained unstripped native libraries; applying NDK `llvm-strip --strip-unneeded` to temporary copies reduced their combined size from 239,107,592 to 63,600,588 bytes. This suggests an approximately 105 MB universal APK before any R8 changes; it is an estimate, not verification of a rebuilt artifact. The packaging configuration change still requires a new owner-built release and runtime acceptance.
+
 Signing requires the owner's existing GPG or SSH signing key and its corresponding Git/GitHub setup. This change creates no keys, changes no signing configuration, and signs no commits or releases. Once the owner has configured signing, use signed commits (`git commit -S`) and annotated signed release tags (`git tag -s <version> -m <message>`). Verify signatures with `git verify-commit <commit>` and `git verify-tag <version>`.
 
 For each release, retain the tagged source archive, application artifacts, full commit ID, and SHA-256 checksums of those artifacts. Sign the checksum manifest using the owner's configured signing tool and publish the verification information alongside the release. A checksum alone proves neither authorship nor publication date. Tagging a release does not by itself sign APK/IPA files or a checksum manifest. Do not publish a release until its contents and licensing notices have been reviewed.

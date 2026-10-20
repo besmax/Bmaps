@@ -433,7 +433,9 @@ class PhoneActivitySession(
         val acquired = ActivityTime(fix.timestampMillis, fix.monotonicMillis ?: (now.monotonicMillis!! - (now.epochMillis - fix.timestampMillis)).coerceAtLeast(0), now.continuityId)
         val age = activityTimeDelta(acquired, now) ?: Long.MAX_VALUE
         val since = recordingSince ?: return
-        if ((activityTimeDelta(since, acquired) ?: -1) < 0 || positionBarrier?.let { (activityTimeDelta(it, acquired) ?: -1) <= 0 } == true) return
+        if ((activityTimeDelta(since, acquired) ?: -1) < 0) return
+        val freshConflict = sourceConflict && age in 0..policy.maxPositionAgeMillis
+        if (!freshConflict && positionBarrier?.let { (activityTimeDelta(it, acquired) ?: -1) <= 0 } == true) return
         if (age !in 0..policy.maxPositionAgeMillis) { quality(ActivityDataAvailability.STALE, now); publish(now); return }
         if (sourceConflict) { quality(ActivityDataAvailability.SOURCE_CONFLICT, now); publish(now); return }
         if (!fix.latitude.isFinite() || fix.latitude !in -90.0..90.0 || !fix.longitude.isFinite() || fix.longitude !in -180.0..180.0 ||

@@ -9,7 +9,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    alias(libs.plugins.androidApplication)
+    id("app.android.application")
     alias(libs.plugins.composeCompiler)
     id("app.android.ui-test")
 }

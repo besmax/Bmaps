@@ -7,6 +7,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
 package bes.max.bmaps.feature.constructor.map.presentation
+import androidx.lifecycle.ViewModelStore
 import bmaps.feature.constructor.generated.resources.*
 import bes.max.bmaps.core.mapengine.*
 import bes.max.bmaps.domain.providers.*
@@ -18,9 +19,11 @@ import kotlin.test.*
 class OnlineMapViewModelTest {
     @Test fun selectionRetryPreservesViewportAndIgnoresRetiredEvents() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val owner = ViewModelStore()
         try {
             var opens = 0
             val model = OnlineMapViewModel(ProviderRegistry.builtIn(), OnlineSourceOpener { opens++; OnlineSourceResult.Failed(OnlineSourceFailure.MISSING_CREDENTIAL) })
+            owner.put("online-map", model)
             runCurrent()
             val first = assertNotNull(model.state.value.session)
             assertEquals(0, opens)
@@ -41,7 +44,12 @@ class OnlineMapViewModelTest {
             val keyed = assertNotNull(model.state.value.session)
             assertFailsWith<IllegalStateException> { keyed.layers.single().source.open() }
             assertEquals(Res.string.provider_key_required, model.state.value.error)
-        } finally { Dispatchers.resetMain() }
+        } finally {
+            try {
+                owner.clear()
+                runCurrent()
+            } finally { Dispatchers.resetMain() }
+        }
     }
 
     @Test fun validatesGlobalMatricesWithoutTruncatingSourceLevels() {
