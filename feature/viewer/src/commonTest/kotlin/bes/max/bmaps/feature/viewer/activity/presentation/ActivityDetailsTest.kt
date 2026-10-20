@@ -6,7 +6,7 @@ License: https://polyformproject.org/licenses/noncommercial/1.0.0
 Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
-package bes.max.bmaps.feature.viewer.history.presentation
+package bes.max.bmaps.feature.viewer.activity.presentation
 
 import androidx.lifecycle.ViewModelStore
 import bes.max.bmaps.core.sharing.SharedDocumentStore

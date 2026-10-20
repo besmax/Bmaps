@@ -6,11 +6,9 @@ License: https://polyformproject.org/licenses/noncommercial/1.0.0
 Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
-package bes.max.bmaps.feature.viewer.history.presentation
+package bes.max.bmaps.feature.viewer.activity.presentation
 
 import androidx.lifecycle.ViewModelStore
-import bes.max.bmaps.core.sharing.SharedDocumentStore
-import bes.max.bmaps.core.sharing.SharingLocation
 import bes.max.bmaps.domain.activity.*
 import bmaps.feature.viewer.generated.resources.*
 import kotlinx.coroutines.Dispatchers
@@ -116,7 +114,7 @@ class HistoryViewModelTest {
             assertEquals(Res.string.history_error, model.state.value.error)
         }
     }
-    @Test fun historyPagingAndFiltersAreSentToTheRepository() = runTest {
+    @Test fun historyPagingAndSearchAreSentToTheRepository() = runTest {
         fixture { model, repository ->
             model.refresh(); runCurrent()
             assertEquals(listOf("first"), model.state.value.activities.map { it.id })
@@ -124,17 +122,16 @@ class HistoryViewModelTest {
             model.more(); runCurrent()
             assertEquals(listOf("first", "second"), model.state.value.activities.map { it.id })
             assertEquals(ActivityHistoryCursor(1000, "first"), repository.queries.last().before)
-            model.filter(2); runCurrent()
-            assertEquals(setOf(ActivityStatus.INTERRUPTED), repository.queries.last().statuses)
-            assertNull(repository.queries.last().before)
             model.search("Hike"); runCurrent()
             assertEquals("Hike", repository.queries.last().nameContains)
             assertEquals(50, repository.queries.last().limit)
+            assertEquals(setOf(ActivityStatus.COMPLETED), repository.queries.last().statuses)
+            assertNull(repository.queries.last().before)
         }
     }
     @Test fun completedActivityListUsesCatalogFilteringAndRetainsItsFilterWhileSearching() = runTest {
         fixture { model, repository ->
-            model.filter(1); runCurrent()
+            model.refresh(); runCurrent()
             assertEquals(setOf(ActivityStatus.COMPLETED), repository.queries.last().statuses)
             model.search("Ride"); runCurrent()
             assertEquals(setOf(ActivityStatus.COMPLETED), repository.queries.last().statuses)
@@ -143,32 +140,12 @@ class HistoryViewModelTest {
             assertEquals(ActivityHistoryCursor(1000, "first"), repository.queries.last().before)
         }
     }
-    @Test fun invalidRenameStaysVisibleAndValidRenamePreservesTheRecordedTimeline() = runTest {
-        fixture { model, repository ->
-            model.refresh(); runCurrent()
-            val original = repository.record
-            model.edit("first", false, ""); model.rename(); runCurrent()
-            assertEquals(Res.string.history_invalid_name, model.state.value.error)
-            assertTrue(repository.commits.isEmpty())
-            assertEquals("first", model.state.value.editingId)
-            model.draft("Renamed"); model.rename(); runCurrent()
-            assertEquals("Renamed", repository.record.name)
-            assertEquals(1L, repository.record.revision)
-            assertEquals(original.startedAt, repository.record.startedAt)
-            assertEquals(original.updatedAt, repository.record.updatedAt)
-            assertEquals(original.statistics, repository.record.statistics)
-            assertNull(model.state.value.editingId)
-            assertNull(model.state.value.error)
-        }
-    }
     private suspend fun TestScope.fixture(block: suspend (HistoryViewModel, HistoryTestRepository) -> Unit) {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val owner = ViewModelStore()
         try {
             val repository = HistoryTestRepository()
-            val routes = HistoryTestRoutes()
-            val model = HistoryViewModel(repository, routes, HistoryTestSession(), ActivityExporter(repository, routes),
-                SharedDocumentStore(SharingLocation("unused-history-test")))
+            val model = HistoryViewModel(repository, HistoryTestSession())
             owner.put("history", model)
             block(model, repository)
         } finally { owner.clear(); runCurrent(); Dispatchers.resetMain() }
@@ -205,14 +182,6 @@ private class HistoryTestRepository : ActivityRepository {
     override suspend fun reconcile(): ActivityResult<Unit> = ActivityResult.Success(Unit)
     override suspend fun appliedCommand(activityId: String, commandId: String): ActivityResult<ActivityRecord?> = error("unused")
     override fun observeActive() = MutableStateFlow<ActivityRecord?>(null)
-}
-private class HistoryTestRoutes : ActivityRouteRepository {
-    override suspend fun get(id: String): ActivityResult<ActivityRoute> = error("unused")
-    override suspend fun save(route: ActivityRoute, expectedRevision: Long?): ActivityResult<ActivityRoute> = error("unused")
-    override suspend fun derive(activityId: String, routeId: String): ActivityResult<ActivityRoute?> = error("unused")
-    override suspend fun delete(id: String): ActivityResult<Unit> = error("unused")
-    override suspend fun routes(query: ActivityRouteQuery) = ActivityResult.Success(ActivityRoutePage(emptyList(), null))
-    override suspend fun saveImported(routes: List<ActivityRoute>): ActivityResult<Unit> = error("unused")
 }
 private class HistoryTestSession : ActivitySession {
     override val active = MutableStateFlow<ActivityRecord?>(null)

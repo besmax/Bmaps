@@ -6,7 +6,7 @@ License: https://polyformproject.org/licenses/noncommercial/1.0.0
 Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
-package bes.max.bmaps.feature.viewer.history.ui
+package bes.max.bmaps.feature.viewer.activity.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -28,13 +28,13 @@ import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import bes.max.bmaps.feature.viewer.history.presentation.ChartPoint
-import bes.max.bmaps.feature.viewer.history.presentation.reviewNumber
+import bes.max.bmaps.feature.viewer.activity.presentation.ChartPoint
+import bes.max.bmaps.feature.viewer.activity.presentation.activityTimeText
+import bes.max.bmaps.feature.viewer.activity.presentation.reviewNumber
 import bmaps.feature.viewer.generated.resources.*
 import kotlinx.collections.immutable.ImmutableList
 import org.jetbrains.compose.resources.stringResource
 import kotlin.math.abs
-import kotlin.time.Instant
 
 @Composable
 internal fun TelemetryChart(points: ImmutableList<ChartPoint>, unit: String, from: Long, to: Long,
@@ -43,7 +43,7 @@ internal fun TelemetryChart(points: ImmutableList<ChartPoint>, unit: String, fro
     val cursor = MaterialTheme.colorScheme.tertiary
     val grid = MaterialTheme.colorScheme.outlineVariant
     val label = stringResource(Res.string.history_chart_description)
-    val selection = selected?.let { Instant.fromEpochMilliseconds(it).toString() }.orEmpty()
+    val selection = selected?.let { activityTimeText(it) }.orEmpty()
     val select by rememberUpdatedState(onSelect)
     val duration = (to - from).coerceAtLeast(1)
     val minimum = points.minOfOrNull { it.value } ?: 0.0
@@ -103,7 +103,4 @@ internal fun TelemetryChart(points: ImmutableList<ChartPoint>, unit: String, fro
     }
 }
 
-private fun chartTime(time: Long): String {
-    val instant = Instant.fromEpochMilliseconds(time).toString()
-    return instant.substringBefore('T') + "\n" + instant.substringAfter('T').substringBefore('.').removeSuffix("Z") + " UTC"
-}
+private fun chartTime(time: Long): String = activityTimeText(time, dateTimeSeparator = "\n")

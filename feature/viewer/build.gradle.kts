@@ -12,6 +12,7 @@ plugins {
 
 kotlin {
     sourceSets.commonMain.dependencies {
+        implementation(libs.kotlinx.datetime)
         implementation(project(":core:ui"))
         implementation(project(":domain:map-builder"))
         implementation(project(":domain:activity"))

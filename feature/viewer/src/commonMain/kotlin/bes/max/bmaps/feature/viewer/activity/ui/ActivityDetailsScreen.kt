@@ -6,7 +6,7 @@ License: https://polyformproject.org/licenses/noncommercial/1.0.0
 Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
-package bes.max.bmaps.feature.viewer.history.ui
+package bes.max.bmaps.feature.viewer.activity.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -32,12 +32,11 @@ import bes.max.bmaps.core.ui.components.MapIcons
 import bes.max.bmaps.domain.mapbuilder.PackageId
 import bes.max.bmaps.feature.viewer.activity.presentation.TrackMapLayer
 import bes.max.bmaps.feature.viewer.activity.presentation.TrackState
-import bes.max.bmaps.feature.viewer.history.presentation.*
+import bes.max.bmaps.feature.viewer.activity.presentation.*
 import bes.max.bmaps.feature.viewer.map.presentation.ViewerViewModel
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import kotlinx.collections.immutable.ImmutableList
-import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -57,8 +56,7 @@ fun ActivityDetailsScreen(activityId: String, onBack: () -> Unit, packageId: Pac
     LaunchedEffect(review, lifecycle, documents) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             review.events.collect { event -> when (event) {
-                is HistoryEvent.Share -> documents.share(event.document)
-                is HistoryEvent.Message -> snackbar.showSnackbar(getString(event.message))
+                is ActivityReviewEffect.Share -> documents.share(event.document)
             } }
         }
     }

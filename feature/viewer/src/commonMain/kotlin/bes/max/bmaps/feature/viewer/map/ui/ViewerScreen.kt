@@ -27,10 +27,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import bes.max.bmaps.core.mapengine.MapMarker
-import bes.max.bmaps.feature.viewer.history.presentation.ReviewViewModel
-import bes.max.bmaps.feature.viewer.history.presentation.HistoryEvent
-import bes.max.bmaps.feature.viewer.history.ui.ReviewPanel
-import bes.max.bmaps.feature.viewer.history.ui.ReviewDialogs
+import bes.max.bmaps.feature.viewer.activity.presentation.ReviewViewModel
+import bes.max.bmaps.feature.viewer.activity.presentation.ActivityReviewEffect
+import bes.max.bmaps.feature.viewer.activity.ui.ReviewPanel
+import bes.max.bmaps.feature.viewer.activity.ui.ReviewDialogs
 import bes.max.bmaps.core.ui.components.MapIconButton
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -63,7 +63,6 @@ fun ViewerScreen(
     calloutAnimated: Boolean = true,
     autoDismiss: Boolean = true,
     activityId: String? = null,
-    initialRouteId: String? = null,
     onHistory: () -> Unit = {},
     onReview: (String) -> Unit = {},
     trackScreen: Boolean = false,
@@ -94,7 +93,6 @@ fun ViewerScreen(
     val reviewState by review.state.collectAsStateWithLifecycle()
     val reviewDocuments = rememberNativeDocuments({ it.dispose() }, review::nativeFailure)
     LaunchedEffect(activityId) { activityId?.let(review::open) }
-    LaunchedEffect(initialRouteId) { initialRouteId?.let(track::selectRoute) }
     val objects = metroViewModel<MapObjectsViewModel>()
     val objectState by objects.state.collectAsStateWithLifecycle()
     LaunchedEffect(resolvedPackageId) { objects.context(resolvedPackageId); objects.refresh() }
@@ -172,8 +170,7 @@ fun ViewerScreen(
     LaunchedEffect(review, lifecycle, reviewDocuments) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             review.events.collect { event -> when (event) {
-                is HistoryEvent.Share -> reviewDocuments.share(event.document)
-                is HistoryEvent.Message -> snackbar.showSnackbar(getString(event.message))
+                is ActivityReviewEffect.Share -> reviewDocuments.share(event.document)
             } }
         }
     }

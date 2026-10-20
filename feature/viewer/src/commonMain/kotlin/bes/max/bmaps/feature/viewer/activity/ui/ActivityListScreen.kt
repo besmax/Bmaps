@@ -6,7 +6,7 @@ License: https://polyformproject.org/licenses/noncommercial/1.0.0
 Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
-package bes.max.bmaps.feature.viewer.history.ui
+package bes.max.bmaps.feature.viewer.activity.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,7 +22,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import bes.max.bmaps.core.ui.components.MapIcons
-import bes.max.bmaps.feature.viewer.history.presentation.*
+import bes.max.bmaps.feature.viewer.activity.presentation.*
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -33,13 +33,12 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun ActivityListScreen(
     onBack: () -> Unit, onDetails: (String) -> Unit, onOpenActive: () -> Unit,
-    onRecord: () -> Unit, onSavedRoutes: () -> Unit
+    onRecord: () -> Unit
 ) {
     val model = metroViewModel<HistoryViewModel>()
     val state by model.state.collectAsStateWithLifecycle()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(model, lifecycle) {
-        model.filter(1)
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { model.refresh() }
     }
     Scaffold(topBar = {
@@ -52,8 +51,7 @@ fun ActivityListScreen(
                         stringResource(Res.string.viewer_back)
                     )
                 }
-            },
-            actions = { TextButton(onSavedRoutes) { Text(stringResource(Res.string.history_routes)) } })
+            })
     }) { padding ->
         Column(
             Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp),

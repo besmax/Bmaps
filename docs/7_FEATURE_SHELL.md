@@ -80,11 +80,8 @@ The library top-bar Activities icon and track menu use callbacks wired by the um
 | Destination | Entry point / responsibility |
 | --- | --- |
 | `activities` | ActivityListScreen: completed pages and a separate current-owner card; new recording returns to map selection |
-| `saved-routes` | HistoryScreen route management; selecting a map-owned route opens its source map, while an unassigned route requires a target map |
 | `viewer/{packageId}/track` | ViewerScreen with dedicated tracking presentation after successful Start; ordinary map Track icons return to the active source map |
 | `track-map` | Active-owner recovery entry and Android activity-notification target, resolving persisted source-map context |
-| `track-map/{routeId}` | Opens the owned route's map or library map picker for copying an unassigned route |
-| `viewer/{packageId}/route/{routeId}` | Copies an unassigned route into the chosen map before preparation, or opens the map-owned route |
 | `activity/{activityId}` | ActivityDetailsScreen with source-map lookup/vector fallback |
 | `viewer/{packageId}/activity/{activityId}` | ActivityDetailsScreen with supplied package context; successful foreground Finish opens the same details UI |
 

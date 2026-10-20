@@ -6,7 +6,7 @@ License: https://polyformproject.org/licenses/noncommercial/1.0.0
 Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
-package bes.max.bmaps.feature.viewer.history.presentation
+package bes.max.bmaps.feature.viewer.activity.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,6 +15,7 @@ import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import bes.max.bmaps.core.mapengine.MapPoint
 import bes.max.bmaps.core.mapengine.TilePyramid
 import bes.max.bmaps.core.mapengine.positionOf
+import bes.max.bmaps.core.sharing.SharedDocument
 import bes.max.bmaps.core.sharing.SharedDocumentStore
 import bes.max.bmaps.domain.activity.*
 import bes.max.bmaps.feature.viewer.activity.presentation.TrackCoordinate
@@ -27,6 +28,10 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlin.math.abs
 
+internal sealed interface ActivityReviewEffect {
+    data class Share(val document: SharedDocument) : ActivityReviewEffect
+}
+
 @Inject
 @ViewModelKey
 @ContributesIntoMap(AppScope::class)
@@ -34,7 +39,7 @@ class ReviewViewModel(private val reader: ActivityReviewReader, private val acti
     private val exporter: ActivityExporter, private val files: SharedDocumentStore) : ViewModel() {
     private val mutableState = MutableStateFlow(ReviewState())
     internal val state = mutableState.asStateFlow()
-    private val channel = Channel<HistoryEvent>(Channel.BUFFERED)
+    private val channel = Channel<ActivityReviewEffect>(Channel.BUFFERED)
     internal val events = channel.receiveAsFlow()
     private var loading: Job? = null
     private var selecting: Job? = null
@@ -194,7 +199,7 @@ class ReviewViewModel(private val reader: ActivityReviewReader, private val acti
                     if (kind == 1) exporter.telemetry(id, sink) else exporter.recordedPath(id, sink)
                 }
                 mutableState.update { it.copy(exporting = false) }
-                channel.send(HistoryEvent.Share(document))
+                channel.send(ActivityReviewEffect.Share(document))
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: ActivityExportException) { mutableState.update { it.copy(actionError = historyFailure(failure.reason)) } }
             catch (_: Exception) { nativeFailure() }

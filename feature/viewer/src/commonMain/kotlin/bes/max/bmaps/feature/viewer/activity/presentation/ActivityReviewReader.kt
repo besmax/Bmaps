@@ -6,7 +6,7 @@ License: https://polyformproject.org/licenses/noncommercial/1.0.0
 Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
-package bes.max.bmaps.feature.viewer.history.presentation
+package bes.max.bmaps.feature.viewer.activity.presentation
 
 import bes.max.bmaps.domain.activity.ActivityEvent
 import bes.max.bmaps.domain.activity.ActivityEventKind
@@ -58,7 +58,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import org.jetbrains.compose.resources.StringResource
 import kotlin.math.abs
-import kotlin.time.Instant
 
 @Inject
 class ActivityReviewReader(private val activities: ActivityRepository) {
@@ -175,7 +174,7 @@ class ActivityReviewReader(private val activities: ActivityRepository) {
         return ReviewState(
             activityId = id,
             revision = record.revision,
-            date = Instant.fromEpochMilliseconds(record.startedAt.epochMillis).toString(),
+            date = activityTimeText(record.startedAt.epochMillis),
             profile = historyProfile(record.profile),
             packageId = record.packageId,
             averageSpeed = if (statistics.recordingMillis > 0) reviewNumber(statistics.distanceMeters * 3600 / statistics.recordingMillis) else null,
