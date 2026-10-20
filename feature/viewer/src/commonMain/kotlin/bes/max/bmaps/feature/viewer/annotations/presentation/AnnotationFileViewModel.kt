@@ -11,7 +11,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.sharing.*
-import bes.max.bmaps.domain.mapbuilder.AnnotationGeoJson
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationGeoJson
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject

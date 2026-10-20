@@ -14,12 +14,12 @@ internal interface AppGraph : ViewModelGraph {
     val providerRepository: bes.max.bmaps.domain.providers.ProviderRepository
     val onlineTileSourceFactory: bes.max.bmaps.domain.providers.OnlineTileSourceFactory
     val providerCredentials: bes.max.bmaps.core.datastore.ProviderCredentials
-    val packageRepository: bes.max.bmaps.domain.mapbuilder.PackageRepository
+    val packageRepository: bes.max.bmaps.domain.mapbuilder.repository.PackageRepository
     val activitySession: bes.max.bmaps.domain.activity.recording.ActivitySession
     val activityRepository: bes.max.bmaps.domain.activity.repository.ActivityRepository
     val activityRouteRepository: bes.max.bmaps.domain.activity.repository.ActivityRouteRepository
-    val packageBuildStorage: bes.max.bmaps.domain.mapbuilder.PackageBuildStorage
-    val downloadExecutor: bes.max.bmaps.domain.mapbuilder.DownloadExecutor
-    val elevationGenerationScheduler: bes.max.bmaps.domain.mapbuilder.ElevationGenerationScheduler
-    val downloadScheduler: bes.max.bmaps.domain.mapbuilder.DownloadScheduler
+    val packageBuildStorage: bes.max.bmaps.domain.mapbuilder.download.PackageBuildStorage
+    val downloadExecutor: bes.max.bmaps.domain.mapbuilder.download.DownloadExecutor
+    val elevationGenerationScheduler: bes.max.bmaps.domain.mapbuilder.elevation.relief.ElevationGenerationScheduler
+    val downloadScheduler: bes.max.bmaps.domain.mapbuilder.download.DownloadScheduler
 }

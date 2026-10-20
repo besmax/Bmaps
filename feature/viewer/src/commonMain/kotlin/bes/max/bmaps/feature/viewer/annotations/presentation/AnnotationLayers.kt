@@ -7,10 +7,11 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
 package bes.max.bmaps.feature.viewer.annotations.presentation
+
 import androidx.compose.ui.graphics.Color
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.*
-import bes.max.bmaps.domain.mapbuilder.Annotation
+import bes.max.bmaps.domain.mapbuilder.annotations.Annotation
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationKind
 
 internal data class AnnotationObjectUiState(
     val calloutOpen: Boolean = false,

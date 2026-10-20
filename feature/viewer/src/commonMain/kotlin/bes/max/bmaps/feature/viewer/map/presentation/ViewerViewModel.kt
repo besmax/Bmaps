@@ -8,22 +8,32 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.viewer.map.presentation
 
-import kotlinx.collections.immutable.ImmutableList
-import bes.max.bmaps.feature.viewer.activity.presentation.TrackLine
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.model.LayerId
+import bes.max.bmaps.domain.mapbuilder.model.MapAvatar
+import bes.max.bmaps.domain.mapbuilder.model.PackageFailure
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageLayer
+import bes.max.bmaps.domain.mapbuilder.model.PackageManifest
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
+import bes.max.bmaps.domain.mapbuilder.model.PackageSummary
+import bes.max.bmaps.domain.mapbuilder.repository.LayerPresentation
+import bes.max.bmaps.domain.mapbuilder.repository.OpenedPackage
+import bes.max.bmaps.domain.mapbuilder.repository.PackageRepository
+import bes.max.bmaps.feature.viewer.activity.presentation.TrackLine
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlin.math.pow
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import org.jetbrains.compose.resources.StringResource
-import kotlin.math.pow
 
 data class ViewerState(
     val summary: PackageSummary? = null,

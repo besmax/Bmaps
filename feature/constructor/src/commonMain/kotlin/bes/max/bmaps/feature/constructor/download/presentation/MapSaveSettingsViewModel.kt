@@ -10,28 +10,36 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.constructor.download.presentation
 
-import bes.max.bmaps.feature.constructor.map.presentation.MapChoice
-import bmaps.feature.constructor.generated.resources.*
-import org.jetbrains.compose.resources.StringResource
-import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
+import bes.max.bmaps.domain.mapbuilder.download.BuildEstimate
+import bes.max.bmaps.domain.mapbuilder.download.BuildLayerRequest
+import bes.max.bmaps.domain.mapbuilder.download.BuildRequest
+import bes.max.bmaps.domain.mapbuilder.download.DownloadSizeEstimator
+import bes.max.bmaps.domain.mapbuilder.download.TileAreaEstimate
+import bes.max.bmaps.domain.mapbuilder.elevation.estimatedTileBytes
+import bes.max.bmaps.domain.mapbuilder.elevation.supportsTileRequest
+import bes.max.bmaps.domain.mapbuilder.model.LayerId
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
 import bes.max.bmaps.domain.providers.ElevationDataset
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.feature.constructor.map.presentation.MapChoice
+import bmaps.feature.constructor.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlin.time.Clock
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.datetime.number
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
+import org.jetbrains.compose.resources.StringResource
 
 data class AdditionalLayer(val id: String, val choice: MapChoice, val visible: Boolean = true)
 data class MapSaveSettings(val name: String, val bounds: BoundingBox, val levels: Set<Int>,

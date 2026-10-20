@@ -44,9 +44,9 @@ import bes.max.bmaps.domain.activity.model.RouteDirection
 import bes.max.bmaps.domain.activity.model.RoutePosition
 import bes.max.bmaps.domain.activity.model.RouteSelection
 import bes.max.bmaps.domain.activity.model.RouteVertex
-import bes.max.bmaps.domain.mapbuilder.Annotation
-import bes.max.bmaps.domain.mapbuilder.AnnotationKind
-import bes.max.bmaps.domain.mapbuilder.AnnotationValidation
+import bes.max.bmaps.domain.mapbuilder.annotations.Annotation
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationKind
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationValidation
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject

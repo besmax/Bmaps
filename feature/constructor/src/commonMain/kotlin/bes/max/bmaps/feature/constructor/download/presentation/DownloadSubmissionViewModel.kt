@@ -10,25 +10,34 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.constructor.download.presentation
 
-import bes.max.bmaps.feature.constructor.map.presentation.MapChoice
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import bes.max.bmaps.core.datastore.ProviderCredentials
 import bes.max.bmaps.core.datastore.CredentialResult
+import bes.max.bmaps.core.datastore.ProviderCredentials
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.download.BuildLayerRequest
+import bes.max.bmaps.domain.mapbuilder.download.BuildRequest
+import bes.max.bmaps.domain.mapbuilder.download.DownloadExecutor
+import bes.max.bmaps.domain.mapbuilder.download.DownloadPlanner
+import bes.max.bmaps.domain.mapbuilder.download.PackageBuildStorage
+import bes.max.bmaps.domain.mapbuilder.elevation.supportsTileRequest
+import bes.max.bmaps.domain.mapbuilder.model.LayerId
+import bes.max.bmaps.domain.mapbuilder.model.PackageFailure
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
 import bes.max.bmaps.domain.providers.*
+import bes.max.bmaps.feature.constructor.map.presentation.MapChoice
 import bmaps.feature.constructor.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlin.uuid.Uuid
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.StringResource
-import kotlin.uuid.Uuid
 
 data class DownloadSubmissionState(
     val availableBytes: Long? = null, val busy: Boolean = false,

@@ -7,10 +7,19 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
 package bes.max.bmaps.feature.viewer.elevation.presentation
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.elevation.relief.ElevationGenerationController
+import bes.max.bmaps.domain.mapbuilder.elevation.relief.ElevationGenerationJob
+import bes.max.bmaps.domain.mapbuilder.elevation.relief.ElevationLayerGenerator
+import bes.max.bmaps.domain.mapbuilder.elevation.relief.ElevationPalette
+import bes.max.bmaps.domain.mapbuilder.elevation.relief.ElevationReliefOptions
+import bes.max.bmaps.domain.mapbuilder.elevation.relief.ElevationReliefStyle
+import bes.max.bmaps.domain.mapbuilder.model.PackageFailure
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject

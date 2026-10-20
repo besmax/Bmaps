@@ -33,8 +33,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bes.max.bmaps.core.sharing.rememberNativeDocuments
-import bes.max.bmaps.domain.mapbuilder.Annotation
-import bes.max.bmaps.domain.mapbuilder.AnnotationKind
+import bes.max.bmaps.domain.mapbuilder.annotations.Annotation
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationKind
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import org.jetbrains.compose.resources.stringResource

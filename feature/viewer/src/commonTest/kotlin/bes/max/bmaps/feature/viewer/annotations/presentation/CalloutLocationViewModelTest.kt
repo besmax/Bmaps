@@ -11,12 +11,21 @@ package bes.max.bmaps.feature.viewer.annotations.presentation
 import androidx.lifecycle.ViewModelStore
 import bes.max.bmaps.core.datastore.*
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.model.MapAvatar
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
+import bes.max.bmaps.domain.mapbuilder.model.PackageSummary
+import bes.max.bmaps.domain.mapbuilder.repository.LayerPresentation
+import bes.max.bmaps.domain.mapbuilder.repository.OpenedPackage
+import bes.max.bmaps.domain.mapbuilder.repository.PackagePage
+import bes.max.bmaps.domain.mapbuilder.repository.PackageQuery
+import bes.max.bmaps.domain.mapbuilder.repository.PackageRepository
+import bes.max.bmaps.domain.mapbuilder.repository.PackageVerificationProgress
 import bmaps.feature.viewer.generated.resources.*
+import kotlin.test.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
-import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CalloutLocationViewModelTest {

@@ -20,7 +20,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import bes.max.bmaps.core.mapengine.MapEvent
 import bes.max.bmaps.core.mapengine.MapCameraSnapshot
 import bes.max.bmaps.core.mapengine.TilePyramid
-import bes.max.bmaps.domain.mapbuilder.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
 import org.jetbrains.compose.resources.getString
 
 @Composable

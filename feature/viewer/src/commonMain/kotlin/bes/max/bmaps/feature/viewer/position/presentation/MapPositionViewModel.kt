@@ -7,20 +7,26 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
 package bes.max.bmaps.feature.viewer.position.presentation
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.datastore.UserPreferences
 import bes.max.bmaps.core.datastore.UserPreferencesRepository
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.elevation.ElevationDiagnostics
+import bes.max.bmaps.domain.mapbuilder.elevation.PackageElevation
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
+import bes.max.bmaps.domain.mapbuilder.repository.OpenedPackage
+import bes.max.bmaps.domain.mapbuilder.repository.PackageRepository
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.*
 import org.jetbrains.compose.resources.StringResource
 
 data class MapPositionState(

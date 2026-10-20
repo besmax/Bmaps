@@ -8,17 +8,25 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.viewer.annotations.presentation
 
-import bes.max.bmaps.feature.viewer.annotations.ui.icons.parseMarkerSvg
 import androidx.lifecycle.ViewModelStore
-import bes.max.bmaps.core.mapengine.*
 import bes.max.bmaps.core.datastore.*
-import bes.max.bmaps.domain.mapbuilder.*
-import bes.max.bmaps.domain.mapbuilder.Annotation
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.*
+import bes.max.bmaps.core.mapengine.*
+import bes.max.bmaps.domain.mapbuilder.annotations.Annotation
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationElevation
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationElevationResolver
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationGeoJson
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationKind
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationPage
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationRepository
+import bes.max.bmaps.domain.mapbuilder.model.PackageFailure
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
+import bes.max.bmaps.feature.viewer.annotations.ui.icons.parseMarkerSvg
 import kotlin.test.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AnnotationEditorTest {

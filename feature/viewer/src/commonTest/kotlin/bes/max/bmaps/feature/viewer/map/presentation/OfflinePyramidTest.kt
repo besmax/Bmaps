@@ -9,7 +9,9 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.map.presentation
 
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.model.LayerId
+import bes.max.bmaps.domain.mapbuilder.model.PackageAsset
+import bes.max.bmaps.domain.mapbuilder.model.PackageLayer
 import kotlin.test.*
 
 class OfflinePyramidTest {

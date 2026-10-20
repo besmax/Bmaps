@@ -27,7 +27,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
-import bes.max.bmaps.domain.mapbuilder.PackageLayer
+import bes.max.bmaps.domain.mapbuilder.model.PackageLayer
 
 @Composable
 internal fun ViewerLayersDialog(model: ViewerViewModel, state: ViewerState, progress: ElevationProgressState, onCancelGeneration: () -> Unit) {

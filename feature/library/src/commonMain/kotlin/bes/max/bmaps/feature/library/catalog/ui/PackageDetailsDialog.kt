@@ -18,7 +18,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.model.MapAvatar
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageState
+import bes.max.bmaps.domain.mapbuilder.repository.PackageVerificationStage
 import bes.max.bmaps.feature.library.catalog.presentation.LibraryMapUi
 import bes.max.bmaps.feature.library.catalog.presentation.PackageVerificationViewModel
 import bmaps.feature.library.generated.resources.*

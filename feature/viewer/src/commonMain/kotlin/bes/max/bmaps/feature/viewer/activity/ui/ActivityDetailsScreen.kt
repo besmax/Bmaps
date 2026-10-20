@@ -29,7 +29,7 @@ import bes.max.bmaps.core.mapengine.*
 import bes.max.bmaps.core.sharing.rememberNativeDocuments
 import bes.max.bmaps.core.ui.components.MapIconButton
 import bes.max.bmaps.core.ui.components.MapIcons
-import bes.max.bmaps.domain.mapbuilder.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
 import bes.max.bmaps.feature.viewer.activity.presentation.TrackMapLayer
 import bes.max.bmaps.feature.viewer.activity.presentation.TrackState
 import bes.max.bmaps.feature.viewer.activity.presentation.*

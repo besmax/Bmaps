@@ -9,12 +9,23 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.library.catalog.presentation
 
 import androidx.lifecycle.ViewModelStore
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.model.MapAvatar
+import bes.max.bmaps.domain.mapbuilder.model.PackageFailure
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
+import bes.max.bmaps.domain.mapbuilder.model.PackageSummary
+import bes.max.bmaps.domain.mapbuilder.repository.LayerPresentation
+import bes.max.bmaps.domain.mapbuilder.repository.OpenedPackage
+import bes.max.bmaps.domain.mapbuilder.repository.PackagePage
+import bes.max.bmaps.domain.mapbuilder.repository.PackageQuery
+import bes.max.bmaps.domain.mapbuilder.repository.PackageRepository
+import bes.max.bmaps.domain.mapbuilder.repository.PackageVerificationProgress
+import bes.max.bmaps.domain.mapbuilder.repository.PackageVerificationStage
 import bmaps.feature.library.generated.resources.*
+import kotlin.test.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.test.*
-import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PackageVerificationViewModelTest {

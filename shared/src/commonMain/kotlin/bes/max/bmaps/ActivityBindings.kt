@@ -21,7 +21,7 @@ import dev.zacsweers.metro.Provides
 @ContributesTo(AppScope::class)
 object ActivityBindings {
     @Provides
-    fun packageRoutes(repository: bes.max.bmaps.domain.mapbuilder.LocalPackageRepository): bes.max.bmaps.core.storage.PackageRouteStore = repository
+    fun packageRoutes(repository: bes.max.bmaps.domain.mapbuilder.repository.LocalPackageRepository): bes.max.bmaps.core.storage.PackageRouteStore = repository
 
     @Provides
     fun clock(clock: bes.max.bmaps.domain.activity.recording.PhoneActivityClock): bes.max.bmaps.domain.activity.model.ActivityClock = clock

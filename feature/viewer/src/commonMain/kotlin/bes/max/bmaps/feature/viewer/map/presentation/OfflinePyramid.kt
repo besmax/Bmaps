@@ -9,7 +9,7 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.map.presentation
 
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.PackageLayer
+import bes.max.bmaps.domain.mapbuilder.model.PackageLayer
 import kotlin.math.ceil
 import kotlin.math.floor
 

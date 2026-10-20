@@ -29,9 +29,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import bes.max.bmaps.core.sharing.rememberNativeDocuments
-import bes.max.bmaps.domain.mapbuilder.BuildJobState
-import bes.max.bmaps.domain.mapbuilder.PackageId
-import bes.max.bmaps.domain.mapbuilder.PackageState
+import bes.max.bmaps.domain.mapbuilder.download.BuildJobState
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageState
 import bes.max.bmaps.domain.providers.OPENTOPOGRAPHY_CREDENTIAL
 import bes.max.bmaps.feature.library.catalog.presentation.LibraryMapUi
 import bes.max.bmaps.feature.library.catalog.presentation.LibraryMapHeaderUi

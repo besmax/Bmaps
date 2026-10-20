@@ -15,14 +15,19 @@ import bes.max.bmaps.core.datastore.UserPreferences
 import bes.max.bmaps.core.datastore.UserPreferencesRepository
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
+import bes.max.bmaps.domain.mapbuilder.elevation.ElevationDiagnostics
+import bes.max.bmaps.domain.mapbuilder.elevation.PackageElevation
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
+import bes.max.bmaps.domain.mapbuilder.repository.OpenedPackage
+import bes.max.bmaps.domain.mapbuilder.repository.PackageRepository
 import bmaps.feature.viewer.generated.resources.*
-import org.jetbrains.compose.resources.StringResource
-import bes.max.bmaps.domain.mapbuilder.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import org.jetbrains.compose.resources.StringResource
 
 internal data class CalloutLocationState(
     val packageId: PackageId? = null,

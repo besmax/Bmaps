@@ -9,8 +9,8 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.annotations.presentation
 
 import androidx.compose.runtime.Immutable
-import bes.max.bmaps.domain.mapbuilder.Annotation
-import bes.max.bmaps.domain.mapbuilder.AnnotationKind
+import bes.max.bmaps.domain.mapbuilder.annotations.Annotation
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationKind
 import bmaps.feature.viewer.generated.resources.*
 import org.jetbrains.compose.resources.StringResource
 

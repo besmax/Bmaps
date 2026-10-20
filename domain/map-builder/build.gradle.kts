@@ -26,6 +26,7 @@ kotlin {
     }
     sourceSets.commonTest.dependencies {
         implementation(libs.kotlinx.coroutines.test)
+        implementation(libs.androidx.sqlite.bundled)
     }
     sourceSets.androidMain.dependencies {
         api(libs.androidx.work.runtime)

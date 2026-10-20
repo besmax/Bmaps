@@ -7,14 +7,30 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
 package bes.max.bmaps.feature.viewer.map.presentation
+
 import androidx.lifecycle.ViewModelStore
-import bmaps.feature.viewer.generated.resources.*
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.model.LayerId
+import bes.max.bmaps.domain.mapbuilder.model.MapAvatar
+import bes.max.bmaps.domain.mapbuilder.model.PackageAsset
+import bes.max.bmaps.domain.mapbuilder.model.PackageFailure
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageLayer
+import bes.max.bmaps.domain.mapbuilder.model.PackageManifest
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
+import bes.max.bmaps.domain.mapbuilder.model.PackageState
+import bes.max.bmaps.domain.mapbuilder.model.PackageSummary
+import bes.max.bmaps.domain.mapbuilder.repository.LayerPresentation
+import bes.max.bmaps.domain.mapbuilder.repository.OpenedPackage
+import bes.max.bmaps.domain.mapbuilder.repository.PackagePage
+import bes.max.bmaps.domain.mapbuilder.repository.PackageQuery
+import bes.max.bmaps.domain.mapbuilder.repository.PackageRepository
+import bes.max.bmaps.domain.mapbuilder.repository.PackageVerificationProgress
+import bmaps.feature.viewer.generated.resources.*
+import kotlin.test.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
-import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ViewerViewModelTest {

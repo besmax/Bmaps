@@ -27,7 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalUriHandler
-import bes.max.bmaps.domain.mapbuilder.MapAvatar
+import bes.max.bmaps.domain.mapbuilder.model.MapAvatar
 import org.jetbrains.compose.resources.painterResource
 
 @Composable

@@ -7,11 +7,15 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 */
 
 package bes.max.bmaps.feature.library.transfer.presentation
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.sharing.*
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.model.PackageFailure
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
+import bes.max.bmaps.domain.mapbuilder.transfer.PackageTransfer
 import bmaps.feature.library.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject

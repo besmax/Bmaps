@@ -13,7 +13,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
-import bes.max.bmaps.domain.mapbuilder.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
 import androidx.navigation.NavHostController
 import androidx.savedstate.read
 import androidx.navigation.compose.NavHost

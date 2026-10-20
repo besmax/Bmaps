@@ -8,8 +8,8 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.library.catalog.ui
 
-import bes.max.bmaps.domain.mapbuilder.MapAvatar
-import bes.max.bmaps.domain.mapbuilder.PackageState
+import bes.max.bmaps.domain.mapbuilder.model.MapAvatar
+import bes.max.bmaps.domain.mapbuilder.model.PackageState
 import bmaps.feature.library.generated.resources.*
 
 internal fun stateLabel(state: PackageState) = when (state) {

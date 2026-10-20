@@ -10,7 +10,7 @@ package bes.max.bmaps.feature.viewer.map.ui
 
 import bes.max.bmaps.feature.viewer.annotations.presentation.CalloutLocationViewModel
 import bes.max.bmaps.feature.viewer.annotations.presentation.MapRouteSelection
-import bes.max.bmaps.domain.mapbuilder.AnnotationKind
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationKind
 import dev.zacsweers.metrox.viewmodel.metroViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bes.max.bmaps.feature.viewer.annotations.presentation.AnnotationEditorState

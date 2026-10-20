@@ -9,11 +9,11 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps
 
 import bes.max.bmaps.core.di.AppScope
-import bes.max.bmaps.domain.mapbuilder.AnnotationRepository
-import bes.max.bmaps.domain.mapbuilder.LocalPackageRepository
-import bes.max.bmaps.domain.mapbuilder.PackageBuildStorage
-import bes.max.bmaps.domain.mapbuilder.PackageTransfer
-import bes.max.bmaps.domain.mapbuilder.PackageRepository
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationRepository
+import bes.max.bmaps.domain.mapbuilder.repository.LocalPackageRepository
+import bes.max.bmaps.domain.mapbuilder.download.PackageBuildStorage
+import bes.max.bmaps.domain.mapbuilder.transfer.PackageTransfer
+import bes.max.bmaps.domain.mapbuilder.repository.PackageRepository
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides

@@ -9,7 +9,14 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.library.catalog.presentation
 
 import androidx.compose.runtime.Immutable
-import bes.max.bmaps.domain.mapbuilder.*
+import bes.max.bmaps.domain.mapbuilder.download.BuildJobState
+import bes.max.bmaps.domain.mapbuilder.download.BuildProgress
+import bes.max.bmaps.domain.mapbuilder.model.MapAvatar
+import bes.max.bmaps.domain.mapbuilder.model.PackageFailure
+import bes.max.bmaps.domain.mapbuilder.model.PackageState
+import bes.max.bmaps.domain.mapbuilder.model.PackageSummary
+import bes.max.bmaps.domain.mapbuilder.repository.PackageVerificationProgress
+import bes.max.bmaps.domain.mapbuilder.repository.PackageVerificationStage
 import bmaps.feature.library.generated.resources.*
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList

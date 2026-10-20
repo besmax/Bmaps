@@ -10,24 +10,32 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.viewer.annotations.presentation
 
-import bes.max.bmaps.feature.viewer.annotations.ui.icons.MarkerIcons
-import kotlinx.collections.immutable.toImmutableList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.datastore.UserPreferencesRepository
+import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.*
-import bes.max.bmaps.domain.mapbuilder.Annotation
+import bes.max.bmaps.domain.mapbuilder.annotations.Annotation
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationElevationResolver
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationGeoJson
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationImport
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationKind
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationRepository
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationValidation
+import bes.max.bmaps.domain.mapbuilder.model.PackageFailure
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.model.PackageResult
+import bes.max.bmaps.feature.viewer.annotations.ui.icons.MarkerIcons
 import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlin.uuid.Uuid
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import org.jetbrains.compose.resources.StringResource
-import kotlin.uuid.Uuid
 
 internal data class AnnotationEditorState(
     val items: List<Annotation> = emptyList(),

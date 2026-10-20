@@ -38,7 +38,7 @@ class BmapsApplication : Application(), androidx.work.Configuration.Provider, be
 @DependencyGraph(AppScope::class)
 internal interface AndroidAppGraph : AppGraph {
     val activityRecordingHost: bes.max.bmaps.domain.activity.recording.AndroidActivityRecordingHost
-    val downloadWorkerFactory: bes.max.bmaps.domain.mapbuilder.MapDownloadWorkerFactory
+    val downloadWorkerFactory: bes.max.bmaps.domain.mapbuilder.download.MapDownloadWorkerFactory
     @DependencyGraph.Factory
     fun interface Factory {
         fun create(@Provides context: Context): AndroidAppGraph

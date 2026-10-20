@@ -10,8 +10,8 @@ package bes.max.bmaps.feature.viewer.annotations.presentation
 
 import androidx.compose.ui.unit.IntSize
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.Annotation
-import bes.max.bmaps.domain.mapbuilder.AnnotationKind
+import bes.max.bmaps.domain.mapbuilder.annotations.Annotation
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationKind
 import kotlin.test.*
 
 class AnnotationClustererTest {

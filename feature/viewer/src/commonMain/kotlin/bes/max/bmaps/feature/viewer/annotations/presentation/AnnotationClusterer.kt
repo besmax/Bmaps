@@ -9,8 +9,8 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.annotations.presentation
 import androidx.compose.ui.graphics.Color
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.mapbuilder.Annotation
-import bes.max.bmaps.domain.mapbuilder.AnnotationKind
+import bes.max.bmaps.domain.mapbuilder.annotations.Annotation
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationKind
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min

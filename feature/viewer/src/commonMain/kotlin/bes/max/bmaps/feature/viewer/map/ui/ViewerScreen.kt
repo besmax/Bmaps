@@ -41,8 +41,8 @@ import bes.max.bmaps.feature.viewer.activity.ui.*
 import org.jetbrains.compose.resources.getString
 import kotlinx.coroutines.flow.collectLatest
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import bes.max.bmaps.domain.mapbuilder.PackageId
-import bes.max.bmaps.domain.mapbuilder.AnnotationKind
+import bes.max.bmaps.domain.mapbuilder.model.PackageId
+import bes.max.bmaps.domain.mapbuilder.annotations.AnnotationKind
 import bes.max.bmaps.core.location.*
 import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import bes.max.bmaps.core.mapengine.WebMercator
@@ -75,7 +75,7 @@ fun ViewerScreen(
     LaunchedEffect(packageId) { packageId?.let(relief::open) }
     LaunchedEffect(reliefProgress.job?.token, reliefProgress.job?.state, state.manifest) {
         val job = reliefProgress.job
-        if (job?.state == bes.max.bmaps.domain.mapbuilder.ElevationGenerationState.COMPLETED &&
+        if (job?.state == bes.max.bmaps.domain.mapbuilder.elevation.relief.ElevationGenerationState.COMPLETED &&
             state.manifest != null && state.manifest?.layers?.none { it.tiles.relativePath == "layers/elevation-relief-${job.token}.mbtiles" } == true) model.refreshRelief()
     }
     val position = metroViewModel<MapPositionViewModel>()

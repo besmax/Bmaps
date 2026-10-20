@@ -16,8 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.*
-import bes.max.bmaps.domain.mapbuilder.BuildEstimate
-import bes.max.bmaps.domain.mapbuilder.DownloadSizeEstimator
+import bes.max.bmaps.domain.mapbuilder.download.BuildEstimate
+import bes.max.bmaps.domain.mapbuilder.download.DownloadSizeEstimator
 import bes.max.bmaps.domain.providers.BuiltInProviders
 import bes.max.bmaps.feature.constructor.map.presentation.MapChoice
 import kotlin.test.*
