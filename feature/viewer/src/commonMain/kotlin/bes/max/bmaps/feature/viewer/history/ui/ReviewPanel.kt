@@ -8,8 +8,6 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 
 package bes.max.bmaps.feature.viewer.history.ui
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,16 +17,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import bes.max.bmaps.feature.viewer.history.presentation.*
 import bmaps.feature.viewer.generated.resources.*
 import kotlinx.collections.immutable.ImmutableList
 import org.jetbrains.compose.resources.stringResource
-import kotlin.math.abs
 import kotlin.time.Instant
 
 @Composable
@@ -65,24 +59,29 @@ internal fun ReviewTelemetry(state: ReviewState, onSeries: (Int) -> Unit, onSele
         Text("${stringResource(series.metric)} · ${series.unit}", style = MaterialTheme.typography.titleSmall)
         Text(series.source, style = MaterialTheme.typography.bodySmall)
         Text(stringResource(Res.string.history_sample_statistics, series.minimum, series.mean, series.maximum, series.count.toString()), style = MaterialTheme.typography.bodySmall)
-        TelemetryChart(series.points, state.fromTime, state.toTime, state.selectedTime, onSelect)
-        if (series.points.isNotEmpty()) Slider(
-            value = series.points.indexOfFirst { it.time == state.selectedTime }.coerceAtLeast(0).toFloat(),
-            onValueChange = { value -> series.points.getOrNull(value.toInt())?.let { onSelect(it.time, it.id) } },
-            valueRange = 0f..(series.points.size - 1).coerceAtLeast(1).toFloat(),
-            modifier = Modifier.semantics { contentDescription = "${series.unit}: ${series.source}" })
+        Text(stringResource(Res.string.history_selected_value, state.selectedValue ?: "—"),
+            style = MaterialTheme.typography.bodyMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        ReviewSelectionLine(stringResource(Res.string.history_selected_time,
+            state.selectedTime?.let { Instant.fromEpochMilliseconds(it).toString() } ?: "—"))
+        TelemetryChart(series.points, series.unit, state.fromTime, state.toTime, state.selectedTime, onSelect)
     }
     if (!state.heartRateAvailable) Text(stringResource(Res.string.history_heart_unavailable), style = MaterialTheme.typography.bodySmall)
     if (state.series.isEmpty()) Text(stringResource(Res.string.history_no_measurements), style = MaterialTheme.typography.bodySmall)
-    state.selectedValue?.let { Text(stringResource(Res.string.history_selected_value, it), style = MaterialTheme.typography.bodyMedium) }
-    state.selectedSource?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-    state.selectedTime?.let { Text(stringResource(Res.string.history_selected_time, Instant.fromEpochMilliseconds(it).toString()), style = MaterialTheme.typography.bodySmall) }
-    state.selectedPositionTime?.let { Text(stringResource(Res.string.history_position_time, Instant.fromEpochMilliseconds(it).toString()), style = MaterialTheme.typography.bodySmall) }
-    if (state.selectedTime != null && state.selectedPosition == null) Text(stringResource(Res.string.history_no_position), style = MaterialTheme.typography.bodySmall)
+    ReviewSelectionLine(state.selectedSource.orEmpty())
+    ReviewSelectionLine(state.selectedPositionTime?.let {
+        stringResource(Res.string.history_position_time, Instant.fromEpochMilliseconds(it).toString())
+    }.orEmpty())
+    ReviewSelectionLine(if (state.selectedTime != null && state.selectedPosition == null)
+        stringResource(Res.string.history_no_position) else "")
     Row {
         TextButton({ onEvents(true) }) { Text(stringResource(Res.string.history_events)) }
         TextButton({ onExport(true) }, enabled = state.exportable && !state.busy) { Text(stringResource(Res.string.history_export)) }
     }
+}
+
+@Composable
+private fun ReviewSelectionLine(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable
@@ -105,26 +104,6 @@ private fun ReviewSeriesList(series: ImmutableList<ReviewSeries>, selected: Int,
 @Composable
 private fun ReviewSeriesItem(index: Int, metric: org.jetbrains.compose.resources.StringResource, source: String, selected: Boolean, onSelect: (Int) -> Unit) {
     FilterChip(selected, { onSelect(index) }, label = { Text("${stringResource(metric)} · $source", maxLines = 1) })
-}
-
-@Composable
-private fun TelemetryChart(points: ImmutableList<ChartPoint>, from: Long, to: Long, selected: Long?, onSelect: (Long, String?) -> Unit) {
-    val color = MaterialTheme.colorScheme.primary
-    val cursor = MaterialTheme.colorScheme.tertiary
-    val label = stringResource(Res.string.history_chart_description)
-    Canvas(Modifier.fillMaxWidth().height(150.dp).semantics { contentDescription = label }
-        .pointerInput(points, from, to) { detectTapGestures { position ->
-            val time = from + ((to - from) * (position.x / size.width).coerceIn(0f, 1f)).toLong()
-            points.minByOrNull { abs(it.time - time) }?.let { onSelect(it.time, it.id) }
-        } }) {
-        val minimum = points.minOfOrNull { it.value } ?: 0.0
-        val maximum = points.maxOfOrNull { it.value } ?: 1.0
-        fun position(point: ChartPoint) = Offset(((point.time - from).toDouble() / (to - from).coerceAtLeast(1) * size.width).toFloat(),
-            (size.height - (point.value - minimum) / (maximum - minimum).coerceAtLeast(1.0) * size.height).toFloat())
-        points.zipWithNext().forEach { (a, b) -> if (a.run == b.run) drawLine(color, position(a), position(b), 2.dp.toPx()) }
-        points.forEach { drawCircle(color, 2.dp.toPx(), position(it)) }
-        selected?.let { val x = ((it - from).toDouble() / (to - from).coerceAtLeast(1) * size.width).toFloat(); drawLine(cursor, Offset(x, 0f), Offset(x, size.height), 1.dp.toPx()) }
-    }
 }
 
 @Composable

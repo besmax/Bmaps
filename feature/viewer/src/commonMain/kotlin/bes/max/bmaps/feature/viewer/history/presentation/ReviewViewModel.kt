@@ -115,7 +115,11 @@ class ReviewViewModel(private val reader: ActivityReviewReader, private val acti
         if (time < 0) return
         val token = generation
         selecting?.cancel()
-        mutableState.update { it.copy(selectedTime = time, selectedPosition = null, selectedPositionTime = null, selectedValue = null, selectedSource = null) }
+        val series = state.value.series.getOrNull(state.value.selectedSeries)
+        val point = series?.points?.firstOrNull { it.id == sampleId && it.time == time }
+        val chartValue = point?.let { "${reviewNumber(it.value)} ${series.unit}" }
+        mutableState.update { it.copy(selectedTime = time, selectedPosition = null, selectedPositionTime = null,
+            selectedValue = chartValue, selectedSource = null) }
         selecting = viewModelScope.launch {
             try {
                 val candidates = mutableListOf<TelemetrySample>()

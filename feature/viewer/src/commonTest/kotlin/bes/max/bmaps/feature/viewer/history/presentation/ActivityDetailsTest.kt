@@ -37,6 +37,28 @@ class ActivityDetailsTest {
         assertNull(empty.maximumSpeed)
     }
 
+    @Test fun chartValueIsAvailableDuringDelayedLookupAndRapidReselection() = runTest {
+        fixture { model, repository ->
+            repository.telemetryDelay = 1000
+            model.selectTime(1000, "fast")
+            assertEquals("36.0 km/h", model.state.value.selectedValue)
+            runCurrent()
+            assertEquals("36.0 km/h", model.state.value.selectedValue)
+            advanceTimeBy(500)
+            model.selectTime(1000, "slow")
+            assertEquals("3.6 km/h", model.state.value.selectedValue)
+            runCurrent()
+            advanceTimeBy(500)
+            runCurrent()
+            assertEquals("3.6 km/h", model.state.value.selectedValue)
+            advanceTimeBy(500)
+            runCurrent()
+            assertEquals("3.6 km/h", model.state.value.selectedValue)
+            assertEquals(1000L, model.state.value.selectedTime)
+            assertNull(model.state.value.selectedPosition)
+        }
+    }
+
     @Test fun invalidRenameStaysVisibleAndValidRenameKeepsRecordingAndSelectedCursor() = runTest {
         fixture { model, repository ->
             val original = repository.record
@@ -115,6 +137,7 @@ private class DetailsTestRepository : ActivityRepository {
     var samples = listOf(sample("slow", 1.0), sample("fast", 10.0))
     val commits = mutableListOf<ActivityCommit>()
     var deletions = 0
+    var telemetryDelay = 0L
     private fun sample(id: String, speed: Double) = TelemetrySample(id,
         MeasurementSource("phone", MeasurementSourceKind.PHONE_LOCATION), started, started,
         MeasurementPhase.RECORDING, SpeedMeasurement(speed))
@@ -124,7 +147,10 @@ private class DetailsTestRepository : ActivityRepository {
         record = value.record
         return ActivityResult.Success(record)
     }
-    override suspend fun telemetry(activityId: String, query: TelemetryQuery) = ActivityResult.Success(TelemetryPage(samples, null))
+    override suspend fun telemetry(activityId: String, query: TelemetryQuery): ActivityResult<TelemetryPage> {
+        delay(telemetryDelay)
+        return ActivityResult.Success(TelemetryPage(samples, null))
+    }
     override suspend fun positions(activityId: String, query: ActivityPositionQuery) = ActivityResult.Success(ActivityPositionPage(emptyList(), null))
     override suspend fun events(activityId: String, query: ActivityEventQuery) = ActivityResult.Success(ActivityEventPage(emptyList(), null))
     override suspend fun delete(id: String): ActivityResult<Unit> { deletions++; return ActivityResult.Success(Unit) }

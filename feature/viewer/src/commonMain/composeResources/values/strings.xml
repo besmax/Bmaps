@@ -286,7 +286,8 @@
     <string name="history_position_time">Nearest recorded position: %1$s</string>
     <string name="history_no_position">No unambiguous recorded position is available within five seconds.</string>
     <string name="history_events">Timeline events</string>
-    <string name="history_chart_description">Telemetry by acquisition time. Tap a point or use the slider to select a measurement.</string>
+    <string name="history_chart_hint">Tap or drag across the chart to select a measurement. Gaps indicate missing data.</string>
+    <string name="history_chart_description">Telemetry by acquisition time. Tap or drag horizontally to select a recorded measurement.</string>
     <string name="history_selected_position">Selected recorded position</string>
     <string name="history_neutral_map">Track map · no background map</string>
     <string name="history_cancel_export">Cancel export</string>
