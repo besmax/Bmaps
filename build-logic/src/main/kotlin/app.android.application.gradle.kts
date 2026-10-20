@@ -16,4 +16,14 @@ val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 android {
     ndkVersion = libs.findVersion("android-ndk").get().requiredVersion
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
 }

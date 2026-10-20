@@ -12,7 +12,7 @@ This document serves as the single source of truth for the project's module topo
 
 * **`:androidApp`**
     * **Responsibility:** Native Android application host, application lifecycle entry points and platform packaging; delegates shared UI and DI graph assembly to `:shared`.
-    * **Build:** `app.android.application` pins the packaging NDK to the catalog's `android-ndk`, matching the native libraries so AGP can strip debug symbols from packaged JNI libraries. Release artifact verification is described in the [signed release procedure](18_LICENSING_AND_PROVENANCE.md#signed-release-procedure).
+    * **Build:** `app.android.application` pins the packaging NDK to the catalog's `android-ndk`, matching the native libraries so AGP can strip debug symbols from packaged JNI libraries, and owns release code/resource optimization. Release settings and artifact verification are described in the [signed release procedure](18_LICENSING_AND_PROVENANCE.md#signed-release-procedure).
 
 `iosApp` is the native Xcode host, not a registered Gradle module. The module entries below enumerate Gradle projects declared by settings.gradle.kts.
 

@@ -17,3 +17,30 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# Android release artifacts and signing credentials
+/androidApp/release/
+/androidApp/debug/
+*.apk
+*.aab
+*.apks
+*.keystore
+*.jks
+keystore.properties
+signing.properties
+
+# Xcode and Swift build artifacts
+DerivedData/
+*.xcarchive/
+*.ipa
+*.dSYM/
+*.dSYM.zip
+.build/
+.swiftpm/
+
+# Python caches and crash diagnostics
+__pycache__/
+*.py[cod]
+*.hprof
+hs_err_pid*.log
+replay_pid*.log
