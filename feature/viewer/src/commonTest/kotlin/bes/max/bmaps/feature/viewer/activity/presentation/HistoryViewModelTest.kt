@@ -9,14 +9,40 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.activity.presentation
 
 import androidx.lifecycle.ViewModelStore
-import bes.max.bmaps.domain.activity.*
+import bes.max.bmaps.domain.activity.model.ActivityEvent
+import bes.max.bmaps.domain.activity.model.ActivityProfile
+import bes.max.bmaps.domain.activity.model.ActivityRecord
+import bes.max.bmaps.domain.activity.model.ActivityResult
+import bes.max.bmaps.domain.activity.model.ActivityRoute
+import bes.max.bmaps.domain.activity.model.ActivityStatistics
+import bes.max.bmaps.domain.activity.model.ActivityStatus
+import bes.max.bmaps.domain.activity.model.ActivityTime
+import bes.max.bmaps.domain.activity.navigation.ActivityNavigationAlert
+import bes.max.bmaps.domain.activity.navigation.ActivityNavigationCommand
+import bes.max.bmaps.domain.activity.navigation.ActivityNavigationState
+import bes.max.bmaps.domain.activity.navigation.ActivityPositionPage
+import bes.max.bmaps.domain.activity.navigation.ActivityPositionQuery
+import bes.max.bmaps.domain.activity.recording.ActivityCommand
+import bes.max.bmaps.domain.activity.recording.ActivityLiveState
+import bes.max.bmaps.domain.activity.recording.ActivitySession
+import bes.max.bmaps.domain.activity.recording.ActivityStartRequest
+import bes.max.bmaps.domain.activity.repository.ActivityCommit
+import bes.max.bmaps.domain.activity.repository.ActivityEventPage
+import bes.max.bmaps.domain.activity.repository.ActivityEventQuery
+import bes.max.bmaps.domain.activity.repository.ActivityHistoryCursor
+import bes.max.bmaps.domain.activity.repository.ActivityHistoryPage
+import bes.max.bmaps.domain.activity.repository.ActivityHistoryQuery
+import bes.max.bmaps.domain.activity.repository.ActivityRepository
+import bes.max.bmaps.domain.activity.repository.ActivitySummary
+import bes.max.bmaps.domain.activity.repository.TelemetryPage
+import bes.max.bmaps.domain.activity.repository.TelemetryQuery
 import bmaps.feature.viewer.generated.resources.*
+import kotlin.test.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.*
-import kotlin.test.*
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class HistoryViewModelTest {

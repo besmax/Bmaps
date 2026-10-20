@@ -3,6 +3,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application>
-        <service android:name="bes.max.bmaps.domain.activity.ActivityRecordingService" android:exported="false" android:foregroundServiceType="location" android:stopWithTask="false" />
+        <service android:name="bes.max.bmaps.domain.activity.recording.ActivityRecordingService" android:exported="false" android:foregroundServiceType="location" android:stopWithTask="false" />
     </application>
 </manifest>

@@ -10,8 +10,8 @@ package bes.max.bmaps.feature.viewer.activity.presentation
 
 import androidx.compose.ui.graphics.Color
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.activity.PositionMeasurement
-import bes.max.bmaps.domain.activity.TelemetrySample
+import bes.max.bmaps.domain.activity.model.PositionMeasurement
+import bes.max.bmaps.domain.activity.model.TelemetrySample
 import kotlinx.collections.immutable.toImmutableList
 import kotlin.math.abs
 

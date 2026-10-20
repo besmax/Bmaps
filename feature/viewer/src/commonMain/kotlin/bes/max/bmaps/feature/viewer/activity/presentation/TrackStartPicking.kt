@@ -10,7 +10,7 @@ package bes.max.bmaps.feature.viewer.activity.presentation
 
 import androidx.compose.runtime.Immutable
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.activity.ActivityRoute
+import bes.max.bmaps.domain.activity.model.ActivityRoute
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlin.math.*

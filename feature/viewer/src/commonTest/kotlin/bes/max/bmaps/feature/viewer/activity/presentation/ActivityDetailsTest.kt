@@ -11,12 +11,38 @@ package bes.max.bmaps.feature.viewer.activity.presentation
 import androidx.lifecycle.ViewModelStore
 import bes.max.bmaps.core.sharing.SharedDocumentStore
 import bes.max.bmaps.core.sharing.SharingLocation
-import bes.max.bmaps.domain.activity.*
+import bes.max.bmaps.domain.activity.exchange.ActivityExporter
+import bes.max.bmaps.domain.activity.model.ActivityEvent
+import bes.max.bmaps.domain.activity.model.ActivityProfile
+import bes.max.bmaps.domain.activity.model.ActivityRecord
+import bes.max.bmaps.domain.activity.model.ActivityResult
+import bes.max.bmaps.domain.activity.model.ActivityRoute
+import bes.max.bmaps.domain.activity.model.ActivityStatistics
+import bes.max.bmaps.domain.activity.model.ActivityStatus
+import bes.max.bmaps.domain.activity.model.ActivityTime
+import bes.max.bmaps.domain.activity.model.MeasurementPhase
+import bes.max.bmaps.domain.activity.model.MeasurementSource
+import bes.max.bmaps.domain.activity.model.MeasurementSourceKind
+import bes.max.bmaps.domain.activity.model.SpeedMeasurement
+import bes.max.bmaps.domain.activity.model.TelemetrySample
+import bes.max.bmaps.domain.activity.navigation.ActivityPositionPage
+import bes.max.bmaps.domain.activity.navigation.ActivityPositionQuery
+import bes.max.bmaps.domain.activity.repository.ActivityCommit
+import bes.max.bmaps.domain.activity.repository.ActivityEventPage
+import bes.max.bmaps.domain.activity.repository.ActivityEventQuery
+import bes.max.bmaps.domain.activity.repository.ActivityHistoryPage
+import bes.max.bmaps.domain.activity.repository.ActivityHistoryQuery
+import bes.max.bmaps.domain.activity.repository.ActivityRepository
+import bes.max.bmaps.domain.activity.repository.ActivityRoutePage
+import bes.max.bmaps.domain.activity.repository.ActivityRouteQuery
+import bes.max.bmaps.domain.activity.repository.ActivityRouteRepository
+import bes.max.bmaps.domain.activity.repository.TelemetryPage
+import bes.max.bmaps.domain.activity.repository.TelemetryQuery
 import bmaps.feature.viewer.generated.resources.*
+import kotlin.test.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
-import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ActivityDetailsTest {

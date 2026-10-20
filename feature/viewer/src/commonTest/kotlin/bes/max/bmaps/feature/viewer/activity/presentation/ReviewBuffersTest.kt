@@ -9,7 +9,12 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.activity.presentation
 
 import bes.max.bmaps.core.mapengine.GeographicCoordinate
-import bes.max.bmaps.domain.activity.*
+import bes.max.bmaps.domain.activity.model.ActivityTime
+import bes.max.bmaps.domain.activity.model.MeasurementPhase
+import bes.max.bmaps.domain.activity.model.MeasurementSource
+import bes.max.bmaps.domain.activity.model.MeasurementSourceKind
+import bes.max.bmaps.domain.activity.model.PositionMeasurement
+import bes.max.bmaps.domain.activity.model.TelemetrySample
 import bmaps.feature.viewer.generated.resources.*
 import kotlin.test.*
 

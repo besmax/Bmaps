@@ -9,12 +9,20 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.activity.presentation
 
 import androidx.compose.runtime.Immutable
-import bes.max.bmaps.domain.activity.*
+import bes.max.bmaps.domain.activity.model.ActivityDataAvailability
+import bes.max.bmaps.domain.activity.model.ActivityProfile
+import bes.max.bmaps.domain.activity.model.ActivityRoute
+import bes.max.bmaps.domain.activity.model.ActivityStatus
+import bes.max.bmaps.domain.activity.model.HeartRateMeasurement
+import bes.max.bmaps.domain.activity.model.RouteMatchQuality
+import bes.max.bmaps.domain.activity.model.SpeedMeasurement
+import bes.max.bmaps.domain.activity.navigation.ActivityNavigationMode
+import bes.max.bmaps.domain.activity.recording.ActivityLiveState
 import bmaps.feature.viewer.generated.resources.*
+import kotlin.math.*
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import org.jetbrains.compose.resources.StringResource
-import kotlin.math.*
 
 @Immutable
 data class TrackCoordinate(val latitude: Double, val longitude: Double)

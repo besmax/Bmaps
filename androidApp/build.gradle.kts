@@ -52,4 +52,9 @@ android {
     buildFeatures {
         compose = true
     }
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
 }

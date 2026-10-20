@@ -10,9 +10,11 @@ package bes.max.bmaps.feature.viewer.activity.presentation
 
 import androidx.compose.ui.unit.IntSize
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.activity.*
-import kotlinx.coroutines.test.runTest
+import bes.max.bmaps.domain.activity.model.ActivityRoute
+import bes.max.bmaps.domain.activity.model.RouteSegment
+import bes.max.bmaps.domain.activity.model.RouteVertex
 import kotlin.test.*
+import kotlinx.coroutines.test.runTest
 
 class TrackStartPickingTest {
     private val camera = MapCameraSnapshot(1, TilePyramid(ZoomRange(0, 0)), MapViewport(),

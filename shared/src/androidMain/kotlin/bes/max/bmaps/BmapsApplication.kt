@@ -18,7 +18,7 @@ import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.createGraphFactory
 
-class BmapsApplication : Application(), androidx.work.Configuration.Provider, bes.max.bmaps.domain.activity.ActivityRecordingServiceOwner {
+class BmapsApplication : Application(), androidx.work.Configuration.Provider, bes.max.bmaps.domain.activity.recording.ActivityRecordingServiceOwner {
     internal val graph: AndroidAppGraph by lazy {
         createGraphFactory<AndroidAppGraph.Factory>().create(applicationContext)
     }
@@ -37,7 +37,7 @@ class BmapsApplication : Application(), androidx.work.Configuration.Provider, be
 
 @DependencyGraph(AppScope::class)
 internal interface AndroidAppGraph : AppGraph {
-    val activityRecordingHost: bes.max.bmaps.domain.activity.AndroidActivityRecordingHost
+    val activityRecordingHost: bes.max.bmaps.domain.activity.recording.AndroidActivityRecordingHost
     val downloadWorkerFactory: bes.max.bmaps.domain.mapbuilder.MapDownloadWorkerFactory
     @DependencyGraph.Factory
     fun interface Factory {
@@ -51,4 +51,4 @@ fun App(fixtureMap: Boolean = false, openActiveActivity: Boolean = false, onActi
     App(application.graph, fixtureMap = fixtureMap, openActiveActivity = openActiveActivity, onActiveActivityOpened = onActiveActivityOpened)
 }
 
-fun Intent?.opensActiveActivity(): Boolean = this?.action == bes.max.bmaps.domain.activity.ACTIVITY_RECORDING_OPEN_ACTION
+fun Intent?.opensActiveActivity(): Boolean = this?.action == bes.max.bmaps.domain.activity.recording.ACTIVITY_RECORDING_OPEN_ACTION

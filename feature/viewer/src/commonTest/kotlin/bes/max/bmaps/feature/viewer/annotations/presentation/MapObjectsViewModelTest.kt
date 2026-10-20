@@ -10,23 +10,29 @@ package bes.max.bmaps.feature.viewer.annotations.presentation
 
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewModelScope
+import bes.max.bmaps.core.mapengine.BoundingBox
 import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import bes.max.bmaps.core.sharing.PickedDocument
-import bes.max.bmaps.domain.activity.*
+import bes.max.bmaps.domain.activity.model.ActivityFailure
+import bes.max.bmaps.domain.activity.model.ActivityResult
+import bes.max.bmaps.domain.activity.model.ActivityRoute
+import bes.max.bmaps.domain.activity.repository.ActivityRoutePage
+import bes.max.bmaps.domain.activity.repository.ActivityRouteQuery
+import bes.max.bmaps.domain.activity.repository.ActivityRouteRepository
+import bes.max.bmaps.domain.activity.repository.ActivityRouteSummary
 import bes.max.bmaps.domain.mapbuilder.Annotation
 import bes.max.bmaps.domain.mapbuilder.AnnotationElevationResolver
 import bes.max.bmaps.domain.mapbuilder.AnnotationPage
 import bes.max.bmaps.domain.mapbuilder.AnnotationRepository
+import bes.max.bmaps.domain.mapbuilder.PackageFailure
 import bes.max.bmaps.domain.mapbuilder.PackageId
 import bes.max.bmaps.domain.mapbuilder.PackageResult
-import bes.max.bmaps.domain.mapbuilder.PackageFailure
-import bes.max.bmaps.core.mapengine.BoundingBox
 import bmaps.feature.viewer.generated.resources.*
+import kotlin.test.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.*
 import kotlinx.io.Buffer
-import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MapObjectsViewModelTest {

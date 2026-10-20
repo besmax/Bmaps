@@ -9,10 +9,10 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps
 
 import bes.max.bmaps.core.di.AppScope
-import bes.max.bmaps.domain.activity.ActivityRepository
-import bes.max.bmaps.domain.activity.ActivityRouteRepository
-import bes.max.bmaps.domain.activity.LocalActivityRepository
-import bes.max.bmaps.domain.activity.LocalActivityRouteRepository
+import bes.max.bmaps.domain.activity.repository.ActivityRepository
+import bes.max.bmaps.domain.activity.repository.ActivityRouteRepository
+import bes.max.bmaps.domain.activity.repository.LocalActivityRepository
+import bes.max.bmaps.domain.activity.repository.LocalActivityRouteRepository
 import dev.zacsweers.metro.BindingContainer
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
@@ -24,10 +24,10 @@ object ActivityBindings {
     fun packageRoutes(repository: bes.max.bmaps.domain.mapbuilder.LocalPackageRepository): bes.max.bmaps.core.storage.PackageRouteStore = repository
 
     @Provides
-    fun clock(clock: bes.max.bmaps.domain.activity.PhoneActivityClock): bes.max.bmaps.domain.activity.ActivityClock = clock
+    fun clock(clock: bes.max.bmaps.domain.activity.recording.PhoneActivityClock): bes.max.bmaps.domain.activity.model.ActivityClock = clock
 
     @Provides
-    fun session(session: bes.max.bmaps.domain.activity.PhoneActivitySession): bes.max.bmaps.domain.activity.ActivitySession = session
+    fun session(session: bes.max.bmaps.domain.activity.recording.PhoneActivitySession): bes.max.bmaps.domain.activity.recording.ActivitySession = session
 
     @Provides
     fun activities(repository: LocalActivityRepository): ActivityRepository = repository

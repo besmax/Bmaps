@@ -16,7 +16,15 @@ import androidx.lifecycle.viewModelScope
 import bes.max.bmaps.core.di.AppScope
 import bes.max.bmaps.core.mapengine.GeographicCoordinate
 import bes.max.bmaps.core.sharing.PickedDocument
-import bes.max.bmaps.domain.activity.*
+import bes.max.bmaps.domain.activity.exchange.ActivityRouteGpx
+import bes.max.bmaps.domain.activity.model.ActivityLimits
+import bes.max.bmaps.domain.activity.model.ActivityResult
+import bes.max.bmaps.domain.activity.model.ActivityRoute
+import bes.max.bmaps.domain.activity.model.ActivityValidation
+import bes.max.bmaps.domain.activity.model.packageRouteId
+import bes.max.bmaps.domain.activity.repository.ActivityRouteQuery
+import bes.max.bmaps.domain.activity.repository.ActivityRouteRepository
+import bes.max.bmaps.domain.activity.route.ActivityRoutePreview
 import bes.max.bmaps.domain.mapbuilder.Annotation
 import bes.max.bmaps.domain.mapbuilder.AnnotationElevation
 import bes.max.bmaps.domain.mapbuilder.AnnotationElevationResolver
@@ -35,6 +43,7 @@ import bmaps.feature.viewer.generated.resources.*
 import dev.zacsweers.metro.ContributesIntoMap
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
+import kotlin.uuid.Uuid
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -44,7 +53,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
 import org.jetbrains.compose.resources.StringResource
-import kotlin.uuid.Uuid
 
 @Immutable
 internal data class MapAnnotationItem(val id: String, val name: String, val kind: AnnotationKind)

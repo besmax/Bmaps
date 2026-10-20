@@ -9,10 +9,26 @@ Commercial permissions: see COMMERCIAL-LICENSE.md in the project root.
 package bes.max.bmaps.feature.viewer.activity.presentation
 
 import bes.max.bmaps.core.mapengine.*
-import bes.max.bmaps.domain.activity.*
+import bes.max.bmaps.domain.activity.model.ActivityDataAvailability
+import bes.max.bmaps.domain.activity.model.ActivityDurations
+import bes.max.bmaps.domain.activity.model.ActivityFailure
+import bes.max.bmaps.domain.activity.model.ActivityProfile
+import bes.max.bmaps.domain.activity.model.ActivityRecord
+import bes.max.bmaps.domain.activity.model.ActivityStatus
+import bes.max.bmaps.domain.activity.model.ActivityTime
+import bes.max.bmaps.domain.activity.model.HeartRateMeasurement
+import bes.max.bmaps.domain.activity.model.MeasurementPhase
+import bes.max.bmaps.domain.activity.model.MeasurementSource
+import bes.max.bmaps.domain.activity.model.MeasurementSourceKind
+import bes.max.bmaps.domain.activity.model.PositionMeasurement
+import bes.max.bmaps.domain.activity.model.RouteMatchQuality
+import bes.max.bmaps.domain.activity.model.RouteProgress
+import bes.max.bmaps.domain.activity.model.SpeedMeasurement
+import bes.max.bmaps.domain.activity.model.TelemetrySample
+import bes.max.bmaps.domain.activity.recording.ActivityLiveState
 import bmaps.feature.viewer.generated.resources.*
-import kotlinx.collections.immutable.toImmutableList
 import kotlin.test.*
+import kotlinx.collections.immutable.toImmutableList
 
 class TrackPresentationTest {
     @Test fun pausedAndUnreliableMeasurementsAreNotPresentedAsLive() {
