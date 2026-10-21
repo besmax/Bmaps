@@ -311,9 +311,10 @@ fun ViewerScreen(
                     .safeDrawingPadding().padding(start = 16.dp, end = 80.dp, bottom = 16.dp)
                     .heightIn(max = maxHeight * 0.6f))
             if (activityId == null && trackScreen && trackState.metrics != null && !trackState.correcting) TrackRecordingPanel(
-                trackState, trackActions, track::panel,
-                Modifier.align(Alignment.BottomCenter).safeDrawingPadding().padding(start = 16.dp, end = 80.dp, top = 12.dp, bottom = 12.dp)
-                    .heightIn(max = maxHeight * 0.45f),
+                trackState, trackActions, track::panel, model::toggleImmersive,
+                Modifier.align(if (maxWidth > maxHeight) Alignment.BottomStart else Alignment.BottomCenter).safeDrawingPadding().padding(start = 16.dp, end = 80.dp, top = 12.dp, bottom = 12.dp)
+                    .heightIn(max = maxHeight * if (maxWidth > maxHeight) 0.6f else 0.45f),
+                compact = maxWidth > maxHeight,
                 mapStatus = when {
                     locationState.sourceConflict -> stringResource(Res.string.track_gps_conflict)
                     locationState.deliveryGap -> stringResource(Res.string.track_gps_waiting)

@@ -158,8 +158,9 @@ internal fun TrackStartPicker(state: TrackState, onConfirm: () -> Unit, onCancel
 }
 
 @Composable
-internal fun TrackOverflow(expanded: Boolean, metrics: TrackMetrics, actions: TrackActions) {
+internal fun TrackOverflow(expanded: Boolean, metrics: TrackMetrics, actions: TrackActions, onHide: () -> Unit) {
     DropdownMenu(expanded, { actions.menu(false) }) {
+        TrackMenuItem(Res.string.viewer_hide_controls) { actions.menu(false); onHide() }
         TrackMenuItem(Res.string.track_finish, enabled = !metrics.failed) { actions.menu(false); actions.confirmFinish(true) }
         if (metrics.recording) TrackMenuItem(Res.string.track_mark_point) { actions.menu(false); actions.mark() }
         TrackMenuItem(Res.string.history_title) { actions.menu(false); actions.history() }
